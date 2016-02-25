@@ -18,10 +18,25 @@ var (
 	goServerCAFile = "go-server-ca.pem"
 	privateKeyFile = "agent-private-key.pem"
 	certFile       = "agent-cert.pem"
+	serverHost     = "localhost"
+	sslPort        = "8154"
+	httpPort       = "8153"
 )
 
+func sslHostAndPort() string {
+	return serverHost + ":" + sslPort
+}
+
+func httpsServerURL(path string) string {
+	return "https://" + sslHostAndPort() + path
+}
+
+func httpServerURL(path string) string {
+	return "http://" + serverHost + ":" + httpPort + path
+}
+
 func readGoServerCACert() {
-	conn, err := tls.Dial("tcp", "localhost:8154", &tls.Config{
+	conn, err := tls.Dial("tcp", sslHostAndPort(), &tls.Config{
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -38,6 +53,9 @@ func readGoServerCACert() {
 }
 
 func main() {
+	if serverHost == "localhost" {
+		serverHost, _ = os.Hostname()
+	}
 	readGoServerCACert()
 	register()
 	caCert, err := ioutil.ReadFile(goServerCAFile)
@@ -61,7 +79,7 @@ func main() {
 	tlsConfig.BuildNameToCertificate()
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	client := &http.Client{Transport: transport}
-	resp, err := client.Get("https://localhost:8154")
+	resp, err := client.Get(httpsServerURL("/"))
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +95,7 @@ type Registration struct {
 func register() {
 	hostname, _ := os.Hostname()
 	workingDir, _ := os.Getwd()
-	resp, _ := http.PostForm("http://localhost:8153/go/admin/agent",
+	resp, _ := http.PostForm(httpServerURL("/go/admin/agent"),
 		url.Values{
 			"hostname":                      {hostname},
 			"uuid":                          {"564e9408-fb78-4856-4215-52e0-e14bb054"},
