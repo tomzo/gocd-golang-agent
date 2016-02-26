@@ -52,10 +52,18 @@ func readGoServerCACert() {
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: state.PeerCertificates[0].Raw})
 }
 
-func main() {
-	if serverHost == "localhost" {
-		serverHost, _ = os.Hostname()
+func extractServerDN(certFileName string) string {
+	pemBlock, err := ioutil.ReadFile(certFileName)
+	if err != nil {
+		panic(err)
 	}
+
+	der, _ := pem.Decode(pemBlock)
+	cert, _ := x509.ParseCertificate(der.Bytes)
+	return cert.Subject.CommonName
+}
+
+func main() {
 	readGoServerCACert()
 	register()
 	caCert, err := ioutil.ReadFile(goServerCAFile)
@@ -72,20 +80,29 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      roots,
+		ServerName:   extractServerDN(goServerCAFile),
 	}
+
 	tlsConfig.BuildNameToCertificate()
 	transport := &http.Transport{TLSClientConfig: tlsConfig}
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(httpsServerURL("/"))
+	defer resp.Body.Close()
 	if err != nil {
 		panic(err)
 	}
-	log.Println(resp.Body)
-	defer resp.Body.Close()
+	dumpResponse(resp)
 
+}
+
+func dumpResponse(resp *http.Response) {
+	log.Println(resp.Status)
+	body, _ := ioutil.ReadAll(resp.Body)
+	log.Println(string(body))
 }
 
 type Registration struct {
@@ -98,7 +115,7 @@ func register() {
 	resp, _ := http.PostForm(httpServerURL("/go/admin/agent"),
 		url.Values{
 			"hostname":                      {hostname},
-			"uuid":                          {"564e9408-fb78-4856-4215-52e0-e14bb054"},
+			"uuid":                          {"564e9408-fb78-4856-4215-52e0-e14bb055"},
 			"location":                      {workingDir},
 			"operatingSystem":               {runtime.GOOS},
 			"usablespace":                   {"5000000000"},
@@ -113,8 +130,7 @@ func register() {
 	var registration Registration
 	dec := json.NewDecoder(resp.Body)
 
-	err := dec.Decode(&registration)
-	if err != nil {
+	if err := dec.Decode(&registration); err != nil {
 		panic(err)
 	}
 
