@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"golang.org/x/net/websocket"
 	"io/ioutil"
+	// "log"
 )
 
 func messageMarshal(v interface{}) ([]byte, byte, error) {
 	json, jerr := json.Marshal(v)
+	// log.Println(string(json))
 	if jerr != nil {
 		return []byte{}, websocket.BinaryFrame, jerr
 	}
@@ -31,6 +33,6 @@ func messageUnmarshal(msg []byte, payloadType byte, v interface{}) (err error) {
 var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}
 
 type Message struct {
-	Action string
-	Data   map[string]interface{}
+	Action string                 `json:"action"`
+	Data   map[string]interface{} `json:"data"`
 }

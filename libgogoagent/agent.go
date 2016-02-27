@@ -3,9 +3,6 @@ package libgogoagent
 import (
 	"fmt"
 	"golang.org/x/net/websocket"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
 	"runtime"
 	"time"
@@ -82,9 +79,9 @@ func ping(ws *websocket.Conn) {
 		data["usableSpace"] = "12262604800"
 		data["operatingSystemName"] = runtime.GOOS
 		data["agentLauncherVersion"] = ""
-		msg := map[string]interface{}{
-			"action": "ping",
-			"data":   map[string]interface{}{"type": "com.thoughtworks.go.server.service.AgentRuntimeInfo", "data": data}}
+		msg := Message{"ping", map[string]interface{}{
+			"type": "com.thoughtworks.go.server.service.AgentRuntimeInfo",
+			"data": data}}
 
 		MessageCodec.Send(ws, msg)
 		time.Sleep(10 * time.Second)
