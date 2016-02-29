@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	uuid          = "564e9408-fb78-4856-4215-52e0-e14bb055"
+	uuid          = "564e9408-fb78-4856-4215-52e0-e14bb056"
 	serverHost    = "localhost"
 	sslPort       = "8154"
 	httpPort      = "8153"
@@ -67,18 +67,24 @@ func StartAgent() {
 
 func ping(ws *websocket.Conn) {
 	for {
-
 		data := make(map[string]interface{})
 		data["identifier"] = map[string]string{
 			"hostName":  hostname,
 			"ipAddress": "127.0.0.1",
 			"uuid":      uuid}
-		data["runtimeStatus"] = currentStatus
-		data["buildingInfo"] = map[string]string{"buildingInfo": "", "buildLocator": ""}
+		data["runtimeStatus"] = GetState("runtimeStatus")
+		data["buildingInfo"] = map[string]string{
+			"buildingInfo": GetState("buildingInfo"),
+			"buildLocator": GetState("buildLocator")}
 		data["location"] = workingDir
 		data["usableSpace"] = "12262604800"
 		data["operatingSystemName"] = runtime.GOOS
 		data["agentLauncherVersion"] = ""
+
+		if cookie := GetState("cookie"); cookie != "" {
+			data["cookie"] = cookie
+		}
+
 		msg := Message{"ping", map[string]interface{}{
 			"type": "com.thoughtworks.go.server.service.AgentRuntimeInfo",
 			"data": data}}
