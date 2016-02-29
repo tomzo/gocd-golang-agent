@@ -48,7 +48,7 @@ func StartAgent() {
 
 	loc := "wss://" + GoServerDN() + ":8154/go/agent-websocket"
 	config, _ := websocket.NewConfig(loc, httpsServerURL("/"))
-	config.TlsConfig = GoServerTlsConfig()
+	config.TlsConfig = GoServerTlsConfig(true)
 	ws, err := websocket.DialConfig(config)
 	if err != nil {
 		panic(err)

@@ -43,7 +43,7 @@ func GoServerDN() string {
 	return extractServerDN(goServerCAFile)
 }
 
-func GoServerTlsConfig() *tls.Config {
+func GoServerRootCAs() *x509.CertPool {
 	caCert, err := ioutil.ReadFile(goServerCAFile)
 	if err != nil {
 		panic(err)
@@ -53,20 +53,23 @@ func GoServerTlsConfig() *tls.Config {
 	if !ok {
 		panic("failed to parse root certificate")
 	}
+	return roots
+}
 
-	cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
-	if err != nil {
-		panic(err)
+func GoServerTlsConfig(withClientCert bool) *tls.Config {
+	certs := make([]tls.Certificate, 0)
+	if withClientCert {
+		cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
+		if err != nil {
+			panic(err)
+		}
+		certs = append(certs, cert)
 	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      roots,
+	return &tls.Config{
+		Certificates: certs,
+		RootCAs:      GoServerRootCAs(),
 		ServerName:   extractServerDN(goServerCAFile),
 	}
-
-	tlsConfig.BuildNameToCertificate()
-	return tlsConfig
 }
 
 func Register(params map[string]string) {
@@ -74,10 +77,19 @@ func Register(params map[string]string) {
 	for k, v := range params {
 		form.Add(k, v)
 	}
-	resp, _ := http.PostForm(httpServerURL("/go/admin/agent"), form)
+
+	tr := &http.Transport{
+		TLSClientConfig: GoServerTlsConfig(false),
+	}
+	client := &http.Client{Transport: tr}
+	resp, err := client.PostForm(httpsServerURL("/go/admin/agent"), form)
+	if err != nil {
+		panic(err)
+	}
 
 	defer resp.Body.Close()
 	var registration Registration
+
 	dec := json.NewDecoder(resp.Body)
 
 	if err := dec.Decode(&registration); err != nil {
