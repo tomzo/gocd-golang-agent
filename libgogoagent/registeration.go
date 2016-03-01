@@ -72,16 +72,20 @@ func GoServerTlsConfig(withClientCert bool) *tls.Config {
 	}
 }
 
+func GoServerRemoteClient(withClientCert bool) *http.Client {
+	tr := &http.Transport{
+		TLSClientConfig: GoServerTlsConfig(withClientCert),
+	}
+	return &http.Client{Transport: tr}
+}
+
 func Register(params map[string]string) {
 	form := url.Values{}
 	for k, v := range params {
 		form.Add(k, v)
 	}
 
-	tr := &http.Transport{
-		TLSClientConfig: GoServerTlsConfig(false),
-	}
-	client := &http.Client{Transport: tr}
+	client := GoServerRemoteClient(false)
 	resp, err := client.PostForm(httpsServerURL("/go/admin/agent"), form)
 	if err != nil {
 		panic(err)

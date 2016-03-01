@@ -1,0 +1,3 @@
+*.pem
+/libgogoagent/*.pem
+/gogoagent

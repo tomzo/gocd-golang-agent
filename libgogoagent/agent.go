@@ -1,7 +1,6 @@
 package libgogoagent
 
 import (
-	"fmt"
 	"golang.org/x/net/websocket"
 	"os"
 	"runtime"
@@ -15,7 +14,6 @@ var (
 	httpPort      = "8153"
 	hostname, _   = os.Hostname()
 	workingDir, _ = os.Getwd()
-	currentStatus = "Idle"
 )
 
 func sslHostAndPort() string {
@@ -53,16 +51,32 @@ func StartAgent() {
 	if err != nil {
 		panic(err)
 	}
-	//	fmt.Println(ws)
+
+	buildSession := BuildSession{
+		HttpClient: GoServerRemoteClient(true)}
+
 	go ping(ws)
 
 	for {
 		var msg Message
 		MessageCodec.Receive(ws, &msg)
-		fmt.Printf("message rev: %v\n", msg)
+		switch msg.Action {
+		case "setCookie":
+			str, _ := msg.Data["data"].(string)
+			SetState("cookie", str)
+		case "cmd":
+			processCmdMessage(&buildSession, &msg)
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
+}
 
+func processCmdMessage(buildSession *BuildSession, msg *Message) {
+	SetState("runtimeStatus", "Building")
+	defer SetState("runtimeStatus", "Idle")
+
+	command, _ := msg.Data["data"].(map[string]interface{})
+	buildSession.Process(MakeBuildCommand(command))
 }
 
 func ping(ws *websocket.Conn) {
