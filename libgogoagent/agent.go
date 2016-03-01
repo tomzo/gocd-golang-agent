@@ -1,7 +1,9 @@
 package libgogoagent
 
 import (
+	"fmt"
 	"golang.org/x/net/websocket"
+	"log"
 	"os"
 	"runtime"
 	"time"
@@ -59,24 +61,30 @@ func StartAgent() {
 
 	for {
 		var msg Message
-		MessageCodec.Receive(ws, &msg)
+		err := MessageCodec.Receive(ws, &msg)
+		if err != nil {
+			log.Println("Can't decode message received")
+		}
 		switch msg.Action {
 		case "setCookie":
 			str, _ := msg.Data["data"].(string)
 			SetState("cookie", str)
 		case "cmd":
-			processCmdMessage(&buildSession, &msg)
+			err = processCmdMessage(&buildSession, &msg)
+		}
+		if err != nil {
+			log.Println(fmt.Sprintf("Error(%v) when processing message : %v", err, msg))
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func processCmdMessage(buildSession *BuildSession, msg *Message) {
+func processCmdMessage(buildSession *BuildSession, msg *Message) error {
 	SetState("runtimeStatus", "Building")
 	defer SetState("runtimeStatus", "Idle")
 
 	command, _ := msg.Data["data"].(map[string]interface{})
-	buildSession.Process(MakeBuildCommand(command))
+	return buildSession.Process(MakeBuildCommand(command))
 }
 
 func ping(ws *websocket.Conn) {

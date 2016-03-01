@@ -43,14 +43,14 @@ func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
 	return &console
 }
 
-func (console *BuildConsole) Write(str string) {
+func (console *BuildConsole) Write(data []byte) (int, error) {
 	console.Lock.Lock()
 	defer console.Lock.Unlock()
-	console.Buffer.Write([]byte(str))
+	return console.Buffer.Write(data)
 }
 
 func (console *BuildConsole) WriteLn(ln string) {
-	console.Write(fmt.Sprintf("%v %v\n", time.Now().Format("15:04:05.000"), ln))
+	console.Write([]byte(fmt.Sprintf("%v %v\n", time.Now().Format("15:04:05.000"), ln)))
 }
 
 func (console *BuildConsole) Read(p []byte) (int, error) {

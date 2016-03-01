@@ -1,9 +1,12 @@
 package libgogoagent
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
 )
 
 type BuildSession struct {
@@ -36,6 +39,10 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 		return s.processCompose(cmd)
 	case "export":
 		return s.processExport(cmd)
+	case "test":
+		return s.processTest(cmd)
+	case "exec":
+		return s.processExec(cmd)
 	case "echo":
 		return s.processEcho(cmd)
 	case "reportCurrentStatus":
@@ -46,6 +53,35 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 		//return "Unknown command: " + cmd.Name
 		return s.processEcho(&BuildCommand{Args: []interface{}{cmd.Name}})
 	}
+}
+
+func convertToStringSlice(slice []interface{}) []string {
+	ret := make([]string, len(slice))
+	for i, element := range slice {
+		ret[i] = element.(string)
+	}
+	return ret
+}
+
+func (s *BuildSession) processExec(cmd *BuildCommand) error {
+	arg0 := cmd.Args[0].(string)
+	args := convertToStringSlice(cmd.Args[1:])
+	execCmd := exec.Command(arg0, args...)
+	execCmd.Stdout = s.Console
+	execCmd.Stderr = s.Console
+	execCmd.Dir = cmd.WorkingDirectory
+	return execCmd.Run()
+}
+
+func (s *BuildSession) processTest(cmd *BuildCommand) error {
+	flag := cmd.Args[0].(string)
+	targetPath := cmd.Args[1].(string)
+
+	if "-d" == flag {
+		_, err := os.Stat(targetPath)
+		return err
+	}
+	return errors.New("unknown test flag")
 }
 
 func (s *BuildSession) processEnd(cmd *BuildCommand) error {
