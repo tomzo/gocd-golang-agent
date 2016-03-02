@@ -20,6 +20,16 @@ type BuildSession struct {
 	Envs                  map[string]string
 }
 
+func (s *BuildSession) Close() {
+	//todo: kill running exec command, called in different
+	//gorountine with Process
+}
+
+func (s *BuildSession) Cancel() {
+	//todo: kill running exec command, called in different
+	//gorountine with Process
+}
+
 func (s *BuildSession) Process(cmd *BuildCommand) error {
 	LogInfo("procssing build command: %v\n", cmd)
 	if s.BuildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.BuildStatus {

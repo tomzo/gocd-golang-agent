@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"golang.org/x/net/websocket"
 	"io/ioutil"
-	"time"
 )
 
 type Message struct {
@@ -42,43 +41,50 @@ func messageUnmarshal(msg []byte, payloadType byte, v interface{}) (err error) {
 
 var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}
 
-func StartWebsocket(wsLoc string, httpLoc string) (send chan *Message, received chan *Message) {
-	send, recieved := make(chan *Message), make(chan *Message)
-	go func() {
-	connect:
-		LogInfo("connect to: %v", wsLoc)
-		config, err := websocket.NewConfig(wsLoc, httpLoc)
+type WebsocketConnection struct {
+	Conn     *websocket.Conn
+	Received chan *Message
+}
+
+func (wc *WebsocketConnection) Send(msg *Message) error {
+	return MessageCodec.Send(wc.Conn, msg)
+}
+
+func (wc *WebsocketConnection) Close() {
+	err := wc.Conn.Close()
+	if err != nil {
+		LogInfo("Close websocket connection failed: %v", err)
+	}
+}
+
+func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error) {
+	tlsConfig, err := GoServerTlsConfig(true)
+	if err != nil {
+		return nil, err
+	}
+	wsConfig, err := websocket.NewConfig(wsLoc, httpLoc)
+	if err != nil {
+		return nil, err
+	}
+	wsConfig.TlsConfig = tlsConfig
+	LogInfo("connect to: %v", wsLoc)
+	ws, err := websocket.DialConfig(wsConfig)
+	if err != nil {
+		return nil, err
+	}
+	received := make(chan *Message)
+	go startReceiveMessage(ws, received)
+	return &WebsocketConnection{Conn: ws, Received: received}, nil
+}
+
+func startReceiveMessage(ws *websocket.Conn, received chan *Message) {
+	for {
+		var msg Message
+		err := MessageCodec.Receive(ws, &msg)
 		if err != nil {
-			LogInfo("Cannot create websocket config with [%v, %v]", wsLoc, httpLoc)
-			panic(err)
-		}
-		config.TlsConfig = GoServerTlsConfig(true)
-		ws, err := websocket.DialConfig(config)
-		if err != nil {
-			time.Sleep(10 * time.Second)
-			goto connect
-		}
-		go func() {
-		receiveMessage:
-			var msg Message
-			err := MessageCodec.Receive(ws, &msg)
-			if err == nil {
-				received <- &msg
-				goto receiveMessage
-			}
 			LogInfo("receive message failed: %v", err)
-		}()
-	sendMessage:
-		msg := <-send
-		error := MessageCodec.Send(ws, msg)
-		if error != nil {
-			LogInfo("send message failed: %v", error)
-			if closeErr := ws.Close(); closeErr != nil {
-				LogInfo("Close websocket connection failed: %v", closeErr)
-			}
-			goto connect
+			break
 		}
-		goto sendMessage
-	}()
-	return send, recieved
+		received <- &msg
+	}
 }
