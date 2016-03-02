@@ -11,7 +11,7 @@ import (
 
 type BuildSession struct {
 	HttpClient            *http.Client
-	WebsocketClient       *WebSocketMessageClient
+	Send                  chan *Message
 	BuildStatus           string
 	Console               *BuildConsole
 	ArtifactUploadBaseUrl string
@@ -47,17 +47,19 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 	case "echo":
 		return s.processEcho(cmd)
 	case "reportCurrentStatus":
-		return s.processReportCurrentStatus(cmd)
-	case "reportCompleting":
-		return s.processReportCompleting(cmd)
-	case "reportCompleted":
-		return s.processReportCompleted(cmd)
+		s.Send <- s.makeReportMessage(cmd.Name, cmd.Args[0].(string))
+	case "reportCompleting", "reportCompleted":
+		s.Send <- s.makeReportMessage(cmd.Name, "")
 	case "end":
-		return s.processEnd(cmd)
+		s.Console.Stop <- 1
 	default:
-		//return "Unknown command: " + cmd.Name
-		return s.processEcho(&BuildCommand{Args: []interface{}{cmd.Name}})
+		return s.processEcho(&BuildCommand{Args: []interface{}{"TBI command: " + cmd.Name}})
 	}
+	return nil
+}
+
+func (s *BuildSession) makeReportMessage(name string, status string) *Message {
+	return MakeMessage(name, "com.thoughtworks.go.websocket.Report", s.statusReport(status))
 }
 
 func convertToStringSlice(slice []interface{}) []string {
@@ -87,29 +89,6 @@ func (s *BuildSession) processTest(cmd *BuildCommand) error {
 		return err
 	}
 	return errors.New("unknown test flag")
-}
-
-func (s *BuildSession) processEnd(cmd *BuildCommand) error {
-	s.Console.Stop <- 1
-	return nil
-}
-
-func (s *BuildSession) processReportCurrentStatus(cmd *BuildCommand) error {
-	return s.WebsocketClient.Send(MakeMessage("reportCurrentStatus",
-		"com.thoughtworks.go.websocket.Report",
-		s.statusReport(cmd.Args[0].(string))))
-}
-
-func (s *BuildSession) processReportCompleting(cmd *BuildCommand) error {
-	return s.WebsocketClient.Send(MakeMessage("reportCompleting",
-		"com.thoughtworks.go.websocket.Report",
-		s.statusReport("")))
-}
-
-func (s *BuildSession) processReportCompleted(cmd *BuildCommand) error {
-	return s.WebsocketClient.Send(MakeMessage("reportCompleted",
-		"com.thoughtworks.go.websocket.Report",
-		s.statusReport("")))
 }
 
 func (s *BuildSession) statusReport(jobState string) map[string]interface{} {

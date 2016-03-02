@@ -27,6 +27,10 @@ func httpServerURL(path string) string {
 	return "http://" + serverHost + ":" + httpPort + path
 }
 
+func wsServerURL() string {
+	return "wss://" + GoServerDN() + ":8154/go/agent-websocket"
+}
+
 func StartAgent() {
 	ReadGoServerCACert()
 	Register(map[string]string{
@@ -43,35 +47,24 @@ func StartAgent() {
 		"elasticPluginId":               "",
 	})
 
-	wsClient, err := MakeWebSocketMessageClient("wss://"+GoServerDN()+":8154/go/agent-websocket", httpsServerURL("/"), GoServerTlsConfig(true))
-	if err != nil {
-		panic(err)
-	}
+	send, received := StartWebsocket(wsServerURL(), httpsServerURL("/"))
 
 	buildSession := BuildSession{
-		HttpClient:      GoServerRemoteClient(true),
-		WebsocketClient: wsClient}
+		HttpClient: GoServerRemoteClient(true),
+		Send:       send}
 
 	go func() {
 		for {
 			msg := MakeMessage("ping",
 				"com.thoughtworks.go.server.service.AgentRuntimeInfo",
 				AgentRuntimeInfo())
-			if err := wsClient.Send(msg); err != nil {
-				LogInfo("ping failed. %v", err)
-			}
+			send <- msg
 			time.Sleep(10 * time.Second)
 		}
 	}()
 
 	for {
-		msg, err := wsClient.Receive()
-		if err != nil {
-			LogInfo("websocket reciveing error! %v", err)
-			time.Sleep(10 * time.Second)
-			continue
-		}
-
+		msg := <-received
 		switch msg.Action {
 		case "setCookie":
 			str, _ := msg.Data["data"].(string)
@@ -79,11 +72,11 @@ func StartAgent() {
 		case "cmd":
 			SetState("runtimeStatus", "Building")
 			command, _ := msg.Data["data"].(map[string]interface{})
-			err = buildSession.Process(MakeBuildCommand(command))
+			err := buildSession.Process(MakeBuildCommand(command))
 			SetState("runtimeStatus", "Idle")
-		}
-		if err != nil {
-			LogInfo("Error(%v) when processing message : %v", err, msg)
+			if err != nil {
+				LogInfo("Error(%v) when processing message : %v", err, msg)
+			}
 		}
 	}
 }
