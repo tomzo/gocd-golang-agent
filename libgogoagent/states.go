@@ -1,6 +1,9 @@
 package libgogoagent
 
-import "sync"
+import (
+	"runtime"
+	"sync"
+)
 
 var state = map[string]string{
 	"runtimeStatus": "Idle",
@@ -18,4 +21,25 @@ func GetState(key string) string {
 	lock.Lock()
 	defer lock.Unlock()
 	return state[key]
+}
+
+func AgentRuntimeInfo() map[string]interface{} {
+	data := make(map[string]interface{})
+	data["identifier"] = map[string]string{
+		"hostName":  hostname,
+		"ipAddress": "127.0.0.1",
+		"uuid":      uuid}
+	data["runtimeStatus"] = GetState("runtimeStatus")
+	data["buildingInfo"] = map[string]string{
+		"buildingInfo": GetState("buildingInfo"),
+		"buildLocator": GetState("buildLocator")}
+	data["location"] = workingDir
+	data["usableSpace"] = "12262604800"
+	data["operatingSystemName"] = runtime.GOOS
+	data["agentLauncherVersion"] = ""
+
+	if cookie := GetState("cookie"); cookie != "" {
+		data["cookie"] = cookie
+	}
+	return data
 }

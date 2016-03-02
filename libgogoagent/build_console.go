@@ -25,6 +25,7 @@ func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
 		HttpClient: httpClient,
 		Url:        u,
 		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
+		Stop:       make(chan int),
 	}
 
 	go func() {

@@ -1,3 +1,4 @@
 *.pem
 /libgogoagent/*.pem
 /gogoagent
+/libgogoagent/pipelines/*

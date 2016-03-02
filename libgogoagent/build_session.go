@@ -3,14 +3,15 @@ package libgogoagent
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"unicode"
 )
 
 type BuildSession struct {
 	HttpClient            *http.Client
+	WebsocketClient       *WebSocketMessageClient
 	BuildStatus           string
 	Console               *BuildConsole
 	ArtifactUploadBaseUrl string
@@ -20,7 +21,7 @@ type BuildSession struct {
 }
 
 func (s *BuildSession) Process(cmd *BuildCommand) error {
-	log.Printf("procssing build command: %v\n", cmd)
+	LogInfo("procssing build command: %v\n", cmd)
 	if s.BuildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.BuildStatus {
 		//skip, no failure
 		return nil
@@ -47,6 +48,10 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 		return s.processEcho(cmd)
 	case "reportCurrentStatus":
 		return s.processReportCurrentStatus(cmd)
+	case "reportCompleting":
+		return s.processReportCompleting(cmd)
+	case "reportCompleted":
+		return s.processReportCompleted(cmd)
 	case "end":
 		return s.processEnd(cmd)
 	default:
@@ -90,7 +95,39 @@ func (s *BuildSession) processEnd(cmd *BuildCommand) error {
 }
 
 func (s *BuildSession) processReportCurrentStatus(cmd *BuildCommand) error {
-	return nil
+	return s.WebsocketClient.Send(MakeMessage("reportCurrentStatus",
+		"com.thoughtworks.go.websocket.Report",
+		s.statusReport(cmd.Args[0].(string))))
+}
+
+func (s *BuildSession) processReportCompleting(cmd *BuildCommand) error {
+	return s.WebsocketClient.Send(MakeMessage("reportCompleting",
+		"com.thoughtworks.go.websocket.Report",
+		s.statusReport("")))
+}
+
+func (s *BuildSession) processReportCompleted(cmd *BuildCommand) error {
+	return s.WebsocketClient.Send(MakeMessage("reportCompleted",
+		"com.thoughtworks.go.websocket.Report",
+		s.statusReport("")))
+}
+
+func (s *BuildSession) statusReport(jobState string) map[string]interface{} {
+	ret := map[string]interface{}{
+		"agentRuntimeInfo": AgentRuntimeInfo(),
+		"buildId":          s.BuildId,
+		"jobState":         jobState,
+		"result":           capitalize(s.BuildStatus)}
+	if jobState != "" {
+		ret["jobState"] = jobState
+	}
+	return ret
+}
+
+func capitalize(str string) string {
+	a := []rune(str)
+	a[0] = unicode.ToUpper(a[0])
+	return string(a)
 }
 
 func (s *BuildSession) processEcho(cmd *BuildCommand) error {
