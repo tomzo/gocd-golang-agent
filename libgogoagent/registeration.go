@@ -28,7 +28,7 @@ func ReadGoServerCACert() error {
 		return nil
 	}
 
-	conn, err := tls.Dial("tcp", sslHostAndPort(), &tls.Config{
+	conn, err := tls.Dial("tcp", ConfigGetSslHostAndPort(), &tls.Config{
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -135,7 +135,7 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := client.PostForm(httpsServerURL("/go/admin/agent"), form)
+	resp, err := client.PostForm(ConfigGetHttpsServerURL("/go/admin/agent"), form)
 	if err != nil {
 		return err
 	}

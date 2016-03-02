@@ -7,35 +7,13 @@ import (
 	"time"
 )
 
-var (
-	uuid          = "564e9408-fb78-4856-4215-52e0-e14bb056"
-	serverHost    = "localhost"
-	sslPort       = "8154"
-	httpPort      = "8153"
-	hostname, _   = os.Hostname()
-	workingDir, _ = os.Getwd()
-)
-
-func sslHostAndPort() string {
-	return serverHost + ":" + sslPort
-}
-
-func httpsServerURL(path string) string {
-	return "https://" + sslHostAndPort() + path
-}
-
-func httpServerURL(path string) string {
-	return "http://" + serverHost + ":" + httpPort + path
-}
-
-func wsServerURL() string {
-	return "wss://" + GoServerDN() + ":8154/go/agent-websocket"
-}
-
 func registerData() map[string]string {
+	hostname, _ := os.Hostname()
+	workingDir, _ := os.Getwd()
+
 	return map[string]string{
 		"hostname":                      hostname,
-		"uuid":                          uuid,
+		"uuid":                          ConfigGetAgentUUID(),
 		"location":                      workingDir,
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   "5000000000",
@@ -76,7 +54,7 @@ func doStart(send chan *Message) error {
 	}
 	defer buildSession.Close()
 
-	conn, err := MakeWebsocketConnection(wsServerURL(), httpsServerURL("/"))
+	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
 	if err != nil {
 		return err
 	}

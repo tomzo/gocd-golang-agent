@@ -1,6 +1,7 @@
 package libgogoagent
 
 import (
+	"os"
 	"runtime"
 	"sync"
 )
@@ -24,11 +25,13 @@ func GetState(key string) string {
 }
 
 func AgentRuntimeInfo() map[string]interface{} {
+	hostname, _ := os.Hostname()
+	workingDir, _ := os.Getwd()
 	data := make(map[string]interface{})
 	data["identifier"] = map[string]string{
 		"hostName":  hostname,
 		"ipAddress": "127.0.0.1",
-		"uuid":      uuid}
+		"uuid":      ConfigGetAgentUUID()}
 	data["runtimeStatus"] = GetState("runtimeStatus")
 	data["buildingInfo"] = map[string]string{
 		"buildingInfo": GetState("buildingInfo"),
