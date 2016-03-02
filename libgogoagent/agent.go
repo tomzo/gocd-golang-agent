@@ -68,6 +68,7 @@ func StartAgent() {
 		msg, err := wsClient.Receive()
 		if err != nil {
 			LogInfo("websocket reciveing error! %v", err)
+			time.Sleep(10 * time.Second)
 			continue
 		}
 
