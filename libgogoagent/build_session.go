@@ -18,26 +18,55 @@ type BuildSession struct {
 	PropertyBaseUrl       string
 	BuildId               string
 	Envs                  map[string]string
+	Stopping              bool
+	CancelChannel         chan int
+	DoneChannel           chan int
+}
+
+func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession {
+	return &BuildSession{
+		HttpClient:    httpClient,
+		Send:          send,
+		CancelChannel: make(chan int),
+		DoneChannel:   make(chan int),
+	}
 }
 
 func (s *BuildSession) Close() {
-	//todo: kill running exec command, called in different
-	//gorountine with Process
-}
-
-func (s *BuildSession) Cancel() {
-	//todo: kill running exec command, called in different
-	//gorountine with Process
+	s.CancelChannel <- 0
+	<-s.DoneChannel
 }
 
 func (s *BuildSession) Process(cmd *BuildCommand) error {
+	s.Stopping = false
+	defer func() {
+		close(s.CancelChannel)
+		close(s.DoneChannel)
+	}()
+	return s.process(cmd)
+}
+
+func (s *BuildSession) process(cmd *BuildCommand) error {
+	if s.Stopping {
+		LogDebug("cmd %v ignored because build is canceled", cmd.Name)
+		return nil
+	}
+	select {
+	case <-s.CancelChannel:
+		LogDebug("received cancel signal")
+		LogDebug("cmd %v ignored because build is canceled", cmd.Name)
+		s.Stopping = true
+		return nil
+	default:
+	}
+
 	LogInfo("procssing build command: %v\n", cmd)
 	if s.BuildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.BuildStatus {
 		//skip, no failure
 		return nil
 	}
 	if cmd.Test != nil {
-		success := s.Process(cmd.Test.Command) == nil
+		success := s.process(cmd.Test.Command) == nil
 		if success != cmd.Test.Expectation {
 			return nil
 		}
@@ -69,7 +98,9 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 }
 
 func (s *BuildSession) makeReportMessage(name string, status string) *Message {
-	return MakeMessage(name, "com.thoughtworks.go.websocket.Report", s.statusReport(status))
+	return MakeMessage(name,
+		"com.thoughtworks.go.websocket.Report",
+		s.statusReport(status))
 }
 
 func convertToStringSlice(slice []interface{}) []string {
@@ -87,7 +118,26 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	execCmd.Stdout = s.Console
 	execCmd.Stderr = s.Console
 	execCmd.Dir = cmd.WorkingDirectory
-	return execCmd.Run()
+	done := make(chan bool)
+	go func() {
+		execCmd.Run()
+		done <- true
+	}()
+
+	select {
+	case <-s.CancelChannel:
+		LogDebug("cancel signal is received")
+		LogInfo("killing process %v because build is canceled", execCmd.Process)
+
+		s.Stopping = true
+		if err := execCmd.Process.Kill(); err != nil {
+			LogInfo("kill sub-process failed: %v", err)
+		} else {
+			LogInfo("Process %v is killed", execCmd.Process)
+		}
+	case <-done:
+	}
+	return nil
 }
 
 func (s *BuildSession) processTest(cmd *BuildCommand) error {
@@ -137,7 +187,7 @@ func (s *BuildSession) processExport(cmd *BuildCommand) error {
 		for key, value := range s.Envs {
 			args = append(args, fmt.Sprintf("export %v=%v", key, value))
 		}
-		s.Process(&BuildCommand{
+		s.process(&BuildCommand{
 			Name: "echo",
 			Args: args,
 		})
@@ -148,7 +198,7 @@ func (s *BuildSession) processExport(cmd *BuildCommand) error {
 func (s *BuildSession) processCompose(cmd *BuildCommand) error {
 	var err error
 	for _, sub := range cmd.SubCommands {
-		if err = s.Process(sub); err != nil {
+		if err = s.process(sub); err != nil {
 			s.BuildStatus = "failed"
 		}
 	}

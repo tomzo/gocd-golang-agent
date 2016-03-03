@@ -2,10 +2,13 @@ package libgogoagent
 
 import (
 	"errors"
+	"net/http"
 	"os"
 	"runtime"
 	"time"
 )
+
+var buildSession *BuildSession
 
 func registerData() map[string]string {
 	hostname, _ := os.Hostname()
@@ -38,6 +41,13 @@ func StartAgent() {
 	}
 }
 
+func closeBuildSession() {
+	if buildSession != nil {
+		buildSession.Close()
+		buildSession = nil
+	}
+}
+
 func doStart(send chan *Message) error {
 	err := Register(registerData())
 	if err != nil {
@@ -48,11 +58,7 @@ func doStart(send chan *Message) error {
 	if err != nil {
 		return err
 	}
-	buildSession := &BuildSession{
-		HttpClient: httpClient,
-		Send:       send,
-	}
-	defer buildSession.Close()
+	defer closeBuildSession()
 
 	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
 	if err != nil {
@@ -67,7 +73,7 @@ func doStart(send chan *Message) error {
 				return err
 			}
 		case msg := <-conn.Received:
-			err := processMessage(msg, buildSession)
+			err := processMessage(msg, httpClient, send)
 			if err != nil {
 				return err
 			}
@@ -76,20 +82,19 @@ func doStart(send chan *Message) error {
 	return nil
 }
 
-func processMessage(msg *Message, buildSession *BuildSession) error {
+func processMessage(msg *Message, httpClient *http.Client, send chan *Message) error {
 	switch msg.Action {
 	case "setCookie":
 		str, _ := msg.Data["data"].(string)
 		SetState("cookie", str)
 	case "cancelJob":
-		buildSession.Cancel()
+		closeBuildSession()
 	case "reregister":
 		CleanRegistration()
 		return errors.New("received reregister message")
 	case "cmd":
-		if "Building" == GetState("runtimeStatus") {
-			buildSession.Cancel()
-		}
+		closeBuildSession()
+		buildSession = MakeBuildSession(httpClient, send)
 		go processBuildCommandMessage(msg, buildSession)
 	default:
 		LogInfo("ERROR: unknown message action %v", msg)
