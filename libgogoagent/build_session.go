@@ -33,6 +33,11 @@ func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession
 }
 
 func (s *BuildSession) Close() {
+	defer func() {
+		if r := recover(); r != nil {
+			LogDebug("Recovered from error: %v", r)
+		}
+	}()
 	s.CancelChannel <- 0
 	<-s.DoneChannel
 }
