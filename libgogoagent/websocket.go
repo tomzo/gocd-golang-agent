@@ -72,18 +72,19 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 	if err != nil {
 		return nil, err
 	}
-	received := make(chan *Message)
+	received := make(chan *Message, 1)
 	go startReceiveMessage(ws, received)
 	return &WebsocketConnection{Conn: ws, Received: received}, nil
 }
 
 func startReceiveMessage(ws *websocket.Conn, received chan *Message) {
+	defer close(received)
 	for {
 		var msg Message
 		err := MessageCodec.Receive(ws, &msg)
 		if err != nil {
 			LogInfo("stop reading message due to error: %v", err)
-			break
+			return
 		}
 		received <- &msg
 	}

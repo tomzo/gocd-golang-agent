@@ -29,6 +29,7 @@ func MakeBuildConsole(httpClient *http.Client, uri string, stop chan int) *Build
 
 	go func() {
 		flushTick := time.NewTicker(5 * time.Second)
+		defer flushTick.Stop()
 		for {
 			select {
 			case <-console.Stop:

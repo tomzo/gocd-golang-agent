@@ -30,10 +30,8 @@ func registerData() map[string]string {
 }
 
 func StartAgent() {
-	send := make(chan *Message)
-	go ping(send)
 	for {
-		err := doStart(send)
+		err := doStartAgent()
 		if err != nil {
 			LogInfo("something wrong: %v", err.Error())
 		}
@@ -49,7 +47,7 @@ func closeBuildSession() {
 	}
 }
 
-func doStart(send chan *Message) error {
+func doStartAgent() error {
 	err := Register(registerData())
 	if err != nil {
 		return err
@@ -59,30 +57,37 @@ func doStart(send chan *Message) error {
 	if err != nil {
 		return err
 	}
-	defer closeBuildSession()
-
 	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
+	defer closeBuildSession()
+
+	send := make(chan *Message, 1)
+	defer close(send)
+	pingTick := time.NewTicker(10 * time.Second)
+	defer pingTick.Stop()
 	for {
 		select {
+		case <-pingTick.C:
+			send <- MakeMessage("ping",
+				"com.thoughtworks.go.server.service.AgentRuntimeInfo",
+				AgentRuntimeInfo())
 		case msg := <-send:
-			LogInfo("send %v", msg.Action)
+			LogInfo("send %v message", msg.Action)
 			err := conn.Send(msg)
 			if err != nil {
 				return err
 			}
 		case msg := <-conn.Received:
-			LogInfo("received %v", msg.Action)
+			LogInfo("received %v message", msg.Action)
 			err := processMessage(msg, httpClient, send)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	return nil
 }
 
 func processMessage(msg *Message, httpClient *http.Client, send chan *Message) error {
@@ -108,19 +113,10 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	SetState("runtimeStatus", "Building")
 	command, _ := msg.Data["data"].(map[string]interface{})
+	LogInfo("start process build command")
 	err := buildSession.Process(MakeBuildCommand(command))
 	SetState("runtimeStatus", "Idle")
 	if err != nil {
 		LogInfo("Error(%v) when processing message : %v", err, msg)
-	}
-}
-
-func ping(send chan *Message) {
-	for {
-		msg := MakeMessage("ping",
-			"com.thoughtworks.go.server.service.AgentRuntimeInfo",
-			AgentRuntimeInfo())
-		send <- msg
-		time.Sleep(10 * time.Second)
 	}
 }
