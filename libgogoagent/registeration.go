@@ -28,6 +28,7 @@ func ReadGoServerCACert() error {
 		return nil
 	}
 
+	LogInfo("fetching Go server[%v] CA certificate", ConfigGetSslHostAndPort())
 	conn, err := tls.Dial("tcp", ConfigGetSslHostAndPort(), &tls.Config{
 		InsecureSkipVerify: true,
 	})
@@ -45,10 +46,6 @@ func ReadGoServerCACert() error {
 	defer certOut.Close()
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: state.PeerCertificates[0].Raw})
 	return nil
-}
-
-func GoServerDN() string {
-	return extractServerDN(goServerCAFile)
 }
 
 func GoServerRootCAs() (*x509.CertPool, error) {
@@ -135,6 +132,8 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	if err != nil {
 		return err
 	}
+
+	LogInfo("fetching agent key and certificates")
 	resp, err := client.PostForm(ConfigGetHttpsServerURL("/go/admin/agent"), form)
 	if err != nil {
 		return err

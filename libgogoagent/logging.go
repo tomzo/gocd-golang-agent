@@ -14,5 +14,5 @@ func LogDebug(format string, v ...interface{}) {
 }
 
 func LogInfo(format string, v ...interface{}) {
-	fmt.Printf("[INFO]"+format+"\n", v...)
+	fmt.Printf("[INFO] "+format+"\n", v...)
 }

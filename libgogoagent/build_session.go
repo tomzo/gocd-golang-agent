@@ -18,54 +18,45 @@ type BuildSession struct {
 	PropertyBaseUrl       string
 	BuildId               string
 	Envs                  map[string]string
-	Stopping              bool
-	CancelChannel         chan int
-	DoneChannel           chan int
+	Cancel                chan int
+	Done                  chan int
 }
 
 func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession {
 	return &BuildSession{
-		HttpClient:    httpClient,
-		Send:          send,
-		CancelChannel: make(chan int),
-		DoneChannel:   make(chan int),
+		HttpClient: httpClient,
+		Send:       send,
+		Cancel:     make(chan int),
+		Done:       make(chan int),
 	}
 }
 
 func (s *BuildSession) Close() {
-	defer func() {
-		if r := recover(); r != nil {
-			LogDebug("Recovered from error: %v", r)
-		}
-	}()
-	s.CancelChannel <- 0
-	<-s.DoneChannel
+	close(s.Cancel)
+	<-s.Done
+}
+
+func (s *BuildSession) isCanceled() bool {
+	select {
+	case <-s.Cancel:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *BuildSession) Process(cmd *BuildCommand) error {
-	s.Stopping = false
-	defer func() {
-		close(s.CancelChannel)
-		close(s.DoneChannel)
-	}()
+	defer close(s.Done)
 	return s.process(cmd)
 }
 
 func (s *BuildSession) process(cmd *BuildCommand) error {
-	if s.Stopping {
-		LogDebug("cmd %v ignored because build is canceled", cmd.Name)
+	if s.isCanceled() {
+		LogDebug("Ignored command %v, because build is canceled", cmd.Name)
 		return nil
-	}
-	select {
-	case <-s.CancelChannel:
-		LogDebug("received cancel signal")
-		LogDebug("cmd %v ignored because build is canceled", cmd.Name)
-		s.Stopping = true
-		return nil
-	default:
 	}
 
-	LogInfo("procssing build command: %v\n", cmd)
+	LogDebug("procssing build command: %v\n", cmd)
 	if s.BuildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.BuildStatus {
 		//skip, no failure
 		return nil
@@ -97,7 +88,7 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "end":
 		s.Console.Stop <- 1
 	default:
-		return s.processEcho(&BuildCommand{Args: []interface{}{"TBI command: " + cmd.Name}})
+		return s.echo("TBI command: %v", cmd.Name)
 	}
 	return nil
 }
@@ -130,13 +121,11 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	}()
 
 	select {
-	case <-s.CancelChannel:
-		LogDebug("cancel signal is received")
-		LogInfo("killing process %v because build is canceled", execCmd.Process)
-
-		s.Stopping = true
+	case <-s.Cancel:
+		LogDebug("received cancel signal")
+		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			LogInfo("kill sub-process failed: %v", err)
+			s.echo("kill command %v failed, error: %v", cmd.Args, err)
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
@@ -172,6 +161,11 @@ func capitalize(str string) string {
 	a := []rune(str)
 	a[0] = unicode.ToUpper(a[0])
 	return string(a)
+}
+
+func (s *BuildSession) echo(format string, a ...interface{}) error {
+	str := fmt.Sprintf(format, a)
+	return s.process(&BuildCommand{Name: "echo", Args: []interface{}{str}})
 }
 
 func (s *BuildSession) processEcho(cmd *BuildCommand) error {

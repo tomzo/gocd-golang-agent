@@ -82,7 +82,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *Message) {
 		var msg Message
 		err := MessageCodec.Receive(ws, &msg)
 		if err != nil {
-			LogInfo("receive message failed: %v", err)
+			LogInfo("stop reading message due to error: %v", err)
 			break
 		}
 		received <- &msg

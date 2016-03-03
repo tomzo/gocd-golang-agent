@@ -35,8 +35,9 @@ func StartAgent() {
 	for {
 		err := doStart(send)
 		if err != nil {
-			LogInfo(err.Error())
+			LogInfo("something wrong: %v", err.Error())
 		}
+		LogInfo("sleep 10 seconds and restart")
 		time.Sleep(10 * time.Second)
 	}
 }
@@ -68,11 +69,13 @@ func doStart(send chan *Message) error {
 	for {
 		select {
 		case msg := <-send:
+			LogInfo("send %v", msg.Action)
 			err := conn.Send(msg)
 			if err != nil {
 				return err
 			}
 		case msg := <-conn.Received:
+			LogInfo("received %v", msg.Action)
 			err := processMessage(msg, httpClient, send)
 			if err != nil {
 				return err
@@ -91,7 +94,7 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 		closeBuildSession()
 	case "reregister":
 		CleanRegistration()
-		return errors.New("received reregister message")
+		return errors.New("registration problem")
 	case "cmd":
 		closeBuildSession()
 		buildSession = MakeBuildSession(httpClient, send)
