@@ -3,7 +3,6 @@ package libgogoagent
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
@@ -19,7 +18,6 @@ type BuildConsole struct {
 }
 
 func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
-	log.Println(uri)
 	u, _ := url.Parse(uri + "&agentId=" + ConfigGetAgentUUID())
 	console := BuildConsole{
 		HttpClient: httpClient,
@@ -74,6 +72,6 @@ func (console *BuildConsole) Flush() {
 	}
 	_, err := console.HttpClient.Do(&req)
 	if err != nil {
-		log.Println(err)
+		LogInfo("build console flush failed: %v", err)
 	}
 }
