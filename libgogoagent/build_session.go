@@ -86,7 +86,7 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "reportCompleting", "reportCompleted":
 		s.Send <- s.makeReportMessage(cmd.Name, "")
 	case "end":
-		s.Console.Stop <- 1
+		// nothing to do
 	default:
 		return s.echo("TBI command: %v", cmd.Name)
 	}
@@ -208,7 +208,7 @@ func (s *BuildSession) processStart(cmd *BuildCommand) error {
 	settings, _ := cmd.Args[0].(map[string]interface{})
 	SetState("buildLocator", settings["buildLocator"].(string))
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"].(string))
-	s.Console = MakeBuildConsole(s.HttpClient, settings["consoleURI"].(string))
+	s.Console = MakeBuildConsole(s.HttpClient, settings["consoleURI"].(string), s.Done)
 	s.ArtifactUploadBaseUrl = settings["artifactUploadBaseUrl"].(string)
 	s.PropertyBaseUrl = settings["propertyBaseUrl"].(string)
 	s.BuildId = settings["buildId"].(string)

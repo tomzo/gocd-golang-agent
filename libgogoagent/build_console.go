@@ -3,6 +3,7 @@ package libgogoagent
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"sync"
@@ -17,24 +18,25 @@ type BuildConsole struct {
 	Stop       chan int
 }
 
-func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
+func MakeBuildConsole(httpClient *http.Client, uri string, stop chan int) *BuildConsole {
 	u, _ := url.Parse(uri + "&agentId=" + ConfigGetAgentUUID())
 	console := BuildConsole{
 		HttpClient: httpClient,
 		Url:        u,
 		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
-		Stop:       make(chan int),
+		Stop:       stop,
 	}
 
 	go func() {
+		flushTick := time.NewTicker(5 * time.Second)
 		for {
 			select {
 			case <-console.Stop:
 				console.Flush()
+				LogInfo("build console closed")
 				return
-			default:
+			case <-flushTick.C:
 				console.Flush()
-				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
@@ -54,26 +56,23 @@ func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
 	console.Write([]byte(fmt.Sprintf("%v %v\n", time.Now().Format("15:04:05.000"), ln)))
 }
 
-func (console *BuildConsole) Read(p []byte) (int, error) {
-	return console.Buffer.Read(p)
-}
-
-func (console *BuildConsole) Close() error {
-	console.Buffer.Reset()
-	return nil
-}
-
 func (console *BuildConsole) Flush() {
 	console.Lock.Lock()
 	defer console.Lock.Unlock()
+	LogDebug("build console flush, buffer len: %v", console.Buffer.Len())
+	if console.Buffer.Len() == 0 {
+		return
+	}
 	req := http.Request{
 		Method:        http.MethodPut,
 		URL:           console.Url,
-		Body:          console,
+		Body:          ioutil.NopCloser(console.Buffer),
 		ContentLength: int64(console.Buffer.Len()),
+		Close:         true,
 	}
 	_, err := console.HttpClient.Do(&req)
 	if err != nil {
 		LogInfo("build console flush failed: %v", err)
 	}
+	console.Buffer.Reset()
 }
