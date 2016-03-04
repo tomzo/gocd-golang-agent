@@ -20,12 +20,12 @@ func registerData() map[string]string {
 		"location":                      workingDir,
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   "5000000000",
-		"agentAutoRegisterKey":          "",
-		"agentAutoRegisterResources":    "",
-		"agentAutoRegisterEnvironments": "",
-		"agentAutoRegisterHostname":     "",
-		"elasticAgentId":                "",
-		"elasticPluginId":               "",
+		"agentAutoRegisterKey":          agentAutoRegisterKey,
+		"agentAutoRegisterResources":    agentAutoRegisterResources,
+		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
+		"agentAutoRegisterHostname":     agentAutoRegisterHostname,
+		"elasticAgentId":                agentAutoRegisterElasticAgentId,
+		"elasticPluginId":               agentAutoRegisterElasticPluginId,
 	}
 }
 

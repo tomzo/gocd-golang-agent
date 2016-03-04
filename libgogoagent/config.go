@@ -12,6 +12,13 @@ var (
 	sslPort                   = readEnv("GOCD_SERVER_SSL_PORT", "8154")
 	receivedMessageBufferSize = 10
 	sendMessageTimeout        = 120 * time.Second
+
+	agentAutoRegisterKey             = readEnv("GOCD_AGENT_AUTO_REGISTER_KEY", "")
+	agentAutoRegisterResources       = readEnv("GOCD_AGENT_AUTO_REGISTER_RESOURCES", "")
+	agentAutoRegisterEnvironments    = readEnv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS", "")
+	agentAutoRegisterHostname        = readEnv("GOCD_AGENT_AUTO_REGISTER_HOSTNAME", "")
+	agentAutoRegisterElasticAgentId  = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID", "")
+	agentAutoRegisterElasticPluginId = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID", "")
 )
 
 func readEnv(varname string, defaultVal string) string {
