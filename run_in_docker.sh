@@ -20,4 +20,4 @@ docker build -t gogoagent .
 GOCD_SERVER_HOST=${GOCD_SERVER_HOST:-`detectIP`}
 GOCD_SERVER_SSL_PORT=${GOCD_SERVER_SSL_PORT:-8154}
 
-docker run -e GOCD_SERVER_HOST="$GOCD_SERVER_HOST" -e GOCD_SERVER_SSL_PORT="$GOCD_SERVER_SSL_PORT" -e DEBUG="${DEBUG}" gogoagent
+docker run -e GOCD_SERVER_URL="https://$GOCD_SERVER_HOST:$GOCD_SERVER_SSL_PORT" -e DEBUG="${DEBUG}" gogoagent /goagent

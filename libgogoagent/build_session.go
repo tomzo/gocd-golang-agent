@@ -88,7 +88,7 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "end":
 		// nothing to do
 	default:
-		return s.echo("TBI command: %v", cmd.Name)
+		s.Console.WriteLn("TBI command: %v", cmd.Name)
 	}
 	return nil
 }
@@ -114,10 +114,9 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	execCmd.Stdout = s.Console
 	execCmd.Stderr = s.Console
 	execCmd.Dir = cmd.WorkingDirectory
-	done := make(chan bool)
+	done := make(chan error)
 	go func() {
-		execCmd.Run()
-		done <- true
+		done <- execCmd.Run()
 	}()
 
 	select {
@@ -125,13 +124,17 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 		LogDebug("received cancel signal")
 		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.echo("kill command %v failed, error: %v", cmd.Args, err)
+			s.Console.WriteLn("kill command %v failed, error: %v", cmd.Args, err)
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
-	case <-done:
+		return errors.New(fmt.Sprintf("%v is canceled", cmd.Args))
+	case err := <-done:
+		if err != nil {
+			s.Console.WriteLn(err.Error())
+		}
+		return err
 	}
-	return nil
 }
 
 func (s *BuildSession) processTest(cmd *BuildCommand) error {
@@ -161,11 +164,6 @@ func capitalize(str string) string {
 	a := []rune(str)
 	a[0] = unicode.ToUpper(a[0])
 	return string(a)
-}
-
-func (s *BuildSession) echo(format string, a ...interface{}) error {
-	str := fmt.Sprintf(format, a)
-	return s.process(&BuildCommand{Name: "echo", Args: []interface{}{str}})
 }
 
 func (s *BuildSession) processEcho(cmd *BuildCommand) error {

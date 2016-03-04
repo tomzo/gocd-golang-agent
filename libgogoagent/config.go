@@ -2,21 +2,21 @@ package libgogoagent
 
 import (
 	"github.com/satori/go.uuid"
+	"net/url"
 	"os"
 	"time"
 )
 
 var (
 	_uuid                     = uuid.NewV4().String()
-	serverHost                = readEnv("GOCD_SERVER_HOST", "localhost")
-	sslPort                   = readEnv("GOCD_SERVER_SSL_PORT", "8154")
+	serverUrl, _              = url.Parse(readEnv("GOCD_SERVER_URL", "https://localhost:8154"))
+	serverHostAndPort         = serverUrl.Host
 	receivedMessageBufferSize = 10
 	sendMessageTimeout        = 120 * time.Second
 
 	agentAutoRegisterKey             = readEnv("GOCD_AGENT_AUTO_REGISTER_KEY", "")
 	agentAutoRegisterResources       = readEnv("GOCD_AGENT_AUTO_REGISTER_RESOURCES", "")
 	agentAutoRegisterEnvironments    = readEnv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS", "")
-	agentAutoRegisterHostname        = readEnv("GOCD_AGENT_AUTO_REGISTER_HOSTNAME", "")
 	agentAutoRegisterElasticAgentId  = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID", "")
 	agentAutoRegisterElasticPluginId = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID", "")
 )
@@ -32,7 +32,7 @@ func readEnv(varname string, defaultVal string) string {
 }
 
 func ConfigGetSslHostAndPort() string {
-	return serverHost + ":" + sslPort
+	return serverHostAndPort
 }
 
 func ConfigGetHttpsServerURL(path string) string {
@@ -40,7 +40,7 @@ func ConfigGetHttpsServerURL(path string) string {
 }
 
 func ConfigGetWsServerURL() string {
-	return "wss://" + serverHost + ":8154/go/agent-websocket"
+	return "wss://" + ConfigGetSslHostAndPort() + "/go/agent-websocket"
 }
 
 func ConfigGetAgentUUID() string {

@@ -23,7 +23,7 @@ func registerData() map[string]string {
 		"agentAutoRegisterKey":          agentAutoRegisterKey,
 		"agentAutoRegisterResources":    agentAutoRegisterResources,
 		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
-		"agentAutoRegisterHostname":     agentAutoRegisterHostname,
+		"agentAutoRegisterHostname":     hostname,
 		"elasticAgentId":                agentAutoRegisterElasticAgentId,
 		"elasticPluginId":               agentAutoRegisterElasticPluginId,
 	}
@@ -65,7 +65,6 @@ func doStartAgent(send chan *Message) error {
 	}
 	defer conn.Close()
 	defer closeBuildSession()
-
 	for {
 		select {
 		case msg := <-send:
