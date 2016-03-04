@@ -3,12 +3,15 @@ package libgogoagent
 import (
 	"github.com/satori/go.uuid"
 	"os"
+	"time"
 )
 
 var (
-	_uuid      = uuid.NewV4().String()
-	serverHost = readEnv("GOCD_SERVER_HOST", "localhost")
-	sslPort    = readEnv("GOCD_SERVER_SSL_PORT", "8154")
+	_uuid                     = uuid.NewV4().String()
+	serverHost                = readEnv("GOCD_SERVER_HOST", "localhost")
+	sslPort                   = readEnv("GOCD_SERVER_SSL_PORT", "8154")
+	receivedMessageBufferSize = 10
+	sendMessageTimeout        = 120 * time.Second
 )
 
 func readEnv(varname string, defaultVal string) string {

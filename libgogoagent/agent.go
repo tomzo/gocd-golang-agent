@@ -30,8 +30,10 @@ func registerData() map[string]string {
 }
 
 func StartAgent() {
+	send := make(chan *Message)
+	go ping(send)
 	for {
-		err := doStartAgent()
+		err := doStartAgent(send)
 		if err != nil {
 			LogInfo("something wrong: %v", err.Error())
 		}
@@ -47,7 +49,7 @@ func closeBuildSession() {
 	}
 }
 
-func doStartAgent() error {
+func doStartAgent(send chan *Message) error {
 	err := Register(registerData())
 	if err != nil {
 		return err
@@ -64,24 +66,14 @@ func doStartAgent() error {
 	defer conn.Close()
 	defer closeBuildSession()
 
-	send := make(chan *Message, 1)
-	defer close(send)
-	pingTick := time.NewTicker(10 * time.Second)
-	defer pingTick.Stop()
 	for {
 		select {
-		case <-pingTick.C:
-			send <- MakeMessage("ping",
-				"com.thoughtworks.go.server.service.AgentRuntimeInfo",
-				AgentRuntimeInfo())
 		case msg := <-send:
-			LogInfo("send %v message", msg.Action)
 			err := conn.Send(msg)
 			if err != nil {
 				return err
 			}
 		case msg := <-conn.Received:
-			LogInfo("received %v message", msg.Action)
 			err := processMessage(msg, httpClient, send)
 			if err != nil {
 				return err
@@ -99,7 +91,7 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 		closeBuildSession()
 	case "reregister":
 		CleanRegistration()
-		return errors.New("registration problem")
+		return errors.New("received reregister message")
 	case "cmd":
 		closeBuildSession()
 		buildSession = MakeBuildSession(httpClient, send)
@@ -118,5 +110,14 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	SetState("runtimeStatus", "Idle")
 	if err != nil {
 		LogInfo("Error(%v) when processing message : %v", err, msg)
+	}
+}
+
+func ping(send chan *Message) {
+	for {
+		send <- MakeMessage("ping",
+			"com.thoughtworks.go.server.service.AgentRuntimeInfo",
+			AgentRuntimeInfo())
+		time.Sleep(10 * time.Second)
 	}
 }

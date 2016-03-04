@@ -15,7 +15,7 @@ var lock sync.Mutex
 func SetState(key, value string) {
 	lock.Lock()
 	defer lock.Unlock()
-	LogInfo("change %v to %v", key, value)
+	LogInfo("set %v to %v", key, value)
 	state[key] = value
 }
 
