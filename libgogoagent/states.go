@@ -38,7 +38,7 @@ func AgentRuntimeInfo() map[string]interface{} {
 		"buildingInfo": GetState("buildingInfo"),
 		"buildLocator": GetState("buildLocator")}
 	data["location"] = workingDir
-	data["usableSpace"] = "12262604800"
+	data["usableSpace"] = UsableSpace()
 	data["operatingSystemName"] = runtime.GOOS
 	data["agentLauncherVersion"] = ""
 	data["elasticPluginId"] = agentAutoRegisterElasticPluginId

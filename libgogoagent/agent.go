@@ -19,7 +19,7 @@ func registerData() map[string]string {
 		"uuid":                          ConfigGetAgentUUID(),
 		"location":                      workingDir,
 		"operatingSystem":               runtime.GOOS,
-		"usablespace":                   "5000000000",
+		"usablespace":                   UsableSpace(),
 		"agentAutoRegisterKey":          agentAutoRegisterKey,
 		"agentAutoRegisterResources":    agentAutoRegisterResources,
 		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
