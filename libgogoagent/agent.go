@@ -122,7 +122,5 @@ func ping(send chan *Message) {
 	} else {
 		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	}
-
-	msgType := "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
 }
