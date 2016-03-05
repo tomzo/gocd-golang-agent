@@ -106,10 +106,10 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	defer LogDebug("! exit goroutine: process build command message")
 	SetState("runtimeStatus", "Building")
+	defer SetState("runtimeStatus", "Idle")
 	command, _ := msg.Data["data"].(map[string]interface{})
 	LogInfo("start process build command")
 	err := buildSession.Process(MakeBuildCommand(command))
-	SetState("runtimeStatus", "Idle")
 	if err != nil {
 		LogInfo("Error(%v) when processing message : %v", err, msg)
 	}
