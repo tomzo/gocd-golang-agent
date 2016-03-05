@@ -116,6 +116,13 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 }
 
 func ping(send chan *Message) {
+	var msgType string
+	if agentAutoRegisterElasticPluginId == "" {
+		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
+	} else {
+		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
+	}
+
 	msgType := "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
 }

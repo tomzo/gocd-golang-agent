@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set -e
 
 detectIP() {
     for i in 0 1 2 3 4 5 6 7 8 9
@@ -12,7 +13,6 @@ detectIP() {
         fi
     done
 }
-
 
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
 docker build -t gogoagent .
