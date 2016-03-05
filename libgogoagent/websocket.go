@@ -39,9 +39,8 @@ func messageUnmarshal(msg []byte, payloadType byte, v interface{}) (err error) {
 var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}
 
 type WebsocketConnection struct {
-	Conn     *websocket.Conn
-	Received chan Message
-	Ack      chan int
+	Conn *websocket.Conn
+	Ack  chan int
 }
 
 func (wc *WebsocketConnection) Send(msg *Message) error {
@@ -73,7 +72,12 @@ func (wc *WebsocketConnection) Close() {
 	}
 }
 
-func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error) {
+func MakeMessage(action, dataType string, data map[string]interface{}) *Message {
+	return &Message{Action: action,
+		Data: map[string]interface{}{"type": dataType, "data": data}}
+}
+
+func MakeWebsocketConnection(wsLoc, httpLoc string, received chan *Message) (*WebsocketConnection, error) {
 	tlsConfig, err := GoServerTlsConfig(true)
 	if err != nil {
 		return nil, err
@@ -88,14 +92,12 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 	if err != nil {
 		return nil, err
 	}
-	received := make(chan Message, receivedMessageBufferSize)
 	ack := make(chan int, 1)
 	go startReceiveMessage(ws, received, ack)
-	return &WebsocketConnection{Conn: ws, Received: received, Ack: ack}, nil
+	return &WebsocketConnection{Conn: ws, Ack: ack}, nil
 }
 
-func startReceiveMessage(ws *websocket.Conn, received chan Message, ack chan int) {
-	defer close(received)
+func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan int) {
 	defer close(ack)
 	for {
 		var msg Message
@@ -114,7 +116,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan Message, ack chan int
 				LogInfo("Received messages buffer size: %v", cap(received))
 				return
 			} else {
-				received <- msg
+				received <- &msg
 			}
 		}
 	}

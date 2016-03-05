@@ -30,10 +30,13 @@ func registerData() map[string]string {
 }
 
 func StartAgent() {
-	send := make(chan Message)
+	send := make(chan *Message)
+	defer close(send)
+	received := make(chan *Message, receivedMessageBufferSize)
+	defer close(received)
 	go ping(send)
 	for {
-		err := doStartAgent(send)
+		err := doStartAgent(send, received)
 		if err != nil {
 			LogInfo("something wrong: %v", err.Error())
 		}
@@ -49,7 +52,7 @@ func closeBuildSession() {
 	}
 }
 
-func doStartAgent(send chan Message) error {
+func doStartAgent(send chan *Message, received chan *Message) error {
 	err := Register(registerData())
 	if err != nil {
 		return err
@@ -59,7 +62,7 @@ func doStartAgent(send chan Message) error {
 	if err != nil {
 		return err
 	}
-	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
+	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"), received)
 	if err != nil {
 		return err
 	}
@@ -68,15 +71,12 @@ func doStartAgent(send chan Message) error {
 	for {
 		select {
 		case msg := <-send:
-			err := conn.Send(&msg)
+			err := conn.Send(msg)
 			if err != nil {
 				return err
 			}
-		case msg, ok := <-conn.Received:
-			if !ok {
-				return errors.New("Websocket connection closed")
-			}
-			err := processMessage(&msg, httpClient, send)
+		case msg := <-received:
+			err := processMessage(msg, httpClient, send)
 			if err != nil {
 				return err
 			}
@@ -84,7 +84,7 @@ func doStartAgent(send chan Message) error {
 	}
 }
 
-func processMessage(msg *Message, httpClient *http.Client, send chan Message) error {
+func processMessage(msg *Message, httpClient *http.Client, send chan *Message) error {
 	switch msg.Action {
 	case "setCookie":
 		str, _ := msg.Data["data"].(string)
@@ -115,14 +115,10 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	}
 }
 
-func ping(send chan Message) {
+func ping(send chan *Message) {
 	msgType := "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	for {
-		send <- Message{
-			Action: "ping",
-			Data: map[string]interface{}{
-				"type": msgType,
-				"data": AgentRuntimeInfo()}}
+		send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
 		time.Sleep(10 * time.Second)
 	}
 }

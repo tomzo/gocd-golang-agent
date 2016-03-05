@@ -42,7 +42,7 @@ func AgentRuntimeInfo() map[string]interface{} {
 	data["operatingSystemName"] = runtime.GOOS
 	data["agentLauncherVersion"] = ""
 	data["elasticPluginId"] = agentAutoRegisterElasticPluginId
-	data["elasticAgentId" = agentAutoRegisterElasticAgentId
+	data["elasticAgentId"] = agentAutoRegisterElasticAgentId
 
 	if cookie := GetState("cookie"); cookie != "" {
 		data["cookie"] = cookie
