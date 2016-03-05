@@ -30,13 +30,8 @@ func registerData() map[string]string {
 }
 
 func StartAgent() {
-	send := make(chan *Message)
-	defer close(send)
-	received := make(chan *Message, receivedMessageBufferSize)
-	defer close(received)
-	go ping(send)
 	for {
-		err := doStartAgent(send, received)
+		err := doStartAgent()
 		if err != nil {
 			LogInfo("something wrong: %v", err.Error())
 		}
@@ -52,7 +47,7 @@ func closeBuildSession() {
 	}
 }
 
-func doStartAgent(send chan *Message, received chan *Message) error {
+func doStartAgent() error {
 	err := Register(registerData())
 	if err != nil {
 		return err
@@ -62,21 +57,25 @@ func doStartAgent(send chan *Message, received chan *Message) error {
 	if err != nil {
 		return err
 	}
-	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"), received)
+
+	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	defer closeBuildSession()
+
+	pingTick := time.NewTicker(10 * time.Second)
+	ping(conn.Send)
 	for {
 		select {
-		case msg := <-send:
-			err := conn.Send(msg)
-			if err != nil {
-				return err
+		case <-pingTick.C:
+			ping(conn.Send)
+		case msg, ok := <-conn.Received:
+			if !ok {
+				return errors.New("Websocket connection is closed")
 			}
-		case msg := <-received:
-			err := processMessage(msg, httpClient, send)
+			err := processMessage(msg, httpClient, conn.Send)
 			if err != nil {
 				return err
 			}
@@ -105,6 +104,7 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 }
 
 func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
+	defer LogDebug("! exit goroutine: process build command message")
 	SetState("runtimeStatus", "Building")
 	command, _ := msg.Data["data"].(map[string]interface{})
 	LogInfo("start process build command")
@@ -117,8 +117,5 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 
 func ping(send chan *Message) {
 	msgType := "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
-	for {
-		send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
-		time.Sleep(10 * time.Second)
-	}
+	send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
 }
