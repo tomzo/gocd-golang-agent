@@ -116,11 +116,12 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 }
 
 func ping(send chan Message) {
+	msgType := "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	for {
 		send <- Message{
 			Action: "ping",
 			Data: map[string]interface{}{
-				"type": "com.thoughtworks.go.server.service.AgentRuntimeInfo",
+				"type": msgType,
 				"data": AgentRuntimeInfo()}}
 		time.Sleep(10 * time.Second)
 	}

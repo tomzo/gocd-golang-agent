@@ -41,6 +41,8 @@ func AgentRuntimeInfo() map[string]interface{} {
 	data["usableSpace"] = "12262604800"
 	data["operatingSystemName"] = runtime.GOOS
 	data["agentLauncherVersion"] = ""
+	data["elasticPluginId"] = agentAutoRegisterElasticPluginId
+	data["elasticAgentId" = agentAutoRegisterElasticAgentId
 
 	if cookie := GetState("cookie"); cookie != "" {
 		data["cookie"] = cookie
