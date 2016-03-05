@@ -17,13 +17,6 @@ type Message struct {
 	AckId  string                 `json:"ackId"`
 }
 
-func MakeMessage(action string, dataType string, data map[string]interface{}) *Message {
-	return &Message{
-		Action: action,
-		Data:   map[string]interface{}{"type": dataType, "data": data},
-	}
-}
-
 func messageMarshal(v interface{}) ([]byte, byte, error) {
 	json, jerr := json.Marshal(v)
 	if jerr != nil {
@@ -47,7 +40,7 @@ var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}
 
 type WebsocketConnection struct {
 	Conn     *websocket.Conn
-	Received chan *Message
+	Received chan Message
 	Ack      chan int
 }
 
@@ -95,13 +88,13 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 	if err != nil {
 		return nil, err
 	}
-	received := make(chan *Message, receivedMessageBufferSize)
+	received := make(chan Message, receivedMessageBufferSize)
 	ack := make(chan int, 1)
 	go startReceiveMessage(ws, received, ack)
 	return &WebsocketConnection{Conn: ws, Received: received, Ack: ack}, nil
 }
 
-func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan int) {
+func startReceiveMessage(ws *websocket.Conn, received chan Message, ack chan int) {
 	defer close(received)
 	defer close(ack)
 	for {
@@ -121,7 +114,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan in
 				LogInfo("Received messages buffer size: %v", cap(received))
 				return
 			} else {
-				received <- &msg
+				received <- msg
 			}
 		}
 	}

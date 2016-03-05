@@ -30,7 +30,7 @@ func registerData() map[string]string {
 }
 
 func StartAgent() {
-	send := make(chan *Message)
+	send := make(chan Message)
 	go ping(send)
 	for {
 		err := doStartAgent(send)
@@ -49,7 +49,7 @@ func closeBuildSession() {
 	}
 }
 
-func doStartAgent(send chan *Message) error {
+func doStartAgent(send chan Message) error {
 	err := Register(registerData())
 	if err != nil {
 		return err
@@ -68,12 +68,15 @@ func doStartAgent(send chan *Message) error {
 	for {
 		select {
 		case msg := <-send:
-			err := conn.Send(msg)
+			err := conn.Send(&msg)
 			if err != nil {
 				return err
 			}
-		case msg := <-conn.Received:
-			err := processMessage(msg, httpClient, send)
+		case msg, ok := <-conn.Received:
+			if !ok {
+				return errors.New("Websocket connection closed")
+			}
+			err := processMessage(&msg, httpClient, send)
 			if err != nil {
 				return err
 			}
@@ -81,7 +84,7 @@ func doStartAgent(send chan *Message) error {
 	}
 }
 
-func processMessage(msg *Message, httpClient *http.Client, send chan *Message) error {
+func processMessage(msg *Message, httpClient *http.Client, send chan Message) error {
 	switch msg.Action {
 	case "setCookie":
 		str, _ := msg.Data["data"].(string)
@@ -112,11 +115,13 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	}
 }
 
-func ping(send chan *Message) {
+func ping(send chan Message) {
 	for {
-		send <- MakeMessage("ping",
-			"com.thoughtworks.go.server.service.AgentRuntimeInfo",
-			AgentRuntimeInfo())
+		send <- Message{
+			Action: "ping",
+			Data: map[string]interface{}{
+				"type": "com.thoughtworks.go.server.service.AgentRuntimeInfo",
+				"data": AgentRuntimeInfo()}}
 		time.Sleep(10 * time.Second)
 	}
 }

@@ -11,7 +11,7 @@ import (
 
 type BuildSession struct {
 	HttpClient            *http.Client
-	Send                  chan *Message
+	Send                  chan Message
 	BuildStatus           string
 	Console               *BuildConsole
 	ArtifactUploadBaseUrl string
@@ -22,7 +22,7 @@ type BuildSession struct {
 	Done                  chan int
 }
 
-func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession {
+func MakeBuildSession(httpClient *http.Client, send chan Message) *BuildSession {
 	return &BuildSession{
 		HttpClient: httpClient,
 		Send:       send,
@@ -82,21 +82,23 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "echo":
 		return s.processEcho(cmd)
 	case "reportCurrentStatus":
-		s.Send <- s.makeReportMessage(cmd.Name, cmd.Args[0].(string))
+		s.Send <- Message{
+			Action: cmd.Name,
+			Data: map[string]interface{}{
+				"type": "com.thoughtworks.go.websocket.Report",
+				"data": s.statusReport(cmd.Args[0].(string))}}
 	case "reportCompleting", "reportCompleted":
-		s.Send <- s.makeReportMessage(cmd.Name, "")
+		s.Send <- Message{
+			Action: cmd.Name,
+			Data: map[string]interface{}{
+				"type": "com.thoughtworks.go.websocket.Report",
+				"data": s.statusReport("")}}
 	case "end":
 		// nothing to do
 	default:
 		s.Console.WriteLn("TBI command: %v", cmd.Name)
 	}
 	return nil
-}
-
-func (s *BuildSession) makeReportMessage(name string, status string) *Message {
-	return MakeMessage(name,
-		"com.thoughtworks.go.websocket.Report",
-		s.statusReport(status))
 }
 
 func convertToStringSlice(slice []interface{}) []string {
