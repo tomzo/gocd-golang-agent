@@ -20,32 +20,21 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"runtime"
 	"time"
 )
 
 var buildSession *BuildSession
 
-func registerData() map[string]string {
-	hostname, _ := os.Hostname()
-	workingDir, _ := os.Getwd()
-
-	return map[string]string{
-		"hostname":                      hostname,
-		"uuid":                          ConfigGetAgentUUID(),
-		"location":                      workingDir,
-		"operatingSystem":               runtime.GOOS,
-		"usablespace":                   UsableSpace(),
-		"agentAutoRegisterKey":          agentAutoRegisterKey,
-		"agentAutoRegisterResources":    agentAutoRegisterResources,
-		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
-		"agentAutoRegisterHostname":     hostname,
-		"elasticAgentId":                agentAutoRegisterElasticAgentId,
-		"elasticPluginId":               agentAutoRegisterElasticPluginId,
-	}
-}
-
 func StartAgent() {
+	if err := os.Chdir(agentWorkDir); err != nil {
+		LogInfo("%v. Invalid GOCD_AGENT_WORK_DIR?", err)
+		os.Exit(-1)
+	}
+	if err := os.MkdirAll(ConfigFilePath(""), 0744); err != nil {
+		LogInfo("%v", err)
+		os.Exit(-1)
+	}
+
 	for {
 		err := doStartAgent()
 		if err != nil {
@@ -64,7 +53,7 @@ func closeBuildSession() {
 }
 
 func doStartAgent() error {
-	err := Register(registerData())
+	err := Register()
 	if err != nil {
 		return err
 	}

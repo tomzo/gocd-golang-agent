@@ -26,12 +26,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-)
-
-var (
-	goServerCAFile = "go-server-ca.pem"
-	privateKeyFile = "agent-private-key.pem"
-	certFile       = "agent-cert.pem"
+	"runtime"
 )
 
 type Registration struct {
@@ -80,7 +75,7 @@ func GoServerRootCAs() (*x509.CertPool, error) {
 func GoServerTlsConfig(withClientCert bool) (*tls.Config, error) {
 	certs := make([]tls.Certificate, 0)
 	if withClientCert {
-		cert, err := tls.LoadX509KeyPair(certFile, privateKeyFile)
+		cert, err := tls.LoadX509KeyPair(agentCertFile, agentPrivateKeyFile)
 		if err != nil {
 			panic(err)
 		}
@@ -108,18 +103,18 @@ func GoServerRemoteClient(withClientCert bool) (*http.Client, error) {
 	return &http.Client{Transport: tr}, nil
 }
 
-func Register(params map[string]string) error {
+func Register() error {
 	if err := ReadGoServerCACert(); err != nil {
 		return err
 	}
-	if err := readAgentKeyAndCerts(params); err != nil {
+	if err := readAgentKeyAndCerts(registerData()); err != nil {
 		return err
 	}
 	return nil
 }
 
 func CleanRegistration() error {
-	files := []string{goServerCAFile, privateKeyFile, certFile}
+	files := []string{goServerCAFile, agentPrivateKeyFile, agentCertFile}
 	for _, f := range files {
 		_, err := os.Stat(f)
 		if err == nil {
@@ -132,10 +127,29 @@ func CleanRegistration() error {
 	return nil
 }
 
+func registerData() map[string]string {
+	hostname, _ := os.Hostname()
+	workingDir, _ := os.Getwd()
+
+	return map[string]string{
+		"hostname":                      hostname,
+		"uuid":                          _uuid,
+		"location":                      workingDir,
+		"operatingSystem":               runtime.GOOS,
+		"usablespace":                   UsableSpace(),
+		"agentAutoRegisterKey":          agentAutoRegisterKey,
+		"agentAutoRegisterResources":    agentAutoRegisterResources,
+		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
+		"agentAutoRegisterHostname":     hostname,
+		"elasticAgentId":                agentAutoRegisterElasticAgentId,
+		"elasticPluginId":               agentAutoRegisterElasticPluginId,
+	}
+}
+
 func readAgentKeyAndCerts(params map[string]string) error {
-	_, privateKeyFileErr := os.Stat(privateKeyFile)
-	_, certFileErr := os.Stat(certFile)
-	if privateKeyFileErr == nil && certFileErr == nil {
+	_, agentPrivateKeyFileErr := os.Stat(agentPrivateKeyFile)
+	_, agentCertFileErr := os.Stat(agentCertFile)
+	if agentPrivateKeyFileErr == nil && agentCertFileErr == nil {
 		return nil
 	}
 
@@ -164,8 +178,8 @@ func readAgentKeyAndCerts(params map[string]string) error {
 		return err
 	}
 
-	ioutil.WriteFile(privateKeyFile, []byte(registration.AgentPrivateKey), 0600)
-	ioutil.WriteFile(certFile, []byte(registration.AgentCertificate), 0600)
+	ioutil.WriteFile(agentPrivateKeyFile, []byte(registration.AgentPrivateKey), 0600)
+	ioutil.WriteFile(agentCertFile, []byte(registration.AgentCertificate), 0600)
 	return nil
 }
 

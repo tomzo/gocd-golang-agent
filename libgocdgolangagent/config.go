@@ -20,6 +20,7 @@ import (
 	"github.com/satori/go.uuid"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -35,6 +36,12 @@ var (
 	agentAutoRegisterEnvironments    = readEnv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS", "")
 	agentAutoRegisterElasticAgentId  = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID", "")
 	agentAutoRegisterElasticPluginId = readEnv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID", "")
+
+	agentWorkDir        = readEnv("GOCD_AGENT_WORK_DIR", ".")
+	agentConfigDir      = readEnv("GOCD_AGENT_CONFIG_DIR", "config")
+	goServerCAFile      = ConfigFilePath("go-server-ca.pem")
+	agentPrivateKeyFile = ConfigFilePath("agent-private-key.pem")
+	agentCertFile       = ConfigFilePath("agent-cert.pem")
 )
 
 func readEnv(varname string, defaultVal string) string {
@@ -61,4 +68,8 @@ func ConfigGetWsServerURL() string {
 
 func ConfigGetAgentUUID() string {
 	return _uuid
+}
+
+func ConfigFilePath(fileName string) string {
+	return filepath.Join(agentConfigDir, fileName)
 }
