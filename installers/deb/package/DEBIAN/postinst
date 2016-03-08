@@ -1,0 +1,64 @@
+#!/bin/bash
+#*************************GO-LICENSE-START********************************
+# Copyright 2014 ThoughtWorks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#*************************GO-LICENSE-END**********************************
+
+set -e
+set -x
+
+function go_owned {
+    if [ -e "$1" ]; then
+        chown -RL go:go "$1"
+        if [ -L "$1" ]; then
+            chown -h go:go "$1"
+        fi
+    fi
+}
+
+function create_if_does_not_exist {
+    [ -d "$1" ] || mkdir "$1"
+    go_owned "$1"
+}
+
+
+function set_go_agents_defaults_path {
+    GOCD_AGENT_DEFAULTS=/etc/default/gocd-agent
+}
+
+function fix_agent_defaults_ownership {
+    go_owned $GO_AGENT_DEFAULTS || ( echo "user 'go' and group 'go' must exist" && exit 1 )
+}
+
+function create_necessary_agent_directories {
+    create_if_does_not_exist /var/log/gocd-agent
+    create_if_does_not_exist /var/run/gocd-agent
+    create_if_does_not_exist /var/lib/gocd-agent
+}
+
+function print_agent_configuration_suggestions {
+    echo "Now please edit $GO_AGENT_DEFAULTS and set GO_SERVER_URL to the HTTPS address of your Go Server. Please make sure the HOST in the URL is connectable from the agent machine."
+    echo "Once that is done start the Go Agent with '/etc/init.d/gocd-agent start'"
+}
+
+
+if [ "$1" = configure ]; then
+    set_go_agents_defaults_path
+    fix_agent_defaults_ownership
+    create_necessary_agent_directories
+    echo "Installation of GOCD Agent completed."
+    print_agent_configuration_suggestions
+fi
+
+update-rc.d gocd-agent defaults 99 >/dev/null

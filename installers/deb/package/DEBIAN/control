@@ -1,0 +1,11 @@
+Package: gocd-agent
+Section: base
+Priority: optional
+Version: 0.0.0.1-1
+Architecture: all
+Maintainer: The Go Team <studios@thoughtworks.com>
+Conflicts: cruise-agent,go-agent
+Replaces: cruise-agent,go-agent
+Installed-Size: 5120
+Description: Go Agent Component
+ next generation continuous integration and release management server from ThoughtWorks

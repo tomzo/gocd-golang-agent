@@ -2,3 +2,5 @@
 /libgogoagent/*.pem
 /gogoagent
 /libgogoagent/pipelines/*
+/installers/deb/gocd-agent_0.1-1_all.deb
+/installers/deb/package/usr/share/bin/gocd-agent

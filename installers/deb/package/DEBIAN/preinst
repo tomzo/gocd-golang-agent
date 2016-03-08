@@ -1,0 +1,87 @@
+#!/bin/bash
+#*************************GO-LICENSE-START********************************
+# Copyright 2014 ThoughtWorks, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#*************************GO-LICENSE-END**********************************
+
+set -e
+set -x
+
+APP_NAME="'GOCD Agent'"
+
+function has_group {
+    getent group $1 >/dev/null
+}
+
+function has_user {
+    getent passwd $1 >/dev/null
+}
+
+function does_not_have_user {
+    ! has_user $1
+}
+
+function does_not_have_group {
+    ! has_group $1
+}
+
+function warn_about_go_existing_as {
+    echo "$APP_NAME installation will now use $1 'go'"
+}
+
+function user_go_belongs_to_group_go {
+    groups go | grep -q ':.*\<go\>'
+}
+
+function add_user_go_to_group_go {
+    usermod -G go -a go
+}
+
+function warn_about_existing_user_or_group_go {
+    (has_group go && warn_about_go_existing_as group) || true
+    (has_user go && warn_about_go_existing_as user) || true
+}
+
+function create_user_go_if_none {
+    (does_not_have_user go && create_user_go_with_group) || true
+}
+
+function create_group_go_if_none {
+    (does_not_have_group go && create_group go) || true
+}
+
+function ensure_go_user_belongs_to_go_group {
+    user_go_belongs_to_group_go || add_user_go_to_group_go
+}
+
+
+function create_group () {
+    addgroup --system $1
+}
+
+function create_user_go_with_group () {
+    adduser --system --group --gecos "Go User,,," --home /var/go --shell /bin/bash --firstuid 500 --lastuid 600 --disabled-password go
+}
+
+if [ -x "/etc/init.d/gocd-agent" ]; then
+    invoke-rc.d gocd-agent stop || true
+fi
+
+
+if [ $1 = "install" ]; then
+    warn_about_existing_user_or_group_go
+    create_user_go_if_none
+    create_group_go_if_none
+    ensure_go_user_belongs_to_go_group
+fi
