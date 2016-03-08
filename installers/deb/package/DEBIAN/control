@@ -1,4 +1,4 @@
-Package: gocd-agent
+Package: gocd-golang-agent
 Section: base
 Priority: optional
 Version: 0.0.0.1-1

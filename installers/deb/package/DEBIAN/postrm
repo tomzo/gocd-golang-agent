@@ -18,14 +18,14 @@
 set -e
 
 if [ "$1" = "purge" ] ; then
-    update-rc.d gocd-agent remove >/dev/null || exit $?
+    update-rc.d gocd-golang-agent remove >/dev/null || exit $?
 
-    rm -fr /usr/share/gocd-agent
-    rm -fr /var/lib/gocd-agent
-    rm -fr /var/run/gocd-agent
-    rm -fr /var/log/gocd-agent
+    rm -fr /usr/share/gocd-golang-agent
+    rm -fr /var/lib/gocd-golang-agent
+    rm -fr /var/run/gocd-golang-agent
+    rm -fr /var/log/gocd-golang-agent
 
-    GO_AGENT_DEFAULTS=/etc/default/gocd-agent
+    GO_AGENT_DEFAULTS=/etc/default/gocd-golang-agent
     if [ -L $GO_AGENT_DEFAULTS ]; then
         rm $GO_AGENT_DEFAULTS
     fi

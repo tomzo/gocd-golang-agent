@@ -15,9 +15,9 @@ detectIP() {
 }
 
 CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags '-w' .
-docker build -t gogoagent .
+docker build -t gocd-golang-agent .
 
 GOCD_SERVER_HOST=${GOCD_SERVER_HOST:-`detectIP`}
 GOCD_SERVER_SSL_PORT=${GOCD_SERVER_SSL_PORT:-8154}
 
-docker run -e GOCD_SERVER_URL="https://$GOCD_SERVER_HOST:$GOCD_SERVER_SSL_PORT" -e DEBUG="${DEBUG}" gogoagent /goagent
+docker run -e GOCD_SERVER_URL="https://$GOCD_SERVER_HOST:$GOCD_SERVER_SSL_PORT" -e DEBUG="${DEBUG}" gocd-golang-agent /gocd-golang-agent

@@ -1,4 +1,4 @@
-package libgogoagent
+package libgocdgolangagent
 
 import (
 	"strconv"

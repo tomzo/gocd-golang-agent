@@ -1,7 +1,7 @@
 package main
 
-import "github.com/gocd/gogoagent/libgogoagent"
+import "github.com/gocd-contrib/gocd-golang-agent/libgocdgolangagent"
 
 func main() {
-	libgogoagent.StartAgent()
+	libgocdgolangagent.StartAgent()
 }

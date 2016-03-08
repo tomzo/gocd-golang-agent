@@ -33,7 +33,7 @@ function create_if_does_not_exist {
 
 
 function set_go_agents_defaults_path {
-    GOCD_AGENT_DEFAULTS=/etc/default/gocd-agent
+    GOCD_AGENT_DEFAULTS=/etc/default/gocd-golang-agent
 }
 
 function fix_agent_defaults_ownership {
@@ -41,14 +41,14 @@ function fix_agent_defaults_ownership {
 }
 
 function create_necessary_agent_directories {
-    create_if_does_not_exist /var/log/gocd-agent
-    create_if_does_not_exist /var/run/gocd-agent
-    create_if_does_not_exist /var/lib/gocd-agent
+    create_if_does_not_exist /var/log/gocd-golang-agent
+    create_if_does_not_exist /var/run/gocd-golang-agent
+    create_if_does_not_exist /var/lib/gocd-golang-agent
 }
 
 function print_agent_configuration_suggestions {
     echo "Now please edit $GO_AGENT_DEFAULTS and set GO_SERVER_URL to the HTTPS address of your Go Server. Please make sure the HOST in the URL is connectable from the agent machine."
-    echo "Once that is done start the Go Agent with '/etc/init.d/gocd-agent start'"
+    echo "Once that is done start the Go Agent with '/etc/init.d/gocd-golang-agent start'"
 }
 
 
@@ -60,4 +60,4 @@ if [ "$1" = configure ]; then
     print_agent_configuration_suggestions
 fi
 
-update-rc.d gocd-agent defaults 99 >/dev/null
+update-rc.d gocd-golang-agent defaults 99 >/dev/null

@@ -73,8 +73,8 @@ function create_user_go_with_group () {
     adduser --system --group --gecos "Go User,,," --home /var/go --shell /bin/bash --firstuid 500 --lastuid 600 --disabled-password go
 }
 
-if [ -x "/etc/init.d/gocd-agent" ]; then
-    invoke-rc.d gocd-agent stop || true
+if [ -x "/etc/init.d/gocd-golang-agent" ]; then
+    invoke-rc.d gocd-golang-agent stop || true
 fi
 
 
