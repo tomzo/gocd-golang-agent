@@ -16,7 +16,6 @@
 #*************************GO-LICENSE-END**********************************
 
 set -e
-set -x
 
 if [ -x "/etc/init.d/go-agent" ]; then
     invoke-rc.d gocd-agent stop || true

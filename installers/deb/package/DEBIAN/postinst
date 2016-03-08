@@ -16,7 +16,6 @@
 #*************************GO-LICENSE-END**********************************
 
 set -e
-set -x
 
 function go_owned {
     if [ -e "$1" ]; then

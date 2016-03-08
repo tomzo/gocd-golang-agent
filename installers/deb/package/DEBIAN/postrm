@@ -16,7 +16,6 @@
 #*************************GO-LICENSE-END**********************************
 
 set -e
-set -x
 
 if [ "$1" = "purge" ] ; then
     update-rc.d gocd-agent remove >/dev/null || exit $?
