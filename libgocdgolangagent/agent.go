@@ -18,6 +18,8 @@ package libgocdgolangagent
 
 import (
 	"errors"
+	"github.com/satori/go.uuid"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
@@ -26,6 +28,7 @@ import (
 var buildSession *BuildSession
 var logger *Logger
 var config *Config
+var UUID string
 
 func LogDebug(format string, v ...interface{}) {
 	logger.Debug.Printf(format, v...)
@@ -37,20 +40,28 @@ func LogInfo(format string, v ...interface{}) {
 
 func initialize() {
 	config = LoadConfig()
+	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log")
+	LogInfo(">>>>>>> go >>>>>>>")
 	if config.WorkDir != "" {
 		if err := os.Chdir(config.WorkDir); err != nil {
-			panic(err)
+			logger.Error.Fatal(err)
 		}
 	}
-
-	log, err := MakeLogger(config.LogDir, "gocd-golang-agent.log")
-	if err != nil {
-		panic(err)
-	}
-	logger = log
-	LogInfo(">>>>>>> go >>>>>>>")
 	if err := os.MkdirAll(config.ConfigDir, 0744); err != nil {
 		logger.Error.Fatal(err)
+	}
+
+	if _, err := os.Stat(config.UuidFile); err == nil {
+		data, err2 := ioutil.ReadFile(config.UuidFile)
+		if err2 != nil {
+			logger.Error.Printf("failed to read uuid file(%v): %v", config.UuidFile, err2)
+		} else {
+			UUID = string(data)
+		}
+	}
+	if UUID == "" {
+		UUID = uuid.NewV4().String()
+		ioutil.WriteFile(config.UuidFile, []byte(UUID), 0600)
 	}
 }
 

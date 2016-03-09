@@ -17,7 +17,6 @@
 package libgocdgolangagent
 
 import (
-	"github.com/satori/go.uuid"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,7 +25,6 @@ import (
 )
 
 type Config struct {
-	UUID               string
 	SendMessageTimeout time.Duration
 	ServerHostAndPort  string
 	WorkDir            string
@@ -42,13 +40,13 @@ type Config struct {
 	GoServerCAFile      string
 	AgentPrivateKeyFile string
 	AgentCertFile       string
+	UuidFile            string
 	OutputDebugLog      bool
 }
 
 func LoadConfig() *Config {
 	serverUrl, _ := url.Parse(readEnv("GOCD_SERVER_URL", "https://localhost:8154"))
 	return &Config{
-		UUID:                             uuid.NewV4().String(),
 		SendMessageTimeout:               120 * time.Second,
 		ServerHostAndPort:                serverUrl.Host,
 		WorkDir:                          os.Getenv("GOCD_AGENT_WORK_DIR"),
@@ -62,6 +60,7 @@ func LoadConfig() *Config {
 		GoServerCAFile:                   filepath.Join("config", "go-server-ca.pem"),
 		AgentPrivateKeyFile:              filepath.Join("config", "agent-private-key.pem"),
 		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
+		UuidFile:                         filepath.Join("config", "uuid"),
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
 	}
 }

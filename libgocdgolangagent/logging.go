@@ -30,14 +30,14 @@ type Logger struct {
 	Error *log.Logger
 }
 
-func MakeLogger(logDir, file string) (*Logger, error) {
+func MakeLogger(logDir, file string) *Logger {
 	var output, debugOutput io.Writer
 	if logDir != "" {
 		fpath := filepath.Join(logDir, file)
 		var err error
 		output, err = os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
-			return nil, err
+			panic(err)
 		}
 	} else {
 		output = os.Stdout
@@ -53,5 +53,5 @@ func MakeLogger(logDir, file string) (*Logger, error) {
 	infoLogger := log.New(output, "", 0)
 	errorLogger := log.New(output, "ERROR: ", log.Lshortfile)
 
-	return &Logger{Debug: debugLogger, Info: infoLogger, Error: errorLogger}, nil
+	return &Logger{Debug: debugLogger, Info: infoLogger, Error: errorLogger}
 }

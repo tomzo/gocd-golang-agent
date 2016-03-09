@@ -135,7 +135,7 @@ func registerData() map[string]string {
 
 	return map[string]string{
 		"hostname":                      hostname,
-		"uuid":                          config.UUID,
+		"uuid":                          UUID,
 		"location":                      workingDir,
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   UsableSpace(),

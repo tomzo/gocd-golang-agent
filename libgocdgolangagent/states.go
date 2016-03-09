@@ -48,7 +48,7 @@ func AgentRuntimeInfo() map[string]interface{} {
 	data["identifier"] = map[string]string{
 		"hostName":  hostname,
 		"ipAddress": "127.0.0.1",
-		"uuid":      config.UUID}
+		"uuid":      UUID}
 	data["runtimeStatus"] = GetState("runtimeStatus")
 	data["buildingInfo"] = map[string]string{
 		"buildingInfo": GetState("buildingInfo"),

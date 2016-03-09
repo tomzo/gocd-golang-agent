@@ -35,7 +35,7 @@ type BuildConsole struct {
 }
 
 func MakeBuildConsole(httpClient *http.Client, uri string, stop chan int) *BuildConsole {
-	u, _ := url.Parse(uri + "&agentId=" + config.UUID)
+	u, _ := url.Parse(uri + "&agentId=" + UUID)
 	console := BuildConsole{
 		HttpClient: httpClient,
 		Url:        u,
