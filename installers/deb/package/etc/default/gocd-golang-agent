@@ -1,2 +1,3 @@
 export GOCD_SERVER_URL=https://127.0.0.1:8154
 export GOCD_AGENT_WORK_DIR=/var/lib/gocd-golang-agent
+export GOCD_AGENT_LOG_DIR=/var/log/gocd-golang-agent
