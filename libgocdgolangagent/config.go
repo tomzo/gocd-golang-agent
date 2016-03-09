@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -93,4 +94,12 @@ func ConfigGetAgentUUID() string {
 
 func ConfigFilePath(fileName string) string {
 	return filepath.Join("config", fileName)
+}
+
+func ConfigMakeFullServerURL(url string) string {
+	if strings.HasPrefix(url, "/") {
+		return ConfigGetHttpsServerURL(url)
+	} else {
+		return url
+	}
 }
