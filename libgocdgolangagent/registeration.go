@@ -44,14 +44,14 @@ func ReadGoServerCACert() error {
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		LogInfo("failed to connect: " + err.Error())
+		logger.Error.Printf("failed to connect: " + err.Error())
 		return err
 	}
 	defer conn.Close()
 	state := conn.ConnectionState()
 	certOut, err := os.Create(goServerCAFile)
 	if err != nil {
-		LogInfo("failed to open %v for writing: %s", goServerCAFile, err)
+		logger.Error.Printf("failed to open %v for writing: %s", goServerCAFile, err)
 		return err
 	}
 	defer certOut.Close()

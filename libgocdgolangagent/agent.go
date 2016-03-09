@@ -24,20 +24,37 @@ import (
 )
 
 var buildSession *BuildSession
+var logger *Logger
+
+func LogDebug(format string, v ...interface{}) {
+	logger.Debug.Printf(format, v...)
+}
+
+func LogInfo(format string, v ...interface{}) {
+	logger.Info.Printf(format, v...)
+}
+
+func initialize() {
+	if agentWorkDir != "" {
+		if err := os.Chdir(agentWorkDir); err != nil {
+			panic(err)
+		}
+	}
+
+	log, err := MakeLogger(agentLogDir, "gocd-golang-agent.log")
+	if err != nil {
+		panic(err)
+	}
+	logger = log
+	LogInfo(">>>>>>> go >>>>>>>")
+
+	if err := os.MkdirAll(ConfigFilePath(""), 0744); err != nil {
+		logger.Error.Fatal(err)
+	}
+}
 
 func StartAgent() {
-	if err := os.Chdir(AgentWorkDir()); err != nil {
-		panic(err)
-	}
-
-	if err := InitLogger(); err != nil {
-		panic(err)
-	}
-
-	if err := InitConfig(); err != nil {
-		LogInfo("%v", err)
-		os.Exit(-1)
-	}
+	initialize()
 
 	for {
 		err := doStartAgent()
@@ -107,13 +124,13 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 		buildSession = MakeBuildSession(httpClient, send)
 		go processBuildCommandMessage(msg, buildSession)
 	default:
-		LogInfo("ERROR: unknown message action %v", msg)
+		logger.Error.Printf("ERROR: unknown message action %v", msg)
 	}
 	return nil
 }
 
 func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
-	defer LogDebug("! exit goroutine: process build command message")
+	defer logger.Debug.Printf("! exit goroutine: process build command message")
 	SetState("runtimeStatus", "Building")
 	defer SetState("runtimeStatus", "Idle")
 	command, _ := msg.Data["data"].(map[string]interface{})

@@ -24,36 +24,30 @@ import (
 	"path/filepath"
 )
 
-var infoLogger, debugLogger *log.Logger
-
-func logOutput() (io.Writer, error) {
-	logDir := AgentLogDir()
-	if logDir != "" {
-		fpath := filepath.Join(AgentLogDir(), "gocd-golang-agent.log")
-		file, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		return file, err
-	} else {
-		return os.Stdout, nil
-	}
+type Logger struct {
+	Info  *log.Logger
+	Debug *log.Logger
+	Error *log.Logger
 }
 
-func InitLogger() error {
-	writer, err := logOutput()
-	if err != nil {
-		return err
+func MakeLogger(logDir, file string) (*Logger, error) {
+	var output io.Writer
+	if logDir != "" {
+		fpath := filepath.Join(logDir, file)
+		var err error
+		output, err = os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		output = os.Stdout
 	}
-	debugLogger = log.New(writer, "[DEBUG] ", 0)
-	infoLogger = log.New(writer, "[INFO] ", 0)
-	if ConfigGetDebug() {
+	debugLogger := log.New(output, "", 0)
+	infoLogger := log.New(output, "", 0)
+	errorLogger := log.New(output, "[ERROR] ", 0)
+
+	if outputDebugLog {
 		debugLogger.SetOutput(ioutil.Discard)
 	}
-	return nil
-}
-
-func LogDebug(format string, v ...interface{}) {
-	debugLogger.Printf(format, v...)
-}
-
-func LogInfo(format string, v ...interface{}) {
-	infoLogger.Printf(format, v...)
+	return &Logger{Debug: debugLogger, Info: infoLogger, Error: errorLogger}, nil
 }

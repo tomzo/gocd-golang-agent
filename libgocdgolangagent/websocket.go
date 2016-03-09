@@ -42,7 +42,7 @@ func (wc *WebsocketConnection) Close() {
 	close(wc.Send)
 	err := wc.Conn.Close()
 	if err != nil {
-		LogInfo("Close websocket connection failed: %v", err)
+		logger.Error.Printf("Close websocket connection failed: %v", err)
 	}
 }
 
@@ -92,18 +92,18 @@ loop:
 		LogInfo("--> %v", msg.Action)
 		LogDebug("message data: %v", msg.Data)
 		if connClosed {
-			LogInfo("send message failed: connection is closed")
+			logger.Error.Printf("send message failed: connection is closed")
 			goto loop
 		}
 		if err := MessageCodec.Send(ws, msg); err == nil {
 			waitForMessageAck(msg.AckId, ack)
 			goto loop
 		} else {
-			LogInfo("send message failed: %v", err)
+			logger.Error.Printf("send message failed: %v", err)
 			if err := ws.Close(); err == nil {
 				connClosed = true
 			} else {
-				LogInfo("Close websocket connection failed: %v", err)
+				logger.Error.Printf("Close websocket connection failed: %v", err)
 			}
 		}
 	}
@@ -135,7 +135,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan st
 		var msg Message
 		err := MessageCodec.Receive(ws, &msg)
 		if err != nil {
-			LogInfo("receive message failed: %v", err)
+			logger.Error.Printf("receive message failed: %v", err)
 			return
 		}
 		LogInfo("<-- %v", msg.Action)

@@ -89,7 +89,7 @@ func (console *BuildConsole) Flush() {
 	}
 	_, err := console.HttpClient.Do(&req)
 	if err != nil {
-		LogInfo("build console flush failed: %v", err)
+		logger.Error.Printf("build console flush failed: %v", err)
 	}
 	console.Buffer.Reset()
 }
