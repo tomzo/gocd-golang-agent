@@ -25,6 +25,7 @@ import (
 
 var buildSession *BuildSession
 var logger *Logger
+var config *Config
 
 func LogDebug(format string, v ...interface{}) {
 	logger.Debug.Printf(format, v...)
@@ -35,20 +36,20 @@ func LogInfo(format string, v ...interface{}) {
 }
 
 func initialize() {
-	if agentWorkDir != "" {
-		if err := os.Chdir(agentWorkDir); err != nil {
+	config = LoadConfig()
+	if config.WorkDir != "" {
+		if err := os.Chdir(config.WorkDir); err != nil {
 			panic(err)
 		}
 	}
 
-	log, err := MakeLogger(agentLogDir, "gocd-golang-agent.log")
+	log, err := MakeLogger(config.LogDir, "gocd-golang-agent.log")
 	if err != nil {
 		panic(err)
 	}
 	logger = log
 	LogInfo(">>>>>>> go >>>>>>>")
-
-	if err := os.MkdirAll(ConfigFilePath(""), 0744); err != nil {
+	if err := os.MkdirAll(config.ConfigDir, 0744); err != nil {
 		logger.Error.Fatal(err)
 	}
 }
@@ -84,7 +85,7 @@ func doStartAgent() error {
 		return err
 	}
 
-	conn, err := MakeWebsocketConnection(ConfigGetWsServerURL(), ConfigGetHttpsServerURL("/"))
+	conn, err := MakeWebsocketConnection(config.WsServerURL(), config.HttpsServerURL("/"))
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,7 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 
 func ping(send chan *Message) {
 	var msgType string
-	if agentAutoRegisterElasticPluginId == "" {
+	if config.AgentAutoRegisterElasticPluginId == "" {
 		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
 	} else {
 		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"

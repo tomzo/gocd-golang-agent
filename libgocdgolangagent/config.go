@@ -25,23 +25,62 @@ import (
 	"time"
 )
 
-var (
-	_uuid                            = uuid.NewV4().String()
-	sendMessageTimeout               = 120 * time.Second
-	serverUrl, _                     = url.Parse(readEnv("GOCD_SERVER_URL", "https://localhost:8154"))
-	serverHostAndPort                = serverUrl.Host
-	agentWorkDir                     = os.Getenv("GOCD_AGENT_WORK_DIR")
-	agentLogDir                      = os.Getenv("GOCD_AGENT_LOG_DIR")
-	agentAutoRegisterKey             = os.Getenv("GOCD_AGENT_AUTO_REGISTER_KEY")
-	agentAutoRegisterResources       = os.Getenv("GOCD_AGENT_AUTO_REGISTER_RESOURCES")
-	agentAutoRegisterEnvironments    = os.Getenv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS")
-	agentAutoRegisterElasticAgentId  = os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID")
-	agentAutoRegisterElasticPluginId = os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID")
-	goServerCAFile                   = ConfigFilePath("go-server-ca.pem")
-	agentPrivateKeyFile              = ConfigFilePath("agent-private-key.pem")
-	agentCertFile                    = ConfigFilePath("agent-cert.pem")
-	outputDebugLog                   = os.Getenv("DEBUG") != ""
-)
+type Config struct {
+	UUID               string
+	SendMessageTimeout time.Duration
+	ServerHostAndPort  string
+	WorkDir            string
+	LogDir             string
+	ConfigDir          string
+
+	AgentAutoRegisterKey             string
+	AgentAutoRegisterResources       string
+	AgentAutoRegisterEnvironments    string
+	AgentAutoRegisterElasticAgentId  string
+	AgentAutoRegisterElasticPluginId string
+
+	GoServerCAFile      string
+	AgentPrivateKeyFile string
+	AgentCertFile       string
+	OutputDebugLog      bool
+}
+
+func LoadConfig() *Config {
+	serverUrl, _ := url.Parse(readEnv("GOCD_SERVER_URL", "https://localhost:8154"))
+	return &Config{
+		UUID:                             uuid.NewV4().String(),
+		SendMessageTimeout:               120 * time.Second,
+		ServerHostAndPort:                serverUrl.Host,
+		WorkDir:                          os.Getenv("GOCD_AGENT_WORK_DIR"),
+		LogDir:                           os.Getenv("GOCD_AGENT_LOG_DIR"),
+		ConfigDir:                        readEnv("GOCD_AGENT_CONFIG_DIR", "config"),
+		AgentAutoRegisterKey:             os.Getenv("GOCD_AGENT_AUTO_REGISTER_KEY"),
+		AgentAutoRegisterResources:       os.Getenv("GOCD_AGENT_AUTO_REGISTER_RESOURCES"),
+		AgentAutoRegisterEnvironments:    os.Getenv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS"),
+		AgentAutoRegisterElasticAgentId:  os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID"),
+		AgentAutoRegisterElasticPluginId: os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID"),
+		GoServerCAFile:                   filepath.Join("config", "go-server-ca.pem"),
+		AgentPrivateKeyFile:              filepath.Join("config", "agent-private-key.pem"),
+		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
+		OutputDebugLog:                   os.Getenv("DEBUG") != "",
+	}
+}
+
+func (c *Config) HttpsServerURL(path string) string {
+	return "https://" + c.ServerHostAndPort + path
+}
+
+func (c *Config) WsServerURL() string {
+	return "wss://" + c.ServerHostAndPort + "/go/agent-websocket"
+}
+
+func (c *Config) MakeFullServerURL(url string) string {
+	if strings.HasPrefix(url, "/") {
+		return c.HttpsServerURL(url)
+	} else {
+		return url
+	}
+}
 
 func readEnv(varname string, defaultVal string) string {
 	val := os.Getenv(varname)
@@ -49,33 +88,5 @@ func readEnv(varname string, defaultVal string) string {
 		return defaultVal
 	} else {
 		return val
-	}
-}
-
-func ConfigGetSslHostAndPort() string {
-	return serverHostAndPort
-}
-
-func ConfigGetHttpsServerURL(path string) string {
-	return "https://" + ConfigGetSslHostAndPort() + path
-}
-
-func ConfigGetWsServerURL() string {
-	return "wss://" + ConfigGetSslHostAndPort() + "/go/agent-websocket"
-}
-
-func ConfigGetAgentUUID() string {
-	return _uuid
-}
-
-func ConfigFilePath(fileName string) string {
-	return filepath.Join("config", fileName)
-}
-
-func ConfigMakeFullServerURL(url string) string {
-	if strings.HasPrefix(url, "/") {
-		return ConfigGetHttpsServerURL(url)
-	} else {
-		return url
 	}
 }

@@ -48,7 +48,7 @@ func AgentRuntimeInfo() map[string]interface{} {
 	data["identifier"] = map[string]string{
 		"hostName":  hostname,
 		"ipAddress": "127.0.0.1",
-		"uuid":      ConfigGetAgentUUID()}
+		"uuid":      config.UUID}
 	data["runtimeStatus"] = GetState("runtimeStatus")
 	data["buildingInfo"] = map[string]string{
 		"buildingInfo": GetState("buildingInfo"),
@@ -57,8 +57,8 @@ func AgentRuntimeInfo() map[string]interface{} {
 	data["usableSpace"] = UsableSpace()
 	data["operatingSystemName"] = runtime.GOOS
 	data["agentLauncherVersion"] = ""
-	data["elasticPluginId"] = agentAutoRegisterElasticPluginId
-	data["elasticAgentId"] = agentAutoRegisterElasticAgentId
+	data["elasticPluginId"] = config.AgentAutoRegisterElasticPluginId
+	data["elasticAgentId"] = config.AgentAutoRegisterElasticAgentId
 
 	if cookie := GetState("cookie"); cookie != "" {
 		data["cookie"] = cookie

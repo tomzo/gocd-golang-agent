@@ -111,7 +111,7 @@ loop:
 }
 
 func waitForMessageAck(ackId string, ack chan string) {
-	timeout := time.NewTimer(sendMessageTimeout)
+	timeout := time.NewTimer(config.SendMessageTimeout)
 	defer timeout.Stop()
 	for {
 		select {

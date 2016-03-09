@@ -220,9 +220,9 @@ func (s *BuildSession) processStart(cmd *BuildCommand) error {
 	settings, _ := cmd.Args[0].(map[string]interface{})
 	SetState("buildLocator", settings["buildLocator"].(string))
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"].(string))
-	s.Console = MakeBuildConsole(s.HttpClient, ConfigMakeFullServerURL(settings["consoleURI"].(string)), s.Done)
-	s.ArtifactUploadBaseUrl = ConfigMakeFullServerURL(settings["artifactUploadBaseUrl"].(string))
-	s.PropertyBaseUrl = ConfigMakeFullServerURL(settings["propertyBaseUrl"].(string))
+	s.Console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"].(string)), s.Done)
+	s.ArtifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"].(string))
+	s.PropertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"].(string))
 	s.BuildId = settings["buildId"].(string)
 	s.Envs = make(map[string]string)
 	s.BuildStatus = "passed"

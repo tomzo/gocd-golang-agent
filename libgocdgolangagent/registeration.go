@@ -34,13 +34,13 @@ type Registration struct {
 }
 
 func ReadGoServerCACert() error {
-	_, err := os.Stat(goServerCAFile)
+	_, err := os.Stat(config.GoServerCAFile)
 	if err == nil {
 		return nil
 	}
 
-	LogInfo("fetching Go server[%v] CA certificate", ConfigGetSslHostAndPort())
-	conn, err := tls.Dial("tcp", ConfigGetSslHostAndPort(), &tls.Config{
+	LogInfo("fetching Go server[%v] CA certificate", config.ServerHostAndPort)
+	conn, err := tls.Dial("tcp", config.ServerHostAndPort, &tls.Config{
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -49,9 +49,9 @@ func ReadGoServerCACert() error {
 	}
 	defer conn.Close()
 	state := conn.ConnectionState()
-	certOut, err := os.Create(goServerCAFile)
+	certOut, err := os.Create(config.GoServerCAFile)
 	if err != nil {
-		logger.Error.Printf("failed to open %v for writing: %s", goServerCAFile, err)
+		logger.Error.Printf("failed to open %v for writing: %s", config.GoServerCAFile, err)
 		return err
 	}
 	defer certOut.Close()
@@ -60,7 +60,7 @@ func ReadGoServerCACert() error {
 }
 
 func GoServerRootCAs() (*x509.CertPool, error) {
-	caCert, err := ioutil.ReadFile(goServerCAFile)
+	caCert, err := ioutil.ReadFile(config.GoServerCAFile)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func GoServerRootCAs() (*x509.CertPool, error) {
 func GoServerTlsConfig(withClientCert bool) (*tls.Config, error) {
 	certs := make([]tls.Certificate, 0)
 	if withClientCert {
-		cert, err := tls.LoadX509KeyPair(agentCertFile, agentPrivateKeyFile)
+		cert, err := tls.LoadX509KeyPair(config.AgentCertFile, config.AgentPrivateKeyFile)
 		if err != nil {
 			panic(err)
 		}
@@ -88,7 +88,7 @@ func GoServerTlsConfig(withClientCert bool) (*tls.Config, error) {
 	return &tls.Config{
 		Certificates: certs,
 		RootCAs:      roots,
-		ServerName:   extractServerDN(goServerCAFile),
+		ServerName:   extractServerDN(config.GoServerCAFile),
 	}, nil
 }
 
@@ -114,7 +114,9 @@ func Register() error {
 }
 
 func CleanRegistration() error {
-	files := []string{goServerCAFile, agentPrivateKeyFile, agentCertFile}
+	files := []string{config.GoServerCAFile,
+		config.AgentPrivateKeyFile,
+		config.AgentCertFile}
 	for _, f := range files {
 		_, err := os.Stat(f)
 		if err == nil {
@@ -133,22 +135,22 @@ func registerData() map[string]string {
 
 	return map[string]string{
 		"hostname":                      hostname,
-		"uuid":                          _uuid,
+		"uuid":                          config.UUID,
 		"location":                      workingDir,
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   UsableSpace(),
-		"agentAutoRegisterKey":          agentAutoRegisterKey,
-		"agentAutoRegisterResources":    agentAutoRegisterResources,
-		"agentAutoRegisterEnvironments": agentAutoRegisterEnvironments,
+		"agentAutoRegisterKey":          config.AgentAutoRegisterKey,
+		"agentAutoRegisterResources":    config.AgentAutoRegisterResources,
+		"agentAutoRegisterEnvironments": config.AgentAutoRegisterEnvironments,
 		"agentAutoRegisterHostname":     hostname,
-		"elasticAgentId":                agentAutoRegisterElasticAgentId,
-		"elasticPluginId":               agentAutoRegisterElasticPluginId,
+		"elasticAgentId":                config.AgentAutoRegisterElasticAgentId,
+		"elasticPluginId":               config.AgentAutoRegisterElasticPluginId,
 	}
 }
 
 func readAgentKeyAndCerts(params map[string]string) error {
-	_, agentPrivateKeyFileErr := os.Stat(agentPrivateKeyFile)
-	_, agentCertFileErr := os.Stat(agentCertFile)
+	_, agentPrivateKeyFileErr := os.Stat(config.AgentPrivateKeyFile)
+	_, agentCertFileErr := os.Stat(config.AgentCertFile)
 	if agentPrivateKeyFileErr == nil && agentCertFileErr == nil {
 		return nil
 	}
@@ -164,7 +166,7 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	}
 
 	LogInfo("fetching agent key and certificates")
-	resp, err := client.PostForm(ConfigGetHttpsServerURL("/go/admin/agent"), form)
+	resp, err := client.PostForm(config.HttpsServerURL("/go/admin/agent"), form)
 	if err != nil {
 		return err
 	}
@@ -178,8 +180,8 @@ func readAgentKeyAndCerts(params map[string]string) error {
 		return err
 	}
 
-	ioutil.WriteFile(agentPrivateKeyFile, []byte(registration.AgentPrivateKey), 0600)
-	ioutil.WriteFile(agentCertFile, []byte(registration.AgentCertificate), 0600)
+	ioutil.WriteFile(config.AgentPrivateKeyFile, []byte(registration.AgentPrivateKey), 0600)
+	ioutil.WriteFile(config.AgentCertFile, []byte(registration.AgentCertificate), 0600)
 	return nil
 }
 

@@ -43,7 +43,7 @@ func MakeLogger(logDir, file string) (*Logger, error) {
 		output = os.Stdout
 	}
 
-	if outputDebugLog {
+	if config.OutputDebugLog {
 		debugOutput = output
 	} else {
 		debugOutput = ioutil.Discard
