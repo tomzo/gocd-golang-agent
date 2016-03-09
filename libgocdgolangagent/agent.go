@@ -26,11 +26,15 @@ import (
 var buildSession *BuildSession
 
 func StartAgent() {
-	if err := os.Chdir(agentWorkDir); err != nil {
-		LogInfo("%v. Invalid GOCD_AGENT_WORK_DIR?", err)
-		os.Exit(-1)
+	if err := os.Chdir(AgentWorkDir()); err != nil {
+		panic(err)
 	}
-	if err := os.MkdirAll(ConfigFilePath(""), 0744); err != nil {
+
+	if err := InitLogger(); err != nil {
+		panic(err)
+	}
+
+	if err := InitConfig(); err != nil {
 		LogInfo("%v", err)
 		os.Exit(-1)
 	}

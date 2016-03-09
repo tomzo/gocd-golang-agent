@@ -17,18 +17,43 @@
 package libgocdgolangagent
 
 import (
-	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 )
 
-var debug = os.Getenv("DEBUG") != ""
+var infoLogger, debugLogger *log.Logger
 
-func LogDebug(format string, v ...interface{}) {
-	if debug {
-		fmt.Printf("[DEBUG] "+format+"\n", v...)
+func logOutput() (io.Writer, error) {
+	logDir := AgentLogDir()
+	if logDir != "" {
+		fpath := filepath.Join(AgentLogDir(), "gocd-golang-agent.log")
+		file, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		return file, err
+	} else {
+		return os.Stdout, nil
 	}
 }
 
+func InitLogger() error {
+	writer, err := logOutput()
+	if err != nil {
+		return err
+	}
+	debugLogger = log.New(writer, "[DEBUG] ", 0)
+	infoLogger = log.New(writer, "[INFO] ", 0)
+	if ConfigGetDebug() {
+		debugLogger.SetOutput(ioutil.Discard)
+	}
+	return nil
+}
+
+func LogDebug(format string, v ...interface{}) {
+	debugLogger.Printf(format, v...)
+}
+
 func LogInfo(format string, v ...interface{}) {
-	fmt.Printf("[INFO] "+format+"\n", v...)
+	infoLogger.Printf(format, v...)
 }
