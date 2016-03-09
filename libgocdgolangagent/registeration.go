@@ -77,7 +77,7 @@ func GoServerTlsConfig(withClientCert bool) (*tls.Config, error) {
 	if withClientCert {
 		cert, err := tls.LoadX509KeyPair(config.AgentCertFile, config.AgentPrivateKeyFile)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		certs = append(certs, cert)
 	}
@@ -85,10 +85,14 @@ func GoServerTlsConfig(withClientCert bool) (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	serverName, err := extractServerDN(config.GoServerCAFile)
+	if err != nil {
+		return nil, err
+	}
 	return &tls.Config{
 		Certificates: certs,
 		RootCAs:      roots,
-		ServerName:   extractServerDN(config.GoServerCAFile),
+		ServerName:   serverName,
 	}, nil
 }
 
@@ -185,13 +189,16 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	return nil
 }
 
-func extractServerDN(certFileName string) string {
+func extractServerDN(certFileName string) (string, error) {
 	pemBlock, err := ioutil.ReadFile(certFileName)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	der, _ := pem.Decode(pemBlock)
-	cert, _ := x509.ParseCertificate(der.Bytes)
-	return cert.Subject.CommonName
+	cert, err := x509.ParseCertificate(der.Bytes)
+	if err != nil {
+		return "", err
+	}
+	return cert.Subject.CommonName, nil
 }
