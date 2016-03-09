@@ -51,7 +51,7 @@ func MakeLogger(logDir, file string) (*Logger, error) {
 
 	debugLogger := log.New(debugOutput, "", 0)
 	infoLogger := log.New(output, "", 0)
-	errorLogger := log.New(output, "ERROR: ", 0)
+	errorLogger := log.New(output, "ERROR: ", log.Lshortfile)
 
 	return &Logger{Debug: debugLogger, Info: infoLogger, Error: errorLogger}, nil
 }
