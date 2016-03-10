@@ -15,11 +15,12 @@
 # limitations under the License.
 #
 set -e
-
+# set -x
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
-PROJECT_DIR="$SCRIPT_DIR/../../"
-BINARY_FILE="$SCRIPT_DIR/package/usr/bin/gocd-golang-agent"
-DEB_FILE="gocd-golang-agent_0.1-1_all.deb"
+. $SCRIPT_DIR/vars
+PROJECT_DIR="${SCRIPT_DIR}/../../"
+BINARY_FILE="${SCRIPT_DIR}/package/usr/bin/gocd-golang-agent"
+CONTROL_FILE="${SCRIPT_DIR}/package/DEBIAN/control"
 
 echo "############################"
 echo "Cross compiling for linux..."
@@ -35,14 +36,25 @@ echo "############################"
 echo "Packaging to deb file..."
 echo "############################"
 
+
 cd $SCRIPT_DIR
+
+if [ -f *.deb ]
+then
+    rm *.deb
+fi
+
+sed -i '' '/^Version:.*$/d' $CONTROL_FILE
+echo "Version: $GGA_VERSION-$GGA_DEB_VERSION" >> $CONTROL_FILE
 docker build -t gocd/deb-maker .
-docker run -v ${PWD}:/build gocd/deb-maker /bin/bash -c "cd /build/package && fakeroot dpkg-deb --build . ../$DEB_FILE"
+docker run -v ${PWD}:/build gocd/deb-maker /bin/bash -c "cd /build/package && fakeroot dpkg-deb --build . ../$DEB_FILENAME"
+sed -i '' '/^Version:.*$/d' $CONTROL_FILE
+
 
 echo "############################"
 echo "Making sure installer can be installed..."
 echo "############################"
 
-docker run -v ${PWD}:/build gocd/deb-maker /bin/bash -c "cd /build && dpkg -i $DEB_FILE && service gocd-golang-agent start && sleep 3 && ps aux | grep -v 'grep' | grep gocd-golang-agent"
+docker run -v ${PWD}:/build gocd/deb-maker /bin/bash -c "cd /build && dpkg -i $DEB_FILENAME && service gocd-golang-agent start && sleep 3 && ps aux | grep -v 'grep' | grep gocd-golang-agent"
 
 echo "All check passed."

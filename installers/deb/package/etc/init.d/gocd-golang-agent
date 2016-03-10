@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-set -x
 ### BEGIN INIT INFO
 # Provides: gocd-golang-agent
 # Required-Start: $network $remote_fs
