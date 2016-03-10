@@ -14,21 +14,22 @@
  * limitations under the License.
  */
 
-package main
+package libgocdgolangagent
 
 import (
-	"github.com/gocd-contrib/gocd-golang-agent/libgocdgolangagent"
-	"time"
+	"github.com/satori/go.uuid"
 )
 
-func main() {
-	libgocdgolangagent.Initialize()
-	for {
-		err := libgocdgolangagent.Start()
-		if err != nil {
-			libgocdgolangagent.LogInfo("something wrong: %v", err.Error())
-		}
-		libgocdgolangagent.LogInfo("sleep 10 seconds and restart")
-		time.Sleep(10 * time.Second)
+type Message struct {
+	Action string                 `json:"action"`
+	Data   map[string]interface{} `json:"data"`
+	AckId  string                 `json:"ackId"`
+}
+
+func MakeMessage(action, dataType string, data interface{}) *Message {
+	return &Message{
+		Action: action,
+		Data:   map[string]interface{}{"type": dataType, "data": data},
+		AckId:  uuid.NewV4().String(),
 	}
 }

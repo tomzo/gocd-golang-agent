@@ -20,17 +20,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
 	"io/ioutil"
 	"time"
 )
-
-type Message struct {
-	Action string                 `json:"action"`
-	Data   map[string]interface{} `json:"data"`
-	AckId  string                 `json:"ackId"`
-}
 
 type WebsocketConnection struct {
 	Conn     *websocket.Conn
@@ -43,14 +36,6 @@ func (wc *WebsocketConnection) Close() {
 	err := wc.Conn.Close()
 	if err != nil {
 		logger.Error.Printf("Close websocket connection failed: %v", err)
-	}
-}
-
-func MakeMessage(action, dataType string, data map[string]interface{}) *Message {
-	return &Message{
-		Action: action,
-		Data:   map[string]interface{}{"type": dataType, "data": data},
-		AckId:  uuid.NewV4().String(),
 	}
 }
 

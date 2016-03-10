@@ -38,7 +38,7 @@ func LogInfo(format string, v ...interface{}) {
 	logger.Info.Printf(format, v...)
 }
 
-func initialize() {
+func Initialize() {
 	config = LoadConfig()
 	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log")
 	LogInfo(">>>>>>> go >>>>>>>")
@@ -65,27 +65,7 @@ func initialize() {
 	}
 }
 
-func StartAgent() {
-	initialize()
-
-	for {
-		err := doStartAgent()
-		if err != nil {
-			LogInfo("something wrong: %v", err.Error())
-		}
-		LogInfo("sleep 10 seconds and restart")
-		time.Sleep(10 * time.Second)
-	}
-}
-
-func closeBuildSession() {
-	if buildSession != nil {
-		buildSession.Close()
-		buildSession = nil
-	}
-}
-
-func doStartAgent() error {
+func Start() error {
 	err := Register()
 	if err != nil {
 		return err
@@ -161,4 +141,11 @@ func ping(send chan *Message) {
 		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	}
 	send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
+}
+
+func closeBuildSession() {
+	if buildSession != nil {
+		buildSession.Close()
+		buildSession = nil
+	}
 }
