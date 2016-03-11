@@ -20,4 +20,6 @@ set -e
 
 #                   src/github.com/gocd-contrib/gocd-golang-agent
 export GOPATH=`pwd`/../../../../
+go get golang.org/x/net/websocket
+go get github.com/satori/go.uuid
 go test ./...
