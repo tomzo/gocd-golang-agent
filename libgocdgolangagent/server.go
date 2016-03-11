@@ -28,16 +28,21 @@ import (
 	"path/filepath"
 )
 
+type AgentStateListener interface {
+	Notify(uuid, state string)
+}
+
 type Server struct {
-	Port        string
-	URL         string
-	CertPemFile string
-	KeyPemFile  string
-	WorkingDir  string
-	Logger      *Logger
-	addAgent    chan *RemoteAgent
-	delAgent    chan *RemoteAgent
-	sendMessage chan *RemoteAgentMessage
+	Port                string
+	URL                 string
+	CertPemFile         string
+	KeyPemFile          string
+	WorkingDir          string
+	Logger              *Logger
+	AgentStateListeners []AgentStateListener
+	addAgent            chan *RemoteAgent
+	delAgent            chan *RemoteAgent
+	sendMessage         chan *RemoteAgentMessage
 }
 
 func (s *Server) Start() error {
@@ -48,9 +53,20 @@ func (s *Server) Start() error {
 	go s.manageAgents()
 
 	http.Handle("/go/agent-websocket", s.websocketHandler())
-	http.HandleFunc("/console", s.consoleHandler())
+	http.HandleFunc("/go/console", s.consoleHandler())
 	http.HandleFunc("/go/admin/agent", s.registorHandler())
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
+}
+
+func (s *Server) ConsoleUrl(buildId string) string {
+	return s.URL + "/go/console?buildId=" + buildId
+}
+
+func (s *Server) ArtifactUploadBaseUrl(buildId string) string {
+	return s.URL + "/go/artifacts/" + buildId
+}
+func (s *Server) PropertyBaseUrl(buildId string) string {
+	return s.URL + "/go/property/" + buildId
 }
 
 func (s *Server) manageAgents() {
@@ -112,28 +128,32 @@ func (s *Server) websocketHandler() websocket.Handler {
 		agent := &RemoteAgent{conn: ws}
 		defer func() {
 			s.Del(agent)
-			s.log("close websocket connection for %v", agent)
+			s.Log("close websocket connection for %v", agent)
 			err := agent.Close()
 			if err != nil {
-				s.log("error when closing websocket connection for %v: %v", agent, err)
+				s.Log("error when closing websocket connection for %v: %v", agent, err)
 			}
 		}()
-		s.log("websocket connection is open for %v", agent)
+		s.Log("websocket connection is open for %v", agent)
 		agent.Listen(s)
 	})
+}
+
+func (s *Server) ConsoleLog(buildId string) ([]byte, error) {
+	return ioutil.ReadFile(s.consoleLogFile(buildId))
 }
 
 func (s *Server) consoleHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		bytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			s.log("read request body error: %v", err)
+			s.Log("read request body error: %v", err)
 			return
 		}
 		buildId := req.URL.Query().Get("buildId")
 		err = s.appendConsoleLog(s.consoleLogFile(buildId), bytes)
 		if err != nil {
-			s.log("append console log error: %v", err)
+			s.Log("append console log error: %v", err)
 			return
 		}
 	}
@@ -152,6 +172,7 @@ func (s *Server) appendConsoleLog(filename string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	s.Log("append data(%v) to %v", len(data), filename)
 	n, err := f.Write(data)
 	if err == nil && n < len(data) {
 		err = io.ErrShortWrite
@@ -162,7 +183,7 @@ func (s *Server) appendConsoleLog(filename string, data []byte) error {
 	return err
 }
 
-func (s *Server) log(format string, v ...interface{}) {
+func (s *Server) Log(format string, v ...interface{}) {
 	s.Logger.Info.Printf(format, v...)
 }
 
@@ -182,6 +203,12 @@ func (s *Server) Del(agent *RemoteAgent) {
 	s.delAgent <- agent
 }
 
+func (s *Server) Notify(uuid, state string) {
+	for _, listener := range s.AgentStateListeners {
+		listener.Notify(uuid, state)
+	}
+}
+
 type RemoteAgent struct {
 	conn *websocket.Conn
 	UUID string
@@ -196,6 +223,7 @@ func (agent *RemoteAgent) Listen(server *Server) {
 		} else if err != nil {
 			server.Error("receive error: %v", err)
 		} else {
+			server.Log("received message: %v", msg.Action)
 			err = agent.Ack(&msg)
 			if err != nil {
 				server.Error("ack error: %v", err)
@@ -207,6 +235,11 @@ func (agent *RemoteAgent) Listen(server *Server) {
 					server.Add(agent)
 					agent.SetCookie()
 				}
+				server.Notify(agent.UUID, AgentRuntimeStatus(msg.Data["data"]))
+			case "reportCurrentStatus":
+				report := msg.Data["data"].(map[string]interface{})
+				state := AgentRuntimeStatus(report["agentRuntimeInfo"])
+				server.Notify(agent.UUID, state)
 			}
 		}
 	}

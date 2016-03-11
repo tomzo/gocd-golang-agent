@@ -31,26 +31,29 @@ type BuildConsole struct {
 	HttpClient *http.Client
 	Buffer     *bytes.Buffer
 	Lock       sync.Mutex
-	Stop       chan int
+	stop       chan bool
+	closed     *sync.WaitGroup
 }
 
-func MakeBuildConsole(httpClient *http.Client, uri string, stop chan int) *BuildConsole {
+func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
 	u, _ := url.Parse(uri + "&agentId=" + UUID)
 	console := BuildConsole{
 		HttpClient: httpClient,
 		Url:        u,
 		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
-		Stop:       stop,
+		stop:       make(chan bool),
+		closed:     &sync.WaitGroup{},
 	}
-
+	console.closed.Add(1)
 	go func() {
 		flushTick := time.NewTicker(5 * time.Second)
 		defer flushTick.Stop()
 		for {
 			select {
-			case <-console.Stop:
+			case <-console.stop:
 				console.Flush()
 				LogInfo("build console closed")
+				console.closed.Done()
 				return
 			case <-flushTick.C:
 				console.Flush()
@@ -59,6 +62,11 @@ func MakeBuildConsole(httpClient *http.Client, uri string, stop chan int) *Build
 	}()
 
 	return &console
+}
+
+func (console *BuildConsole) Close() {
+	console.stop <- true
+	console.closed.Wait()
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {

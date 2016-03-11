@@ -69,6 +69,10 @@ func AgentUUID(info interface{}) string {
 	m, _ := info.(map[string]interface{})
 	identifier := m["identifier"]
 	id, _ := identifier.(map[string]interface{})
-	uid, _ := id["uuid"].(string)
-	return uid
+	return id["uuid"].(string)
+}
+func AgentRuntimeStatus(info interface{}) string {
+	m, _ := info.(map[string]interface{})
+	state := m["runtimeStatus"]
+	return state.(string)
 }

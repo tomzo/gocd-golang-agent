@@ -26,35 +26,36 @@ import (
 )
 
 type BuildSession struct {
-	HttpClient            *http.Client
-	Send                  chan *Message
-	BuildStatus           string
-	Console               *BuildConsole
-	ArtifactUploadBaseUrl string
-	PropertyBaseUrl       string
-	BuildId               string
-	Envs                  map[string]string
-	Cancel                chan int
-	Done                  chan int
+	HttpClient *http.Client
+	Send       chan *Message
+
+	buildStatus           string
+	console               *BuildConsole
+	artifactUploadBaseUrl string
+	propertyBaseUrl       string
+	buildId               string
+	envs                  map[string]string
+	cancel                chan int
+	done                  chan int
 }
 
 func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession {
 	return &BuildSession{
 		HttpClient: httpClient,
 		Send:       send,
-		Cancel:     make(chan int),
-		Done:       make(chan int),
+		cancel:     make(chan int),
+		done:       make(chan int),
 	}
 }
 
 func (s *BuildSession) Close() {
-	close(s.Cancel)
-	<-s.Done
+	close(s.cancel)
+	<-s.done
 }
 
 func (s *BuildSession) isCanceled() bool {
 	select {
-	case <-s.Cancel:
+	case <-s.cancel:
 		return true
 	default:
 		return false
@@ -62,7 +63,12 @@ func (s *BuildSession) isCanceled() bool {
 }
 
 func (s *BuildSession) Process(cmd *BuildCommand) error {
-	defer close(s.Done)
+	defer func() {
+		if s.console != nil {
+			s.console.Close()
+		}
+		close(s.done)
+	}()
 	return s.process(cmd)
 }
 
@@ -73,7 +79,7 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	}
 
 	LogDebug("procssing build command: %v\n", cmd)
-	if s.BuildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.BuildStatus {
+	if s.buildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.buildStatus {
 		//skip, no failure
 		return nil
 	}
@@ -108,7 +114,7 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "end":
 		// nothing to do
 	default:
-		s.Console.WriteLn("TBI command: %v", cmd.Name)
+		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
 	return nil
 }
@@ -125,8 +131,8 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	arg0 := cmd.Args[0].(string)
 	args := convertToStringSlice(cmd.Args[1:])
 	execCmd := exec.Command(arg0, args...)
-	execCmd.Stdout = s.Console
-	execCmd.Stderr = s.Console
+	execCmd.Stdout = s.console
+	execCmd.Stderr = s.console
 	execCmd.Dir = cmd.WorkingDirectory
 	done := make(chan error)
 	go func() {
@@ -134,18 +140,18 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	}()
 
 	select {
-	case <-s.Cancel:
+	case <-s.cancel:
 		LogDebug("received cancel signal")
 		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.Console.WriteLn("kill command %v failed, error: %v", cmd.Args, err)
+			s.console.WriteLn("kill command %v failed, error: %v", cmd.Args, err)
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
 		return errors.New(fmt.Sprintf("%v is canceled", cmd.Args))
 	case err := <-done:
 		if err != nil {
-			s.Console.WriteLn(err.Error())
+			s.console.WriteLn(err.Error())
 		}
 		return err
 	}
@@ -165,12 +171,9 @@ func (s *BuildSession) processTest(cmd *BuildCommand) error {
 func (s *BuildSession) statusReport(jobState string) map[string]interface{} {
 	ret := map[string]interface{}{
 		"agentRuntimeInfo": AgentRuntimeInfo(),
-		"buildId":          s.BuildId,
+		"buildId":          s.buildId,
 		"jobState":         jobState,
-		"result":           capitalize(s.BuildStatus)}
-	if jobState != "" {
-		ret["jobState"] = jobState
-	}
+		"result":           capitalize(s.buildStatus)}
 	return ret
 }
 
@@ -182,7 +185,7 @@ func capitalize(str string) string {
 
 func (s *BuildSession) processEcho(cmd *BuildCommand) error {
 	for _, arg := range cmd.Args {
-		s.Console.WriteLn(arg.(string))
+		s.console.WriteLn(arg.(string))
 	}
 	return nil
 }
@@ -191,11 +194,11 @@ func (s *BuildSession) processExport(cmd *BuildCommand) error {
 	if len(cmd.Args) > 0 {
 		newEnvs := cmd.Args[0].(map[string]interface{})
 		for key, value := range newEnvs {
-			s.Envs[key] = value.(string)
+			s.envs[key] = value.(string)
 		}
 	} else {
 		args := make([]interface{}, 0)
-		for key, value := range s.Envs {
+		for key, value := range s.envs {
 			args = append(args, fmt.Sprintf("export %v=%v", key, value))
 		}
 		s.process(&BuildCommand{
@@ -210,7 +213,7 @@ func (s *BuildSession) processCompose(cmd *BuildCommand) error {
 	var err error
 	for _, sub := range cmd.SubCommands {
 		if err = s.process(sub); err != nil {
-			s.BuildStatus = "failed"
+			s.buildStatus = "failed"
 		}
 	}
 	return err
@@ -220,11 +223,11 @@ func (s *BuildSession) processStart(cmd *BuildCommand) error {
 	settings, _ := cmd.Args[0].(map[string]interface{})
 	SetState("buildLocator", settings["buildLocator"].(string))
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"].(string))
-	s.Console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"].(string)), s.Done)
-	s.ArtifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"].(string))
-	s.PropertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"].(string))
-	s.BuildId = settings["buildId"].(string)
-	s.Envs = make(map[string]string)
-	s.BuildStatus = "passed"
+	s.console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"].(string)))
+	s.artifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"].(string))
+	s.propertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"].(string))
+	s.buildId = settings["buildId"].(string)
+	s.envs = make(map[string]string)
+	s.buildStatus = "passed"
 	return nil
 }
