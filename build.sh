@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-set -x
+set +x
 set -e
 
 #                   src/github.com/gocd-contrib/gocd-golang-agent
