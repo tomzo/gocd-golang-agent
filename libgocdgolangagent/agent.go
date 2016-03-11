@@ -126,8 +126,10 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	SetState("runtimeStatus", "Building")
 	defer SetState("runtimeStatus", "Idle")
 	command, _ := msg.Data["data"].(map[string]interface{})
-	LogInfo("start process build command")
-	err := buildSession.Process(MakeBuildCommand(command))
+	buildCmd := MakeBuildCommand(command)
+	LogInfo("start process build command:")
+	LogInfo(buildCmd.dump(2, 2))
+	err := buildSession.Process(buildCmd)
 	if err != nil {
 		LogInfo("Error(%v) when processing message : %v", err, msg)
 	}

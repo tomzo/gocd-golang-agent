@@ -17,7 +17,10 @@
 package libgocdgolangagent
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 type CommandTest struct {
@@ -37,4 +40,21 @@ func MakeBuildCommand(command map[string]interface{}) *BuildCommand {
 	str, _ := json.Marshal(command)
 	json.Unmarshal(str, &cmd)
 	return &cmd
+}
+
+func (cmd *BuildCommand) dump(indent, step int) string {
+	var buffer bytes.Buffer
+	buffer.WriteString(strings.Repeat(" ", indent))
+	buffer.WriteString(cmd.Name)
+	for _, arg := range cmd.Args {
+		buffer.WriteString(fmt.Sprintf(" \"%v\"", arg))
+	}
+	if "passed" != cmd.RunIfConfig {
+		buffer.WriteString(fmt.Sprintf(" runIf:%v", cmd.RunIfConfig))
+	}
+	for _, subCmd := range cmd.SubCommands {
+		buffer.WriteString("\n")
+		buffer.WriteString(subCmd.dump(indent+step, step))
+	}
+	return buffer.String()
 }
