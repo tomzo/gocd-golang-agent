@@ -19,13 +19,7 @@ set -x
 set -e
 
 #                   src/github.com/gocd-contrib/gocd-golang-agent
-# export GOPATH=`pwd`/../../../../
-# go get golang.org/x/net/websocket
-# go get github.com/satori/go.uuid
-# go test ./...
-
-echo "foo"
-sleep 2
-echo "bar"
-sleep 2
-echo "foobar"
+export GOPATH=`pwd`/../../../../
+go get golang.org/x/net/websocket
+go get github.com/satori/go.uuid
+go test -test.v ./...
