@@ -40,7 +40,7 @@ func LogInfo(format string, v ...interface{}) {
 
 func Initialize() {
 	config = LoadConfig()
-	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log")
+	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log", config.OutputDebugLog)
 	LogInfo(">>>>>>> go >>>>>>>")
 	if config.WorkDir != "" {
 		if err := os.Chdir(config.WorkDir); err != nil {

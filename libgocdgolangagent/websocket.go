@@ -96,11 +96,9 @@ loop:
 }
 
 func waitForMessageAck(ackId string, ack chan string) {
-	timeout := time.NewTimer(config.SendMessageTimeout)
-	defer timeout.Stop()
 	for {
 		select {
-		case <-timeout.C:
+		case <-time.After(config.SendMessageTimeout):
 			LogInfo("wait for message ack timeout, id: %v", ackId)
 			return
 		case id := <-ack:

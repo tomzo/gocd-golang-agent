@@ -18,26 +18,63 @@ package libgocdgolangagent
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
+	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 type Server struct {
-	Port         string
-	CertPemFile  string
-	KeyPemFile   string
-	Handle       func(*RemoteAgent)
-	OnConsoleLog func(data string, err error)
+	Port        string
+	URL         string
+	CertPemFile string
+	KeyPemFile  string
+	WorkingDir  string
+	Logger      *Logger
+	addAgent    chan *RemoteAgent
+	delAgent    chan *RemoteAgent
+	sendMessage chan *RemoteAgentMessage
 }
 
 func (s *Server) Start() error {
+	s.addAgent = make(chan *RemoteAgent)
+	s.delAgent = make(chan *RemoteAgent)
+	s.sendMessage = make(chan *RemoteAgentMessage)
+
+	go s.manageAgents()
+
 	http.Handle("/go/agent-websocket", s.websocketHandler())
 	http.HandleFunc("/console", s.consoleHandler())
 	http.HandleFunc("/go/admin/agent", s.registorHandler())
-
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
+}
+
+func (s *Server) manageAgents() {
+	agents := make(map[string]*RemoteAgent)
+	messages := make(map[string][]*Message)
+	for {
+		select {
+		case agent := <-s.addAgent:
+			agents[agent.UUID] = agent
+			for _, msg := range messages[agent.UUID] {
+				agent.Send(msg)
+			}
+			delete(messages, agent.UUID)
+		case agent := <-s.delAgent:
+			delete(agents, agent.UUID)
+		case am := <-s.sendMessage:
+			agent := agents[am.UUID]
+			if agent != nil {
+				agent.Send(am.Msg)
+			} else {
+				messages[am.UUID] = append(messages[am.UUID], am.Msg)
+			}
+		}
+	}
 }
 
 func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
@@ -74,46 +111,132 @@ func (s *Server) websocketHandler() websocket.Handler {
 	return websocket.Handler(func(ws *websocket.Conn) {
 		agent := &RemoteAgent{conn: ws}
 		defer func() {
-			log.Printf("close websocket connection for %v", agent)
+			s.Del(agent)
+			s.log("close websocket connection for %v", agent)
 			err := agent.Close()
 			if err != nil {
-				log.Printf("error when closing websocket connection for %v: %v", agent, err)
+				s.log("error when closing websocket connection for %v: %v", agent, err)
 			}
 		}()
-		log.Printf("websocket connection is open for %v", agent)
-		s.Handle(agent)
+		s.log("websocket connection is open for %v", agent)
+		agent.Listen(s)
 	})
 }
 
 func (s *Server) consoleHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		bytes, err := ioutil.ReadAll(req.Body)
-		s.OnConsoleLog(string(bytes), err)
+		if err != nil {
+			s.log("read request body error: %v", err)
+			return
+		}
+		buildId := req.URL.Query().Get("buildId")
+		err = s.appendConsoleLog(s.consoleLogFile(buildId), bytes)
+		if err != nil {
+			s.log("append console log error: %v", err)
+			return
+		}
 	}
+}
+
+func (s *Server) consoleLogFile(buildId string) string {
+	return filepath.Join(s.WorkingDir, buildId, "console.log")
+}
+
+func (s *Server) appendConsoleLog(filename string, data []byte) error {
+	err := os.MkdirAll(filepath.Dir(filename), 0744)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0744)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
+func (s *Server) log(format string, v ...interface{}) {
+	s.Logger.Info.Printf(format, v...)
+}
+
+func (s *Server) Error(format string, v ...interface{}) {
+	s.Logger.Error.Printf(format, v...)
+}
+
+func (s *Server) Send(uid string, msg *Message) {
+	s.sendMessage <- &RemoteAgentMessage{UUID: uid, Msg: msg}
+}
+
+func (s *Server) Add(agent *RemoteAgent) {
+	s.addAgent <- agent
+}
+
+func (s *Server) Del(agent *RemoteAgent) {
+	s.delAgent <- agent
 }
 
 type RemoteAgent struct {
 	conn *websocket.Conn
+	UUID string
+}
+
+func (agent *RemoteAgent) Listen(server *Server) {
+	for {
+		var msg Message
+		err := MessageCodec.Receive(agent.conn, &msg)
+		if err == io.EOF {
+			return
+		} else if err != nil {
+			server.Error("receive error: %v", err)
+		} else {
+			err = agent.Ack(&msg)
+			if err != nil {
+				server.Error("ack error: %v", err)
+			}
+			switch msg.Action {
+			case "ping":
+				if agent.UUID == "" {
+					agent.UUID = AgentUUID(msg.Data["data"])
+					server.Add(agent)
+					agent.SetCookie()
+				}
+			}
+		}
+	}
 }
 
 func (agent *RemoteAgent) Send(msg *Message) error {
 	return MessageCodec.Send(agent.conn, msg)
 }
 
-func (agent *RemoteAgent) Ack(ackId string) error {
-	return agent.Send(MakeMessage("ack", "java.lang.String", ackId))
+func (agent *RemoteAgent) SetCookie() error {
+	return agent.Send(MakeMessage("setCookie", "java.lang.String", uuid.NewV4().String()))
 }
 
-func (agent *RemoteAgent) Receive() (*Message, error) {
-	var msg Message
-	err := MessageCodec.Receive(agent.conn, &msg)
-	return &msg, err
+func (agent *RemoteAgent) Ack(msg *Message) error {
+	if msg.AckId != "" {
+		return agent.Send(MakeMessage("ack", "java.lang.String", msg.AckId))
+	}
+	return nil
 }
 
 func (agent *RemoteAgent) String() string {
-	return agent.conn.RemoteAddr().String()
+	return fmt.Sprintf("[agent %v, uuid: %v]",
+		agent.conn.RemoteAddr(), agent.UUID)
 }
 
 func (agent *RemoteAgent) Close() error {
 	return agent.conn.Close()
+}
+
+type RemoteAgentMessage struct {
+	UUID string
+	Msg  *Message
 }

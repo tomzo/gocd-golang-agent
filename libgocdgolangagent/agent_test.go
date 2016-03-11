@@ -24,83 +24,72 @@ import (
 )
 
 var (
-	agentWorkDir string
+	server *Server
 )
 
 func TestAgent(t *testing.T) {
-	certFile := tmpFile("test-server-cert.pem")
-	keyFile := tmpFile("test-server-private.pem")
-	cert := MakeCert()
-	err := cert.Generate(certFile, keyFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	server := &Server{
-		Port:        "1234",
-		CertPemFile: certFile,
-		KeyPemFile:  keyFile,
-		Handle: func(agent *RemoteAgent) {
-			var err error
-			var msg *Message
-			for {
-				msg, err = agent.Receive()
-				if err != nil {
-					t.Logf("receive error: %v", err)
-					return
-				}
-				t.Log(msg)
-				err = agent.Ack(msg.AckId)
-				if err != nil {
-					t.Logf("ack error: %v", err)
-					return
-				}
-				err = agent.Send(&Message{Action: "reregister"})
-				if err != nil {
-					t.Logf("send message error: %v", err)
-					return
-				}
-			}
-		},
-		OnConsoleLog: func(str string, err error) {
-			if err == nil {
-				t.Logf("console log: %v", str)
-			} else {
-				t.Logf("console log error: %v", err)
-			}
-		},
-	}
-
-	go func() {
-		err = server.Start()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	os.Setenv("GOCD_SERVER_URL", "https://"+cert.Host+":"+server.Port)
-	os.Setenv("GOCD_AGENT_WORK_DIR", agentWorkDir)
-	os.Setenv("GOCD_AGENT_DIR_DIR", agentWorkDir)
-
 	Initialize()
-	err = Start()
-	if err.Error() != "received reregister message" {
-		t.Error("Unexpected error to quit agent: ", err)
-	}
+	logger.Debug.SetPrefix("[agent]")
+	logger.Info.SetPrefix("[agent]")
+	logger.Error.SetPrefix("[agent]")
+	done := make(chan bool)
+	go func() {
+		err := Start()
+		if err.Error() != "received reregister message" {
+			t.Error("Unexpected error to quit agent: ", err)
+		}
+		done <- true
+	}()
+	server.Send(UUID, &Message{Action: "reregister"})
+	<-done
 }
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	var err error
-	agentWorkDir, err = ioutil.TempDir("", "gocdgolangagent")
+	workingDir, err := ioutil.TempDir("", "gocd-golang-agent")
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(agentWorkDir)
+	println("working directories:", workingDir)
+	serverWorkingDir := filepath.Join(workingDir, "server")
+	agentWorkingDir := filepath.Join(workingDir, "agent")
+
+	err = os.MkdirAll(serverWorkingDir, 0777)
+	if err != nil {
+		panic(err)
+	}
+	err = os.MkdirAll(agentWorkingDir, 0777)
+	if err != nil {
+		panic(err)
+	}
+
+	server = startServer(serverWorkingDir)
+	os.Setenv("GOCD_SERVER_URL", server.URL)
+	os.Setenv("GOCD_AGENT_WORK_DIR", agentWorkingDir)
+	os.Setenv("GOCD_AGENT_LOG_DIR", agentWorkingDir)
 
 	os.Exit(m.Run())
 }
 
-func tmpFile(name string) string {
-	return filepath.Join(agentWorkDir, name)
+func startServer(workingDir string) *Server {
+	certFile := filepath.Join(workingDir, "cert.pem")
+	keyFile := filepath.Join(workingDir, "private.pem")
+	cert := MakeCert()
+	err := cert.Generate(certFile, keyFile)
+	if err != nil {
+		panic(err)
+	}
+	port := "1234"
+	server := &Server{
+		Port:        port,
+		URL:         "https://" + cert.Host + ":" + port,
+		CertPemFile: certFile,
+		KeyPemFile:  keyFile,
+		WorkingDir:  workingDir,
+		Logger:      MakeLogger(workingDir, "server.log", true),
+	}
+
+	go func() { panic(server.Start()) }()
+	return server
 }

@@ -30,7 +30,7 @@ type Logger struct {
 	Error *log.Logger
 }
 
-func MakeLogger(logDir, file string) *Logger {
+func MakeLogger(logDir, file string, debug bool) *Logger {
 	var output, debugOutput io.Writer
 	if logDir != "" {
 		fpath := filepath.Join(logDir, file)
@@ -43,7 +43,7 @@ func MakeLogger(logDir, file string) *Logger {
 		output = os.Stdout
 	}
 
-	if config.OutputDebugLog {
+	if debug {
 		debugOutput = output
 	} else {
 		debugOutput = ioutil.Discard
