@@ -17,7 +17,9 @@
 package libgocdgolangagent
 
 import (
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
@@ -26,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type AgentStateListener interface {
@@ -55,6 +58,8 @@ func (s *Server) Start() error {
 	http.Handle("/go/agent-websocket", s.websocketHandler())
 	http.HandleFunc("/go/console", s.consoleHandler())
 	http.HandleFunc("/go/admin/agent", s.registorHandler())
+	http.HandleFunc("/go/status", s.statusHandler())
+	s.Log("listen to %v", s.Port)
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
 }
 
@@ -67,6 +72,10 @@ func (s *Server) ArtifactUploadBaseUrl(buildId string) string {
 }
 func (s *Server) PropertyBaseUrl(buildId string) string {
 	return s.URL + "/go/property/" + buildId
+}
+
+func (s *Server) StatusUrl() string {
+	return s.URL + "/go/status"
 }
 
 func (s *Server) manageAgents() {
@@ -90,6 +99,31 @@ func (s *Server) manageAgents() {
 				messages[am.UUID] = append(messages[am.UUID], am.Msg)
 			}
 		}
+	}
+}
+
+func (s *Server) WaitForStarted() error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return errors.New("wait for server start timeout")
+		default:
+			_, err := client.Get(s.StatusUrl())
+			if err == nil {
+				return nil
+			}
+		}
+	}
+}
+
+func (s *Server) statusHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte("ok"))
 	}
 }
 

@@ -30,9 +30,9 @@ type BuildConsole struct {
 	Url        *url.URL
 	HttpClient *http.Client
 	Buffer     *bytes.Buffer
-	Lock       sync.Mutex
 	stop       chan bool
 	closed     *sync.WaitGroup
+	write      chan []byte
 }
 
 func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
@@ -43,6 +43,7 @@ func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
 		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
 		stop:       make(chan bool),
 		closed:     &sync.WaitGroup{},
+		write:      make(chan []byte),
 	}
 	console.closed.Add(1)
 	go func() {
@@ -50,6 +51,9 @@ func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
 		defer flushTick.Stop()
 		for {
 			select {
+			case data := <-console.write:
+				LogDebug("BuildConsole: %v", string(data))
+				console.Buffer.Write(data)
 			case <-console.stop:
 				console.Flush()
 				LogInfo("build console closed")
@@ -70,10 +74,8 @@ func (console *BuildConsole) Close() {
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {
-	LogDebug("BuildConsole: %v", string(data))
-	console.Lock.Lock()
-	defer console.Lock.Unlock()
-	return console.Buffer.Write(data)
+	console.write <- data
+	return len(data), nil
 }
 
 func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
@@ -82,8 +84,6 @@ func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
 }
 
 func (console *BuildConsole) Flush() {
-	console.Lock.Lock()
-	defer console.Lock.Unlock()
 	LogDebug("build console flush, buffer len: %v", console.Buffer.Len())
 	if console.Buffer.Len() == 0 {
 		return

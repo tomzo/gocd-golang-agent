@@ -33,6 +33,7 @@ func Test(t *testing.T) {
 	buildId := "1"
 	done := make(chan bool)
 	go func() {
+		t.Log("start agent")
 		err := Start()
 		if err.Error() != "received reregister message" {
 			t.Error("Unexpected error to quit agent: ", err)
@@ -40,6 +41,7 @@ func Test(t *testing.T) {
 		close(done)
 	}()
 
+	t.Log("wait for agent register to server")
 	state := agentState.Next()
 	if state != "Idle" {
 		t.Fatal("expected Idle, but get: %v", state)
@@ -155,6 +157,11 @@ func startServer(workingDir string) *Server {
 	}
 
 	go func() { panic(server.Start()) }()
+
+	if err := server.WaitForStarted(); err != nil {
+		panic(err)
+	}
+
 	return server
 }
 
