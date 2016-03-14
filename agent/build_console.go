@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package libgocdgolangagent
+package agent
 
 import (
 	"bytes"

@@ -17,18 +17,18 @@
 package main
 
 import (
-	"github.com/gocd-contrib/gocd-golang-agent/libgocdgolangagent"
+	"github.com/gocd-contrib/gocd-golang-agent/agent"
 	"time"
 )
 
 func main() {
-	libgocdgolangagent.Initialize()
+	agent.Initialize()
 	for {
-		err := libgocdgolangagent.Start()
+		err := agent.Start()
 		if err != nil {
-			libgocdgolangagent.LogInfo("something wrong: %v", err.Error())
+			agent.LogInfo("something wrong: %v", err.Error())
 		}
-		libgocdgolangagent.LogInfo("sleep 10 seconds and restart")
+		agent.LogInfo("sleep 10 seconds and restart")
 		time.Sleep(10 * time.Second)
 	}
 }
