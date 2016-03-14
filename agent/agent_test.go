@@ -50,39 +50,22 @@ func Test(t *testing.T) {
 		t.Fatal("expected Idle, but get: ", state)
 	}
 
-	start := &protocal.BuildCommand{
-		Name: "start",
-		Args: []interface{}{map[string]interface{}{
-			"buildId":                buildId,
-			"buildLocator":           "p/1/s/1/j",
-			"buildLocatorForDisplay": "p/1/s/1/j",
-			"consoleURI":             goServer.ConsoleUrl(buildId),
-			"artifactUploadBaseUrl":  goServer.ArtifactUploadBaseUrl(buildId),
-			"propertyBaseUrl":        goServer.PropertyBaseUrl(buildId),
-		}},
-		RunIfConfig: "any",
-	}
-	reportCurrentStatus := &protocal.BuildCommand{
-		Name:        "reportCurrentStatus",
-		Args:        []interface{}{"Building"},
-		RunIfConfig: "passed",
-	}
-	echo := &protocal.BuildCommand{
-		Name:        "echo",
-		Args:        []interface{}{"echo hello world"},
-		RunIfConfig: "passed",
-	}
-	end := &protocal.BuildCommand{Name: "end", RunIfConfig: "any"}
+	start := protocal.StartCommand(map[string]string{
+		"buildId":                buildId,
+		"buildLocator":           "p/1/s/1/j",
+		"buildLocatorForDisplay": "p/1/s/1/j",
+		"consoleURI":             goServer.ConsoleUrl(buildId),
+		"artifactUploadBaseUrl":  goServer.ArtifactUploadBaseUrl(buildId),
+		"propertyBaseUrl":        goServer.PropertyBaseUrl(buildId),
+	})
+	reportCurrentStatus := protocal.ReportCurrentStatusCommand("Building")
+	echo := protocal.EchoCommand("echo hello world")
+	end := protocal.EndCommand()
 
-	compose := &protocal.BuildCommand{
-		Name: "compose",
-		SubCommands: []*protocal.BuildCommand{
-			start,
-			reportCurrentStatus,
-			echo,
-			end},
-		RunIfConfig: "any",
-	}
+	compose := protocal.ComposeCommand(start,
+		reportCurrentStatus,
+		echo,
+		end).RunIf("any")
 	goServer.Send(UUID, protocal.CmdMessage(compose))
 	state = agentState.Next()
 	if state != "Building" {

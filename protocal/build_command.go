@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -29,25 +30,78 @@ type CommandTest struct {
 }
 
 type BuildCommand struct {
-	Name, RunIfConfig, WorkingDirectory string
-	Test                                *CommandTest
-	Args                                []interface{}
-	SubCommands                         []*BuildCommand
+	Name             string
+	Args             map[string]string
+	RunIfConfig      string
+	SubCommands      []*BuildCommand
+	WorkingDirectory string
+	Test             *CommandTest
 }
 
-func NewBuildCommand(command map[string]interface{}) *BuildCommand {
+func NewBuildCommand(name string) *BuildCommand {
+	return &BuildCommand{
+		Name:        name,
+		RunIfConfig: "passed",
+	}
+}
+
+func StartCommand(args map[string]string) *BuildCommand {
+	return NewBuildCommand("start").SetArgs(args).RunIf("any")
+}
+
+func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
+	return NewBuildCommand("compose").AddCommands(commands...)
+}
+
+func EchoCommand(contents ...string) *BuildCommand {
+	return NewBuildCommand("echo").SetArgs(listMap(contents...))
+}
+
+func EndCommand() *BuildCommand {
+	return NewBuildCommand("end").RunIf("any")
+}
+
+func ReportCurrentStatusCommand(jobState string) *BuildCommand {
+	args := map[string]string{"jobState": jobState}
+	return NewBuildCommand("reportCurrentStatus").SetArgs(args)
+}
+
+func Parse(command map[string]interface{}) *BuildCommand {
 	var cmd BuildCommand
 	str, _ := json.Marshal(command)
 	json.Unmarshal(str, &cmd)
 	return &cmd
 }
 
+func (cmd *BuildCommand) AddCommands(commands ...*BuildCommand) *BuildCommand {
+	cmd.SubCommands = append(cmd.SubCommands, commands...)
+	return cmd
+}
+
+func (cmd *BuildCommand) SetArgs(args map[string]string) *BuildCommand {
+	cmd.Args = args
+	return cmd
+}
+
+func (cmd *BuildCommand) RunIf(c string) *BuildCommand {
+	cmd.RunIfConfig = c
+	return cmd
+}
+
+func (cmd *BuildCommand) ExtractArgList(size int) []string {
+	ret := make([]string, size)
+	for i := 0; i < size; i++ {
+		ret[i] = cmd.Args[strconv.Itoa(i)]
+	}
+	return ret
+}
+
 func (cmd *BuildCommand) Dump(indent, step int) string {
 	var buffer bytes.Buffer
 	buffer.WriteString(strings.Repeat(" ", indent))
 	buffer.WriteString(cmd.Name)
-	for _, arg := range cmd.Args {
-		buffer.WriteString(fmt.Sprintf(" \"%v\"", arg))
+	for key, value := range cmd.Args {
+		buffer.WriteString(fmt.Sprintf(" %v='%v'", key, value))
 	}
 	if "passed" != cmd.RunIfConfig {
 		buffer.WriteString(fmt.Sprintf(" runIf:%v", cmd.RunIfConfig))
@@ -57,4 +111,12 @@ func (cmd *BuildCommand) Dump(indent, step int) string {
 		buffer.WriteString(subCmd.Dump(indent+step, step))
 	}
 	return buffer.String()
+}
+
+func listMap(list ...string) map[string]string {
+	ret := make(map[string]string, len(list))
+	for i, s := range list {
+		ret[strconv.Itoa(i)] = s
+	}
+	return ret
 }

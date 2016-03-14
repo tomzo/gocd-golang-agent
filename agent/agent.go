@@ -130,7 +130,7 @@ func processBuildCommandMessage(msg *protocal.Message, buildSession *BuildSessio
 	}()
 	SetState("runtimeStatus", "Building")
 	command, _ := msg.Data["data"].(map[string]interface{})
-	buildCmd := protocal.NewBuildCommand(command)
+	buildCmd := protocal.Parse(command)
 	LogInfo("start process build command:")
 	LogInfo(buildCmd.Dump(2, 2))
 	err := buildSession.Process(buildCmd)

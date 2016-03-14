@@ -105,12 +105,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	case "echo":
 		return s.processEcho(cmd)
 	case "reportCurrentStatus", "reportCompleting", "reportCompleted":
-		var jobState string
-		if len(cmd.Args) > 0 {
-			jobState = cmd.Args[0].(string)
-		}
-		s.Send <- protocal.ReportMessage(cmd.Name,
-			s.statusReport(jobState))
+		jobState := cmd.Args["jobState"]
+		s.Send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	case "end":
 		// nothing to do
 	default:
@@ -119,17 +115,9 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	return nil
 }
 
-func convertToStringSlice(slice []interface{}) []string {
-	ret := make([]string, len(slice))
-	for i, element := range slice {
-		ret[i] = element.(string)
-	}
-	return ret
-}
-
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
-	arg0 := cmd.Args[0].(string)
-	args := convertToStringSlice(cmd.Args[1:])
+	arg0 := cmd.Args["command"]
+	args := cmd.ExtractArgList(len(cmd.Args) - 1)
 	execCmd := exec.Command(arg0, args...)
 	execCmd.Stdout = s.console
 	execCmd.Stderr = s.console
@@ -158,8 +146,8 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 }
 
 func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
-	flag := cmd.Args[0].(string)
-	targetPath := cmd.Args[1].(string)
+	flag := cmd.Args["flag"]
+	targetPath := cmd.Args["path"]
 
 	if "-d" == flag {
 		_, err := os.Stat(targetPath)
@@ -184,27 +172,25 @@ func capitalize(str string) string {
 }
 
 func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
-	for _, arg := range cmd.Args {
-		s.console.WriteLn(arg.(string))
+	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
+		s.console.WriteLn(line)
 	}
 	return nil
 }
 
 func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	if len(cmd.Args) > 0 {
-		newEnvs := cmd.Args[0].(map[string]interface{})
-		for key, value := range newEnvs {
-			s.envs[key] = value.(string)
+		for key, value := range cmd.Args {
+			s.envs[key] = value
 		}
 	} else {
-		args := make([]interface{}, 0)
+		exports := make([]string, len(s.envs))
+		i := 0
 		for key, value := range s.envs {
-			args = append(args, fmt.Sprintf("export %v=%v", key, value))
+			exports[i] = fmt.Sprintf("export %v=%v", key, value)
+			i++
 		}
-		s.process(&protocal.BuildCommand{
-			Name: "echo",
-			Args: args,
-		})
+		s.process(protocal.EchoCommand(exports...))
 	}
 	return nil
 }
@@ -220,13 +206,13 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 }
 
 func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
-	settings, _ := cmd.Args[0].(map[string]interface{})
-	SetState("buildLocator", settings["buildLocator"].(string))
-	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"].(string))
-	s.console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"].(string)))
-	s.artifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"].(string))
-	s.propertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"].(string))
-	s.buildId = settings["buildId"].(string)
+	settings := cmd.Args
+	SetState("buildLocator", settings["buildLocator"])
+	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
+	s.console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"]))
+	s.artifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
+	s.propertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"])
+	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"
 	return nil
