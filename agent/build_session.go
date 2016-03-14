@@ -104,14 +104,13 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processExec(cmd)
 	case "echo":
 		return s.processEcho(cmd)
-	case "reportCurrentStatus":
-		s.Send <- protocal.NewMessage(cmd.Name,
-			"com.thoughtworks.go.websocket.Report",
-			s.statusReport(cmd.Args[0].(string)))
-	case "reportCompleting", "reportCompleted":
-		s.Send <- protocal.NewMessage(cmd.Name,
-			"com.thoughtworks.go.websocket.Report",
-			s.statusReport(""))
+	case "reportCurrentStatus", "reportCompleting", "reportCompleted":
+		var jobState string
+		if len(cmd.Args) > 0 {
+			jobState = cmd.Args[0].(string)
+		}
+		s.Send <- protocal.ReportMessage(cmd.Name,
+			s.statusReport(jobState))
 	case "end":
 		// nothing to do
 	default:

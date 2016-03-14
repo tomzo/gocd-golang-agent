@@ -142,13 +142,10 @@ func processBuildCommandMessage(msg *protocal.Message, buildSession *BuildSessio
 }
 
 func ping(send chan *protocal.Message) {
-	var msgType string
-	if config.AgentAutoRegisterElasticPluginId == "" {
-		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
-	} else {
-		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
-	}
-	send <- protocal.NewMessage("ping", msgType, AgentRuntimeInfo())
+	send <- protocal.PingMessage(
+		config.IsElasticAgent(),
+		AgentRuntimeInfo(),
+	)
 }
 
 func closeBuildSession() {

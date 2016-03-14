@@ -308,12 +308,12 @@ func (agent *RemoteAgent) Send(msg *protocal.Message) error {
 }
 
 func (agent *RemoteAgent) SetCookie() error {
-	return agent.Send(protocal.NewMessage("setCookie", "java.lang.String", uuid.NewV4().String()))
+	return agent.Send(protocal.SetCookieMessage(uuid.NewV4().String()))
 }
 
 func (agent *RemoteAgent) Ack(msg *protocal.Message) error {
 	if msg.AckId != "" {
-		return agent.Send(protocal.NewMessage("ack", "java.lang.String", msg.AckId))
+		return agent.Send(protocal.AckMessage(msg.AckId))
 	}
 	return nil
 }

@@ -89,6 +89,10 @@ func (c *Config) MakeFullServerURL(url string) string {
 	}
 }
 
+func (c *Config) IsElasticAgent() bool {
+	return config.AgentAutoRegisterElasticPluginId == ""
+}
+
 func readEnv(varname string, defaultVal string) string {
 	val := os.Getenv(varname)
 	if val == "" {

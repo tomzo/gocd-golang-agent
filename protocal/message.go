@@ -39,6 +39,32 @@ func NewMessage(action, dataType string, data interface{}) *Message {
 	}
 }
 
+func SetCookieMessage(cookie string) *Message {
+	return NewMessage("setCookie", "java.lang.String", cookie)
+}
+
+func AckMessage(ackId string) *Message {
+	return NewMessage("ack", "java.lang.String", ackId)
+}
+
+func CmdMessage(cmd *BuildCommand) *Message {
+	return NewMessage("cmd", "BuildCommand", cmd)
+}
+
+func PingMessage(elasticAgent bool, data map[string]interface{}) *Message {
+	var msgType string
+	if elasticAgent {
+		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
+	} else {
+		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
+	}
+	return NewMessage("ping", msgType, data)
+}
+
+func ReportMessage(t string, report map[string]interface{}) *Message {
+	return NewMessage(t, "com.thoughtworks.go.websocket.Report", report)
+}
+
 func messageMarshal(v interface{}) ([]byte, byte, error) {
 	json, jerr := json.Marshal(v)
 	if jerr != nil {

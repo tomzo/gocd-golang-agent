@@ -83,7 +83,7 @@ func Test(t *testing.T) {
 			end},
 		RunIfConfig: "any",
 	}
-	goServer.Send(UUID, protocal.NewMessage("cmd", "BuildCommand", compose))
+	goServer.Send(UUID, protocal.CmdMessage(compose))
 	state = agentState.Next()
 	if state != "Building" {
 		t.Fatal("expected Building, but get: ", state)
