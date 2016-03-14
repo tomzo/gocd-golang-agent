@@ -19,6 +19,7 @@ package libgocdgolangagent
 import (
 	"errors"
 	"fmt"
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,7 +28,7 @@ import (
 
 type BuildSession struct {
 	HttpClient *http.Client
-	Send       chan *Message
+	Send       chan *protocal.Message
 
 	buildStatus           string
 	console               *BuildConsole
@@ -39,7 +40,7 @@ type BuildSession struct {
 	done                  chan int
 }
 
-func MakeBuildSession(httpClient *http.Client, send chan *Message) *BuildSession {
+func MakeBuildSession(httpClient *http.Client, send chan *protocal.Message) *BuildSession {
 	return &BuildSession{
 		HttpClient: httpClient,
 		Send:       send,
@@ -62,7 +63,7 @@ func (s *BuildSession) isCanceled() bool {
 	}
 }
 
-func (s *BuildSession) Process(cmd *BuildCommand) error {
+func (s *BuildSession) Process(cmd *protocal.BuildCommand) error {
 	defer func() {
 		if s.console != nil {
 			s.console.Close()
@@ -72,7 +73,7 @@ func (s *BuildSession) Process(cmd *BuildCommand) error {
 	return s.process(cmd)
 }
 
-func (s *BuildSession) process(cmd *BuildCommand) error {
+func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	if s.isCanceled() {
 		LogDebug("Ignored command %v, because build is canceled", cmd.Name)
 		return nil
@@ -104,11 +105,11 @@ func (s *BuildSession) process(cmd *BuildCommand) error {
 	case "echo":
 		return s.processEcho(cmd)
 	case "reportCurrentStatus":
-		s.Send <- MakeMessage(cmd.Name,
+		s.Send <- protocal.NewMessage(cmd.Name,
 			"com.thoughtworks.go.websocket.Report",
 			s.statusReport(cmd.Args[0].(string)))
 	case "reportCompleting", "reportCompleted":
-		s.Send <- MakeMessage(cmd.Name,
+		s.Send <- protocal.NewMessage(cmd.Name,
 			"com.thoughtworks.go.websocket.Report",
 			s.statusReport(""))
 	case "end":
@@ -127,7 +128,7 @@ func convertToStringSlice(slice []interface{}) []string {
 	return ret
 }
 
-func (s *BuildSession) processExec(cmd *BuildCommand) error {
+func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 	arg0 := cmd.Args[0].(string)
 	args := convertToStringSlice(cmd.Args[1:])
 	execCmd := exec.Command(arg0, args...)
@@ -157,7 +158,7 @@ func (s *BuildSession) processExec(cmd *BuildCommand) error {
 	}
 }
 
-func (s *BuildSession) processTest(cmd *BuildCommand) error {
+func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	flag := cmd.Args[0].(string)
 	targetPath := cmd.Args[1].(string)
 
@@ -183,14 +184,14 @@ func capitalize(str string) string {
 	return string(a)
 }
 
-func (s *BuildSession) processEcho(cmd *BuildCommand) error {
+func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
 	for _, arg := range cmd.Args {
 		s.console.WriteLn(arg.(string))
 	}
 	return nil
 }
 
-func (s *BuildSession) processExport(cmd *BuildCommand) error {
+func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	if len(cmd.Args) > 0 {
 		newEnvs := cmd.Args[0].(map[string]interface{})
 		for key, value := range newEnvs {
@@ -201,7 +202,7 @@ func (s *BuildSession) processExport(cmd *BuildCommand) error {
 		for key, value := range s.envs {
 			args = append(args, fmt.Sprintf("export %v=%v", key, value))
 		}
-		s.process(&BuildCommand{
+		s.process(&protocal.BuildCommand{
 			Name: "echo",
 			Args: args,
 		})
@@ -209,7 +210,7 @@ func (s *BuildSession) processExport(cmd *BuildCommand) error {
 	return nil
 }
 
-func (s *BuildSession) processCompose(cmd *BuildCommand) error {
+func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 	var err error
 	for _, sub := range cmd.SubCommands {
 		if err = s.process(sub); err != nil {
@@ -219,7 +220,7 @@ func (s *BuildSession) processCompose(cmd *BuildCommand) error {
 	return err
 }
 
-func (s *BuildSession) processStart(cmd *BuildCommand) error {
+func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	settings, _ := cmd.Args[0].(map[string]interface{})
 	SetState("buildLocator", settings["buildLocator"].(string))
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"].(string))

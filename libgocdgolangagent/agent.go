@@ -18,6 +18,7 @@ package libgocdgolangagent
 
 import (
 	"errors"
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"net/http"
@@ -76,7 +77,7 @@ func Start() error {
 		return err
 	}
 
-	conn, err := MakeWebsocketConnection(config.WsServerURL(), config.HttpsServerURL("/"))
+	conn, err := MakeWebsocketConnection(config.WssServerURL(), config.HttpsServerURL())
 	if err != nil {
 		return err
 	}
@@ -101,7 +102,7 @@ func Start() error {
 	}
 }
 
-func processMessage(msg *Message, httpClient *http.Client, send chan *Message) error {
+func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *protocal.Message) error {
 	switch msg.Action {
 	case "setCookie":
 		str, _ := msg.Data["data"].(string)
@@ -121,7 +122,7 @@ func processMessage(msg *Message, httpClient *http.Client, send chan *Message) e
 	return nil
 }
 
-func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
+func processBuildCommandMessage(msg *protocal.Message, buildSession *BuildSession) {
 	defer func() {
 		SetState("runtimeStatus", "Idle")
 		ping(buildSession.Send)
@@ -129,9 +130,9 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	}()
 	SetState("runtimeStatus", "Building")
 	command, _ := msg.Data["data"].(map[string]interface{})
-	buildCmd := MakeBuildCommand(command)
+	buildCmd := protocal.NewBuildCommand(command)
 	LogInfo("start process build command:")
-	LogInfo(buildCmd.dump(2, 2))
+	LogInfo(buildCmd.Dump(2, 2))
 	err := buildSession.Process(buildCmd)
 	if err != nil {
 		LogInfo("Error(%v) when processing message : %v", err, msg)
@@ -140,14 +141,14 @@ func processBuildCommandMessage(msg *Message, buildSession *BuildSession) {
 	}
 }
 
-func ping(send chan *Message) {
+func ping(send chan *protocal.Message) {
 	var msgType string
 	if config.AgentAutoRegisterElasticPluginId == "" {
 		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
 	} else {
 		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	}
-	send <- MakeMessage("ping", msgType, AgentRuntimeInfo())
+	send <- protocal.NewMessage("ping", msgType, AgentRuntimeInfo())
 }
 
 func closeBuildSession() {

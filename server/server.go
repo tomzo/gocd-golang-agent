@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-package libgocdgolangagent
+package server
 
 import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -41,46 +43,65 @@ type Server struct {
 	CertPemFile         string
 	KeyPemFile          string
 	WorkingDir          string
-	Logger              *Logger
+	Logger              *log.Logger
 	AgentStateListeners []AgentStateListener
 	addAgent            chan *RemoteAgent
 	delAgent            chan *RemoteAgent
 	sendMessage         chan *RemoteAgentMessage
 }
 
+func New(port, url, certFile, keyFile, workingDir string, logger *log.Logger, listeners []AgentStateListener) *Server {
+	return &Server{
+		Port:                port,
+		URL:                 url,
+		CertPemFile:         certFile,
+		KeyPemFile:          keyFile,
+		WorkingDir:          workingDir,
+		Logger:              logger,
+		AgentStateListeners: listeners,
+		addAgent:            make(chan *RemoteAgent),
+		delAgent:            make(chan *RemoteAgent),
+		sendMessage:         make(chan *RemoteAgentMessage),
+	}
+
+}
+
 func (s *Server) Start() error {
-	s.addAgent = make(chan *RemoteAgent)
-	s.delAgent = make(chan *RemoteAgent)
-	s.sendMessage = make(chan *RemoteAgentMessage)
-
 	go s.manageAgents()
-
-	http.Handle("/go/agent-websocket", s.websocketHandler())
-	http.HandleFunc("/go/console", s.consoleHandler())
-	http.HandleFunc("/go/admin/agent", s.registorHandler())
-	http.HandleFunc("/go/status", s.statusHandler())
+	http.HandleFunc(s.RegistrationPath(), s.registorHandler())
+	http.Handle(s.WebSocketPath(), s.websocketHandler())
+	http.HandleFunc("/console", s.consoleHandler())
+	http.HandleFunc("/status", s.statusHandler())
 	s.Log("listen to %v", s.Port)
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
 }
 
 func (s *Server) ConsoleUrl(buildId string) string {
-	return s.URL + "/go/console?buildId=" + buildId
+	return s.URL + "/console?buildId=" + buildId
 }
 
 func (s *Server) ArtifactUploadBaseUrl(buildId string) string {
-	return s.URL + "/go/artifacts/" + buildId
+	return s.URL + "/artifacts/" + buildId
 }
 func (s *Server) PropertyBaseUrl(buildId string) string {
-	return s.URL + "/go/property/" + buildId
+	return s.URL + "/property/" + buildId
 }
 
 func (s *Server) StatusUrl() string {
-	return s.URL + "/go/status"
+	return s.URL + "/status"
+}
+
+func (s *Server) WebSocketPath() string {
+	return "/agent-websocket"
+}
+
+func (s *Server) RegistrationPath() string {
+	return "/agent-register"
 }
 
 func (s *Server) manageAgents() {
 	agents := make(map[string]*RemoteAgent)
-	messages := make(map[string][]*Message)
+	messages := make(map[string][]*protocal.Message)
 	for {
 		select {
 		case agent := <-s.addAgent:
@@ -107,7 +128,7 @@ func (s *Server) WaitForStarted() error {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case <-timeout:
@@ -127,11 +148,13 @@ func (s *Server) statusHandler() func(http.ResponseWriter, *http.Request) {
 	}
 }
 
+// todo: does not generate real agent cert and private key yet, just
+// use server cert and private key for testing environment.
 func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var agentPrivateKey, agentCert, regJson []byte
 		var err error
-		var reg *Registration
+		var reg *protocal.Registration
 
 		agentPrivateKey, err = ioutil.ReadFile(s.KeyPemFile)
 		if err != nil {
@@ -141,7 +164,7 @@ func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
 		if err != nil {
 			goto responseError
 		}
-		reg = &Registration{
+		reg = &protocal.Registration{
 			AgentPrivateKey:  string(agentPrivateKey),
 			AgentCertificate: string(agentCert),
 		}
@@ -152,6 +175,7 @@ func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
 		w.Write(regJson)
 		return
 	responseError:
+		s.Log("register failed: %v", err.Error())
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 	}
@@ -218,14 +242,14 @@ func (s *Server) appendConsoleLog(filename string, data []byte) error {
 }
 
 func (s *Server) Log(format string, v ...interface{}) {
-	s.Logger.Info.Printf(format, v...)
+	s.Logger.Printf(format, v...)
 }
 
 func (s *Server) Error(format string, v ...interface{}) {
-	s.Logger.Error.Printf(format, v...)
+	s.Logger.Printf(format, v...)
 }
 
-func (s *Server) Send(uid string, msg *Message) {
+func (s *Server) Send(uid string, msg *protocal.Message) {
 	s.sendMessage <- &RemoteAgentMessage{UUID: uid, Msg: msg}
 }
 
@@ -250,8 +274,8 @@ type RemoteAgent struct {
 
 func (agent *RemoteAgent) Listen(server *Server) {
 	for {
-		var msg Message
-		err := MessageCodec.Receive(agent.conn, &msg)
+		var msg protocal.Message
+		err := protocal.MessageCodec.Receive(agent.conn, &msg)
 		if err == io.EOF {
 			return
 		} else if err != nil {
@@ -265,31 +289,31 @@ func (agent *RemoteAgent) Listen(server *Server) {
 			switch msg.Action {
 			case "ping":
 				if agent.UUID == "" {
-					agent.UUID = AgentUUID(msg.Data["data"])
+					agent.UUID = protocal.AgentUUID(msg.Data["data"])
 					server.Add(agent)
 					agent.SetCookie()
 				}
-				server.Notify(agent.UUID, AgentRuntimeStatus(msg.Data["data"]))
+				server.Notify(agent.UUID, protocal.AgentRuntimeStatus(msg.Data["data"]))
 			case "reportCurrentStatus":
 				report := msg.Data["data"].(map[string]interface{})
-				state := AgentRuntimeStatus(report["agentRuntimeInfo"])
+				state := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
 				server.Notify(agent.UUID, state)
 			}
 		}
 	}
 }
 
-func (agent *RemoteAgent) Send(msg *Message) error {
-	return MessageCodec.Send(agent.conn, msg)
+func (agent *RemoteAgent) Send(msg *protocal.Message) error {
+	return protocal.MessageCodec.Send(agent.conn, msg)
 }
 
 func (agent *RemoteAgent) SetCookie() error {
-	return agent.Send(MakeMessage("setCookie", "java.lang.String", uuid.NewV4().String()))
+	return agent.Send(protocal.NewMessage("setCookie", "java.lang.String", uuid.NewV4().String()))
 }
 
-func (agent *RemoteAgent) Ack(msg *Message) error {
+func (agent *RemoteAgent) Ack(msg *protocal.Message) error {
 	if msg.AckId != "" {
-		return agent.Send(MakeMessage("ack", "java.lang.String", msg.AckId))
+		return agent.Send(protocal.NewMessage("ack", "java.lang.String", msg.AckId))
 	}
 	return nil
 }
@@ -305,5 +329,5 @@ func (agent *RemoteAgent) Close() error {
 
 type RemoteAgentMessage struct {
 	UUID string
-	Msg  *Message
+	Msg  *protocal.Message
 }

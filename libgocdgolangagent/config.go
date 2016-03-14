@@ -27,6 +27,8 @@ import (
 type Config struct {
 	SendMessageTimeout time.Duration
 	ServerHostAndPort  string
+	WebSocketPath      string
+	RegistrationPath   string
 	WorkDir            string
 	LogDir             string
 	ConfigDir          string
@@ -62,20 +64,26 @@ func LoadConfig() *Config {
 		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
 		UuidFile:                         filepath.Join("config", "uuid"),
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
+		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/go/agent-websocket"),
+		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/go/admin/agent"),
 	}
 }
 
-func (c *Config) HttpsServerURL(path string) string {
-	return "https://" + c.ServerHostAndPort + path
+func (c *Config) HttpsServerURL() string {
+	return "https://" + c.ServerHostAndPort
 }
 
-func (c *Config) WsServerURL() string {
-	return "wss://" + c.ServerHostAndPort + "/go/agent-websocket"
+func (c *Config) WssServerURL() string {
+	return "wss://" + c.ServerHostAndPort + c.WebSocketPath
+}
+
+func (c *Config) RegistrationURL() string {
+	return c.MakeFullServerURL(c.RegistrationPath)
 }
 
 func (c *Config) MakeFullServerURL(url string) string {
 	if strings.HasPrefix(url, "/") {
-		return c.HttpsServerURL(url)
+		return c.HttpsServerURL() + url
 	} else {
 		return url
 	}

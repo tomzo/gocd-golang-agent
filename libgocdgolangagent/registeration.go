@@ -22,16 +22,13 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"runtime"
 )
-
-type Registration struct {
-	AgentPrivateKey, AgentCertificate string
-}
 
 func ReadGoServerCACert() error {
 	_, err := os.Stat(config.GoServerCAFile)
@@ -170,13 +167,13 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	}
 
 	LogInfo("fetching agent key and certificates")
-	resp, err := client.PostForm(config.HttpsServerURL("/go/admin/agent"), form)
+	resp, err := client.PostForm(config.RegistrationURL(), form)
 	if err != nil {
 		return err
 	}
 
 	defer resp.Body.Close()
-	var registration Registration
+	var registration protocal.Registration
 
 	dec := json.NewDecoder(resp.Body)
 

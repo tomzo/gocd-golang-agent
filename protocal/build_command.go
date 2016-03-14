@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package libgocdgolangagent
+package protocal
 
 import (
 	"bytes"
@@ -35,14 +35,14 @@ type BuildCommand struct {
 	SubCommands                         []*BuildCommand
 }
 
-func MakeBuildCommand(command map[string]interface{}) *BuildCommand {
+func NewBuildCommand(command map[string]interface{}) *BuildCommand {
 	var cmd BuildCommand
 	str, _ := json.Marshal(command)
 	json.Unmarshal(str, &cmd)
 	return &cmd
 }
 
-func (cmd *BuildCommand) dump(indent, step int) string {
+func (cmd *BuildCommand) Dump(indent, step int) string {
 	var buffer bytes.Buffer
 	buffer.WriteString(strings.Repeat(" ", indent))
 	buffer.WriteString(cmd.Name)
@@ -54,7 +54,7 @@ func (cmd *BuildCommand) dump(indent, step int) string {
 	}
 	for _, subCmd := range cmd.SubCommands {
 		buffer.WriteString("\n")
-		buffer.WriteString(subCmd.dump(indent+step, step))
+		buffer.WriteString(subCmd.Dump(indent+step, step))
 	}
 	return buffer.String()
 }

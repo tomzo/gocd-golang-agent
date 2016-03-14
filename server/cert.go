@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package libgocdgolangagent
+package server
 
 import (
 	"crypto/rand"
@@ -37,7 +37,7 @@ type Cert struct {
 	Organization string
 }
 
-func MakeCert() *Cert {
+func NewCert() *Cert {
 	host, _ := os.Hostname()
 	return &Cert{
 		Host:         host,

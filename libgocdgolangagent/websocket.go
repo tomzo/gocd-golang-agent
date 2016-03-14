@@ -17,18 +17,15 @@
 package libgocdgolangagent
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/json"
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"golang.org/x/net/websocket"
-	"io/ioutil"
 	"time"
 )
 
 type WebsocketConnection struct {
 	Conn     *websocket.Conn
-	Send     chan *Message
-	Received chan *Message
+	Send     chan *protocal.Message
+	Received chan *protocal.Message
 }
 
 func (wc *WebsocketConnection) Close() {
@@ -55,15 +52,15 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 		return nil, err
 	}
 	ack := make(chan string)
-	send := make(chan *Message)
-	received := make(chan *Message)
+	send := make(chan *protocal.Message)
+	received := make(chan *protocal.Message)
 
 	go startReceiveMessage(ws, received, ack)
 	go startSendMessage(ws, send, ack)
 	return &WebsocketConnection{Conn: ws, Send: send, Received: received}, nil
 }
 
-func startSendMessage(ws *websocket.Conn, send chan *Message, ack chan string) {
+func startSendMessage(ws *websocket.Conn, send chan *protocal.Message, ack chan string) {
 	defer LogDebug("! exit goroutine: send message")
 	connClosed := false
 loop:
@@ -80,7 +77,7 @@ loop:
 			logger.Error.Printf("send message failed: connection is closed")
 			goto loop
 		}
-		if err := MessageCodec.Send(ws, msg); err == nil {
+		if err := protocal.MessageCodec.Send(ws, msg); err == nil {
 			waitForMessageAck(msg.AckId, ack)
 			goto loop
 		} else {
@@ -111,12 +108,12 @@ func waitForMessageAck(ackId string, ack chan string) {
 	}
 }
 
-func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan string) {
+func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ack chan string) {
 	defer LogDebug("! exit goroutine: receive message")
 	defer close(received)
 	for {
-		var msg Message
-		err := MessageCodec.Receive(ws, &msg)
+		var msg protocal.Message
+		err := protocal.MessageCodec.Receive(ws, &msg)
 		if err != nil {
 			logger.Error.Printf("receive message failed: %v", err)
 			return
@@ -132,24 +129,3 @@ func startReceiveMessage(ws *websocket.Conn, received chan *Message, ack chan st
 		}
 	}
 }
-
-func messageMarshal(v interface{}) ([]byte, byte, error) {
-	json, jerr := json.Marshal(v)
-	if jerr != nil {
-		return []byte{}, websocket.BinaryFrame, jerr
-	}
-	var b bytes.Buffer
-	w := gzip.NewWriter(&b)
-	_, err := w.Write([]byte(json))
-	w.Close()
-
-	return b.Bytes(), websocket.BinaryFrame, err
-}
-
-func messageUnmarshal(msg []byte, payloadType byte, v interface{}) (err error) {
-	reader, _ := gzip.NewReader(bytes.NewBuffer(msg))
-	jsonBytes, _ := ioutil.ReadAll(reader)
-	return json.Unmarshal(jsonBytes, v)
-}
-
-var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}
