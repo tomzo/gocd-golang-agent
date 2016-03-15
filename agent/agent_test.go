@@ -22,18 +22,76 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
 var (
-	goServer   *server.Server
-	agentState AgentState
+	goServer *server.Server
+	stateLog *StateLog
+	buildId  = "1"
 )
 
-func Test(t *testing.T) {
-	buildId := "1"
+func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
+	done := startAgent(t)
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.ReportCurrentStatusCommand("Preparing"),
+		protocal.ReportCurrentStatusCommand("Building"),
+		protocal.ReportCompletingCommand(),
+		protocal.ReportCompletedCommand(),
+		protocal.EndCommand(),
+	)
+	goServer.Send(UUID, protocal.CmdMessage(compose))
+
+	waitForNextState(t, "agent Building")
+	if GetState("cookie") == "" {
+		t.Fatal("cookie is not set")
+	}
+
+	waitForNextState(t, "build Preparing")
+
+	waitForNextState(t, "agent Building")
+	waitForNextState(t, "build Building")
+
+	waitForNextState(t, "agent Building")
+	waitForNextState(t, "build Passed")
+
+	waitForNextState(t, "agent Building")
+	waitForNextState(t, "build Passed")
+
+	waitForNextState(t, "agent Idle")
+
+	goServer.Send(UUID, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestEcho(t *testing.T) {
+	done := startAgent(t)
+
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.EchoCommand("echo hello world"),
+		protocal.EndCommand(),
+	)
+	goServer.Send(UUID, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	if !strings.Contains(string(log), "echo hello world") {
+		t.Fatalf("console log dos not contain echo content: %v", string(log))
+	}
+
+	goServer.Send(UUID, protocal.ReregisterMessage())
+	<-done
+}
+
+func startAgent(t *testing.T) chan bool {
 	done := make(chan bool)
 	go func() {
 		t.Log("start agent")
@@ -43,14 +101,21 @@ func Test(t *testing.T) {
 		}
 		close(done)
 	}()
+	waitForNextState(t, "agent Idle")
+	return done
+}
 
-	t.Log("wait for agent register to server")
-	state := agentState.Next()
-	if state != "Idle" {
-		t.Fatal("expected Idle, but get: ", state)
+func waitForNextState(t *testing.T, expected string) {
+	state := stateLog.Next()
+	if expected != state {
+		_, file, line, _ := runtime.Caller(1)
+		finfo, _ := os.Stat(file)
+		t.Fatalf("expected agent state: %v, but get: %v\n%v:%v:", expected, state, finfo.Name(), line)
 	}
+}
 
-	start := protocal.StartCommand(map[string]string{
+func startCmd() *protocal.BuildCommand {
+	return protocal.StartCommand(map[string]string{
 		"buildId":                buildId,
 		"buildLocator":           "p/1/s/1/j",
 		"buildLocatorForDisplay": "p/1/s/1/j",
@@ -58,35 +123,6 @@ func Test(t *testing.T) {
 		"artifactUploadBaseUrl":  goServer.ArtifactUploadBaseUrl(buildId),
 		"propertyBaseUrl":        goServer.PropertyBaseUrl(buildId),
 	})
-	reportCurrentStatus := protocal.ReportCurrentStatusCommand("Building")
-	echo := protocal.EchoCommand("echo hello world")
-	end := protocal.EndCommand()
-
-	compose := protocal.ComposeCommand(start,
-		reportCurrentStatus,
-		echo,
-		end).RunIf("any")
-	goServer.Send(UUID, protocal.CmdMessage(compose))
-	state = agentState.Next()
-	if state != "Building" {
-		t.Fatal("expected Building, but get: ", state)
-	}
-	if GetState("cookie") == "" {
-		t.Fatal("cookie is not set")
-	}
-	state = agentState.Next()
-	if state != "Idle" {
-		t.Fatal("expected Idle, but get: ", state)
-	}
-	log, err := goServer.ConsoleLog(buildId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	if !strings.Contains(string(log), "echo hello world") {
-		t.Fatal("echo command is not processed")
-	}
-	goServer.Send(UUID, &protocal.Message{Action: "reregister"})
-	<-done
 }
 
 func TestMain(m *testing.M) {
@@ -117,7 +153,6 @@ func TestMain(m *testing.M) {
 	os.Setenv("GOCD_AGENT_WORK_DIR", agentWorkingDir)
 	os.Setenv("GOCD_AGENT_LOG_DIR", agentWorkingDir)
 
-	println("initialize agent")
 	Initialize()
 
 	os.Exit(m.Run())
@@ -132,16 +167,14 @@ func startServer(workingDir string) {
 		panic(err)
 	}
 	port := "1234"
-	agentState = AgentState{
-		states: make(chan string),
-	}
+	stateLog = &StateLog{states: make(chan string)}
 	goServer = server.New(port,
 		"https://"+cert.Host+":"+port,
 		certFile,
 		keyFile,
 		workingDir,
-		MakeLogger(workingDir, "server.log", true).Info,
-		[]server.AgentStateListener{agentState})
+		MakeLogger(workingDir, "server.log", true).Info)
+	goServer.StateListeners = []server.StateListener{stateLog}
 
 	go func() {
 		e := goServer.Start()
@@ -152,19 +185,27 @@ func startServer(workingDir string) {
 	if err := goServer.WaitForStarted(); err != nil {
 		panic(err)
 	}
+	println("server started")
 }
 
-type AgentState struct {
+type StateLog struct {
 	states chan string
 }
 
-func (as AgentState) Notify(agentUuid, state string) {
-	if agentUuid == UUID {
-		as.states <- state
+func (as *StateLog) Notify(class, id, state string) {
+	switch class {
+	case "agent":
+		if id == UUID {
+			as.states <- "agent " + state
+		}
+	case "build":
+		if id == buildId {
+			as.states <- "build " + state
+		}
 	}
 }
 
-func (as AgentState) Next() string {
+func (as *StateLog) Next() string {
 	select {
 	case state := <-as.states:
 		return state

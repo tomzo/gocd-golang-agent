@@ -66,6 +66,14 @@ func ReportCurrentStatusCommand(jobState string) *BuildCommand {
 	return NewBuildCommand("reportCurrentStatus").SetArgs(args)
 }
 
+func ReportCompletingCommand() *BuildCommand {
+	return NewBuildCommand("reportCompleting")
+}
+
+func ReportCompletedCommand() *BuildCommand {
+	return NewBuildCommand("reportCompleted")
+}
+
 func Parse(command map[string]interface{}) *BuildCommand {
 	var cmd BuildCommand
 	str, _ := json.Marshal(command)

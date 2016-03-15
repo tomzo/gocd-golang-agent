@@ -65,6 +65,10 @@ func ReportMessage(t string, report map[string]interface{}) *Message {
 	return NewMessage(t, "com.thoughtworks.go.websocket.Report", report)
 }
 
+func ReregisterMessage() *Message {
+	return &Message{Action: "reregister"}
+}
+
 func messageMarshal(v interface{}) ([]byte, byte, error) {
 	json, jerr := json.Marshal(v)
 	if jerr != nil {

@@ -33,35 +33,35 @@ import (
 	"time"
 )
 
-type AgentStateListener interface {
-	Notify(uuid, state string)
+type StateListener interface {
+	Notify(class, id, state string)
 }
 
 type Server struct {
-	Port                string
-	URL                 string
-	CertPemFile         string
-	KeyPemFile          string
-	WorkingDir          string
-	Logger              *log.Logger
-	AgentStateListeners []AgentStateListener
-	addAgent            chan *RemoteAgent
-	delAgent            chan *RemoteAgent
-	sendMessage         chan *RemoteAgentMessage
+	Port           string
+	URL            string
+	CertPemFile    string
+	KeyPemFile     string
+	WorkingDir     string
+	Logger         *log.Logger
+	StateListeners []StateListener
+
+	addAgent    chan *RemoteAgent
+	delAgent    chan *RemoteAgent
+	sendMessage chan *RemoteAgentMessage
 }
 
-func New(port, url, certFile, keyFile, workingDir string, logger *log.Logger, listeners []AgentStateListener) *Server {
+func New(port, url, certFile, keyFile, workingDir string, logger *log.Logger) *Server {
 	return &Server{
-		Port:                port,
-		URL:                 url,
-		CertPemFile:         certFile,
-		KeyPemFile:          keyFile,
-		WorkingDir:          workingDir,
-		Logger:              logger,
-		AgentStateListeners: listeners,
-		addAgent:            make(chan *RemoteAgent),
-		delAgent:            make(chan *RemoteAgent),
-		sendMessage:         make(chan *RemoteAgentMessage),
+		Port:        port,
+		URL:         url,
+		CertPemFile: certFile,
+		KeyPemFile:  keyFile,
+		WorkingDir:  workingDir,
+		Logger:      logger,
+		addAgent:    make(chan *RemoteAgent),
+		delAgent:    make(chan *RemoteAgent),
+		sendMessage: make(chan *RemoteAgentMessage),
 	}
 
 }
@@ -261,9 +261,17 @@ func (s *Server) Del(agent *RemoteAgent) {
 	s.delAgent <- agent
 }
 
-func (s *Server) Notify(uuid, state string) {
-	for _, listener := range s.AgentStateListeners {
-		listener.Notify(uuid, state)
+func (s *Server) NotifyAgent(uuid, state string) {
+	s.notify("agent", uuid, state)
+}
+
+func (s *Server) NotifyBuild(uuid, state string) {
+	s.notify("build", uuid, state)
+}
+
+func (s *Server) notify(class, uuid, state string) {
+	for _, listener := range s.StateListeners {
+		listener.Notify(class, uuid, state)
 	}
 }
 
@@ -281,25 +289,40 @@ func (agent *RemoteAgent) Listen(server *Server) {
 		} else if err != nil {
 			server.Error("receive error: %v", err)
 		} else {
-			server.Log("received message: %v", msg.Action)
-			err = agent.Ack(&msg)
-			if err != nil {
-				server.Error("ack error: %v", err)
-			}
-			switch msg.Action {
-			case "ping":
-				if agent.UUID == "" {
-					agent.UUID = protocal.AgentUUID(msg.Data["data"])
-					server.Add(agent)
-					agent.SetCookie()
-				}
-				server.Notify(agent.UUID, protocal.AgentRuntimeStatus(msg.Data["data"]))
-			case "reportCurrentStatus":
-				report := msg.Data["data"].(map[string]interface{})
-				state := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-				server.Notify(agent.UUID, state)
-			}
+			agent.processMessage(server, &msg)
 		}
+	}
+}
+
+func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) {
+	server.Log("received message: %v", msg.Action)
+	err := agent.Ack(msg)
+	if err != nil {
+		server.Error("ack error: %v", err)
+	}
+	switch msg.Action {
+	case "ping":
+		if agent.UUID == "" {
+			agent.UUID = protocal.AgentUUID(msg.Data["data"])
+			server.Add(agent)
+			agent.SetCookie()
+		}
+		agentState := protocal.AgentRuntimeStatus(msg.Data["data"])
+		server.NotifyAgent(agent.UUID, agentState)
+	case "reportCurrentStatus":
+		report := msg.Data["data"].(map[string]interface{})
+		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
+		server.NotifyAgent(agent.UUID, agentState)
+		buildId, _ := report["buildId"].(string)
+		jobState, _ := report["jobState"].(string)
+		server.NotifyBuild(buildId, jobState)
+	case "reportCompleting", "reportCompleted":
+		report := msg.Data["data"].(map[string]interface{})
+		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
+		server.NotifyAgent(agent.UUID, agentState)
+		buildId, _ := report["buildId"].(string)
+		jobResult, _ := report["result"].(string)
+		server.NotifyBuild(buildId, jobResult)
 	}
 }
 
