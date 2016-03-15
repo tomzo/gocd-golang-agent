@@ -42,7 +42,7 @@ type Config struct {
 	GoServerCAFile      string
 	AgentPrivateKeyFile string
 	AgentCertFile       string
-	UuidFile            string
+	AgentIdFile         string
 	OutputDebugLog      bool
 }
 
@@ -62,7 +62,7 @@ func LoadConfig() *Config {
 		GoServerCAFile:                   filepath.Join("config", "go-server-ca.pem"),
 		AgentPrivateKeyFile:              filepath.Join("config", "agent-private-key.pem"),
 		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
-		UuidFile:                         filepath.Join("config", "uuid"),
+		AgentIdFile:                      filepath.Join("config", "agent-id"),
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
 		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/go/agent-websocket"),
 		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/go/admin/agent"),

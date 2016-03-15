@@ -105,19 +105,19 @@ func (s *Server) manageAgents() {
 	for {
 		select {
 		case agent := <-s.addAgent:
-			agents[agent.UUID] = agent
-			for _, msg := range messages[agent.UUID] {
+			agents[agent.id] = agent
+			for _, msg := range messages[agent.id] {
 				agent.Send(msg)
 			}
-			delete(messages, agent.UUID)
+			delete(messages, agent.id)
 		case agent := <-s.delAgent:
-			delete(agents, agent.UUID)
+			delete(agents, agent.id)
 		case am := <-s.sendMessage:
-			agent := agents[am.UUID]
+			agent := agents[am.agentId]
 			if agent != nil {
 				agent.Send(am.Msg)
 			} else {
-				messages[am.UUID] = append(messages[am.UUID], am.Msg)
+				messages[am.agentId] = append(messages[am.agentId], am.Msg)
 			}
 		}
 	}
@@ -249,8 +249,8 @@ func (s *Server) Error(format string, v ...interface{}) {
 	s.Logger.Printf(format, v...)
 }
 
-func (s *Server) Send(uid string, msg *protocal.Message) {
-	s.sendMessage <- &RemoteAgentMessage{UUID: uid, Msg: msg}
+func (s *Server) Send(agentId string, msg *protocal.Message) {
+	s.sendMessage <- &RemoteAgentMessage{agentId: agentId, Msg: msg}
 }
 
 func (s *Server) Add(agent *RemoteAgent) {
@@ -277,7 +277,7 @@ func (s *Server) notify(class, uuid, state string) {
 
 type RemoteAgent struct {
 	conn *websocket.Conn
-	UUID string
+	id   string
 }
 
 func (agent *RemoteAgent) Listen(server *Server) {
@@ -302,24 +302,24 @@ func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) 
 	}
 	switch msg.Action {
 	case "ping":
-		if agent.UUID == "" {
-			agent.UUID = protocal.AgentUUID(msg.Data["data"])
+		if agent.id == "" {
+			agent.id = protocal.AgentId(msg.Data["data"])
 			server.Add(agent)
 			agent.SetCookie()
 		}
 		agentState := protocal.AgentRuntimeStatus(msg.Data["data"])
-		server.NotifyAgent(agent.UUID, agentState)
+		server.NotifyAgent(agent.id, agentState)
 	case "reportCurrentStatus":
 		report := msg.Data["data"].(map[string]interface{})
 		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.UUID, agentState)
+		server.NotifyAgent(agent.id, agentState)
 		buildId, _ := report["buildId"].(string)
 		jobState, _ := report["jobState"].(string)
 		server.NotifyBuild(buildId, jobState)
 	case "reportCompleting", "reportCompleted":
 		report := msg.Data["data"].(map[string]interface{})
 		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.UUID, agentState)
+		server.NotifyAgent(agent.id, agentState)
 		buildId, _ := report["buildId"].(string)
 		jobResult, _ := report["result"].(string)
 		server.NotifyBuild(buildId, jobResult)
@@ -342,8 +342,8 @@ func (agent *RemoteAgent) Ack(msg *protocal.Message) error {
 }
 
 func (agent *RemoteAgent) String() string {
-	return fmt.Sprintf("[agent %v, uuid: %v]",
-		agent.conn.RemoteAddr(), agent.UUID)
+	return fmt.Sprintf("[agent %v, id: %v]",
+		agent.conn.RemoteAddr(), agent.id)
 }
 
 func (agent *RemoteAgent) Close() error {
@@ -351,6 +351,6 @@ func (agent *RemoteAgent) Close() error {
 }
 
 type RemoteAgentMessage struct {
-	UUID string
-	Msg  *protocal.Message
+	agentId string
+	Msg     *protocal.Message
 }

@@ -44,7 +44,7 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 		protocal.ReportCompletedCommand(),
 		protocal.EndCommand(),
 	)
-	goServer.Send(UUID, protocal.CmdMessage(compose))
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
 
 	waitForNextState(t, "agent Building")
 	if GetState("cookie") == "" {
@@ -64,7 +64,7 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 
 	waitForNextState(t, "agent Idle")
 
-	goServer.Send(UUID, protocal.ReregisterMessage())
+	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
 }
 
@@ -76,7 +76,7 @@ func TestEcho(t *testing.T) {
 		protocal.EchoCommand("echo hello world"),
 		protocal.EndCommand(),
 	)
-	goServer.Send(UUID, protocal.CmdMessage(compose))
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -87,7 +87,7 @@ func TestEcho(t *testing.T) {
 		t.Fatalf("console log dos not contain echo content: %v", string(log))
 	}
 
-	goServer.Send(UUID, protocal.ReregisterMessage())
+	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
 }
 
@@ -195,7 +195,7 @@ type StateLog struct {
 func (as *StateLog) Notify(class, id, state string) {
 	switch class {
 	case "agent":
-		if id == UUID {
+		if id == AgentId {
 			as.states <- "agent " + state
 		}
 	case "build":

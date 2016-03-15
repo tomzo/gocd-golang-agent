@@ -35,8 +35,8 @@ type BuildConsole struct {
 	write      chan []byte
 }
 
-func MakeBuildConsole(httpClient *http.Client, uri string) *BuildConsole {
-	u, _ := url.Parse(uri + "&agentId=" + UUID)
+func MakeBuildConsole(agentId string, httpClient *http.Client, uri string) *BuildConsole {
+	u, _ := url.Parse(uri + "&agentId=" + agentId)
 	console := BuildConsole{
 		HttpClient: httpClient,
 		Url:        u,

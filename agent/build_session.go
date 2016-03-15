@@ -209,7 +209,7 @@ func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	settings := cmd.Args
 	SetState("buildLocator", settings["buildLocator"])
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
-	s.console = MakeBuildConsole(s.HttpClient, config.MakeFullServerURL(settings["consoleURI"]))
+	s.console = MakeBuildConsole(AgentId, s.HttpClient, config.MakeFullServerURL(settings["consoleURI"]))
 	s.artifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
 	s.propertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"])
 	s.buildId = settings["buildId"]

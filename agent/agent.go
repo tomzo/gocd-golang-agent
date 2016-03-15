@@ -29,7 +29,7 @@ import (
 var buildSession *BuildSession
 var logger *Logger
 var config *Config
-var UUID string
+var AgentId string
 
 func LogDebug(format string, v ...interface{}) {
 	logger.Debug.Printf(format, v...)
@@ -52,17 +52,17 @@ func Initialize() {
 		logger.Error.Fatal(err)
 	}
 
-	if _, err := os.Stat(config.UuidFile); err == nil {
-		data, err2 := ioutil.ReadFile(config.UuidFile)
+	if _, err := os.Stat(config.AgentIdFile); err == nil {
+		data, err2 := ioutil.ReadFile(config.AgentIdFile)
 		if err2 != nil {
-			logger.Error.Printf("failed to read uuid file(%v): %v", config.UuidFile, err2)
+			logger.Error.Printf("failed to read uuid file(%v): %v", config.AgentIdFile, err2)
 		} else {
-			UUID = string(data)
+			AgentId = string(data)
 		}
 	}
-	if UUID == "" {
-		UUID = uuid.NewV4().String()
-		ioutil.WriteFile(config.UuidFile, []byte(UUID), 0600)
+	if AgentId == "" {
+		AgentId = uuid.NewV4().String()
+		ioutil.WriteFile(config.AgentIdFile, []byte(AgentId), 0600)
 	}
 }
 

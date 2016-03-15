@@ -16,7 +16,7 @@
 
 package protocal
 
-func AgentUUID(info interface{}) string {
+func AgentId(info interface{}) string {
 	m, _ := info.(map[string]interface{})
 	identifier := m["identifier"]
 	id, _ := identifier.(map[string]interface{})
