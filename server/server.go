@@ -20,9 +20,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
-	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
 	"io"
 	"io/ioutil"
@@ -37,6 +35,10 @@ type StateListener interface {
 	Notify(class, id, state string)
 }
 
+type RemoteAgentMessage struct {
+	agentId string
+	Msg     *protocal.Message
+}
 type Server struct {
 	Port           string
 	URL            string
@@ -273,84 +275,4 @@ func (s *Server) notify(class, uuid, state string) {
 	for _, listener := range s.StateListeners {
 		listener.Notify(class, uuid, state)
 	}
-}
-
-type RemoteAgent struct {
-	conn *websocket.Conn
-	id   string
-}
-
-func (agent *RemoteAgent) Listen(server *Server) {
-	for {
-		var msg protocal.Message
-		err := protocal.MessageCodec.Receive(agent.conn, &msg)
-		if err == io.EOF {
-			return
-		} else if err != nil {
-			server.Error("receive error: %v", err)
-		} else {
-			agent.processMessage(server, &msg)
-		}
-	}
-}
-
-func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) {
-	server.Log("received message: %v", msg.Action)
-	err := agent.Ack(msg)
-	if err != nil {
-		server.Error("ack error: %v", err)
-	}
-	switch msg.Action {
-	case "ping":
-		if agent.id == "" {
-			agent.id = protocal.AgentId(msg.Data["data"])
-			server.Add(agent)
-			agent.SetCookie()
-		}
-		agentState := protocal.AgentRuntimeStatus(msg.Data["data"])
-		server.NotifyAgent(agent.id, agentState)
-	case "reportCurrentStatus":
-		report := msg.Data["data"].(map[string]interface{})
-		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.id, agentState)
-		buildId, _ := report["buildId"].(string)
-		jobState, _ := report["jobState"].(string)
-		server.NotifyBuild(buildId, jobState)
-	case "reportCompleting", "reportCompleted":
-		report := msg.Data["data"].(map[string]interface{})
-		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.id, agentState)
-		buildId, _ := report["buildId"].(string)
-		jobResult, _ := report["result"].(string)
-		server.NotifyBuild(buildId, jobResult)
-	}
-}
-
-func (agent *RemoteAgent) Send(msg *protocal.Message) error {
-	return protocal.MessageCodec.Send(agent.conn, msg)
-}
-
-func (agent *RemoteAgent) SetCookie() error {
-	return agent.Send(protocal.SetCookieMessage(uuid.NewV4().String()))
-}
-
-func (agent *RemoteAgent) Ack(msg *protocal.Message) error {
-	if msg.AckId != "" {
-		return agent.Send(protocal.AckMessage(msg.AckId))
-	}
-	return nil
-}
-
-func (agent *RemoteAgent) String() string {
-	return fmt.Sprintf("[agent %v, id: %v]",
-		agent.conn.RemoteAddr(), agent.id)
-}
-
-func (agent *RemoteAgent) Close() error {
-	return agent.conn.Close()
-}
-
-type RemoteAgentMessage struct {
-	agentId string
-	Msg     *protocal.Message
 }
