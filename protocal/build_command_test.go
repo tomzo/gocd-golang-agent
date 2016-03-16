@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package protocal
+package protocal_test
 
 import (
+	. "github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"testing"
 )
 
