@@ -17,12 +17,7 @@
 package protocal
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/json"
 	"github.com/satori/go.uuid"
-	"golang.org/x/net/websocket"
-	"io/ioutil"
 )
 
 type Message struct {
@@ -31,7 +26,7 @@ type Message struct {
 	AckId  string                 `json:"ackId"`
 }
 
-func NewMessage(action, dataType string, data interface{}) *Message {
+func newMessage(action, dataType string, data interface{}) *Message {
 	return &Message{
 		Action: action,
 		Data:   map[string]interface{}{"type": dataType, "data": data},
@@ -40,15 +35,15 @@ func NewMessage(action, dataType string, data interface{}) *Message {
 }
 
 func SetCookieMessage(cookie string) *Message {
-	return NewMessage("setCookie", "java.lang.String", cookie)
+	return newMessage("setCookie", "java.lang.String", cookie)
 }
 
 func AckMessage(ackId string) *Message {
-	return NewMessage("ack", "java.lang.String", ackId)
+	return newMessage("ack", "java.lang.String", ackId)
 }
 
 func CmdMessage(cmd *BuildCommand) *Message {
-	return NewMessage("cmd", "BuildCommand", cmd)
+	return newMessage("cmd", "BuildCommand", cmd)
 }
 
 func PingMessage(elasticAgent bool, data map[string]interface{}) *Message {
@@ -58,34 +53,13 @@ func PingMessage(elasticAgent bool, data map[string]interface{}) *Message {
 	} else {
 		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
 	}
-	return NewMessage("ping", msgType, data)
+	return newMessage("ping", msgType, data)
 }
 
 func ReportMessage(t string, report map[string]interface{}) *Message {
-	return NewMessage(t, "com.thoughtworks.go.websocket.Report", report)
+	return newMessage(t, "com.thoughtworks.go.websocket.Report", report)
 }
 
 func ReregisterMessage() *Message {
 	return &Message{Action: "reregister"}
 }
-
-func messageMarshal(v interface{}) ([]byte, byte, error) {
-	json, jerr := json.Marshal(v)
-	if jerr != nil {
-		return []byte{}, websocket.BinaryFrame, jerr
-	}
-	var b bytes.Buffer
-	w := gzip.NewWriter(&b)
-	_, err := w.Write([]byte(json))
-	w.Close()
-
-	return b.Bytes(), websocket.BinaryFrame, err
-}
-
-func messageUnmarshal(msg []byte, payloadType byte, v interface{}) (err error) {
-	reader, _ := gzip.NewReader(bytes.NewBuffer(msg))
-	jsonBytes, _ := ioutil.ReadAll(reader)
-	return json.Unmarshal(jsonBytes, v)
-}
-
-var MessageCodec = websocket.Codec{messageMarshal, messageUnmarshal}

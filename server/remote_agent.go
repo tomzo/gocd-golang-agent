@@ -31,14 +31,13 @@ type RemoteAgent struct {
 
 func (agent *RemoteAgent) Listen(server *Server) {
 	for {
-		var msg protocal.Message
-		err := protocal.MessageCodec.Receive(agent.conn, &msg)
+		msg, err := protocal.ReceiveMessage(agent.conn)
 		if err == io.EOF {
 			return
 		} else if err != nil {
 			server.Error("receive error: %v", err)
 		} else {
-			agent.processMessage(server, &msg)
+			agent.processMessage(server, msg)
 		}
 	}
 }
@@ -76,7 +75,7 @@ func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) 
 }
 
 func (agent *RemoteAgent) Send(msg *protocal.Message) error {
-	return protocal.MessageCodec.Send(agent.conn, msg)
+	return protocal.SendMessage(agent.conn, msg)
 }
 
 func (agent *RemoteAgent) SetCookie() error {

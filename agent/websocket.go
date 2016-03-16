@@ -77,7 +77,7 @@ loop:
 			logger.Error.Printf("send message failed: connection is closed")
 			goto loop
 		}
-		if err := protocal.MessageCodec.Send(ws, msg); err == nil {
+		if err := protocal.SendMessage(ws, msg); err == nil {
 			waitForMessageAck(msg.AckId, ack)
 			goto loop
 		} else {
@@ -112,8 +112,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ac
 	defer LogDebug("! exit goroutine: receive message")
 	defer close(received)
 	for {
-		var msg protocal.Message
-		err := protocal.MessageCodec.Receive(ws, &msg)
+		msg, err := protocal.ReceiveMessage(ws)
 		if err != nil {
 			logger.Error.Printf("receive message failed: %v", err)
 			return
@@ -125,7 +124,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ac
 			ackId, _ := msg.Data["data"].(string)
 			ack <- ackId
 		} else {
-			received <- &msg
+			received <- msg
 		}
 	}
 }
