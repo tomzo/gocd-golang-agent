@@ -31,10 +31,11 @@ import (
 var (
 	goServer *server.Server
 	stateLog *StateLog
-	buildId  = "1"
+	buildId  string
 )
 
 func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
+	buildId = "TestReportStatusAndSetCookieAfterConnected"
 	done := startAgent(t)
 	compose := protocal.ComposeCommand(
 		startCmd(),
@@ -69,6 +70,7 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 }
 
 func TestEcho(t *testing.T) {
+	buildId = "TestEcho"
 	done := startAgent(t)
 
 	compose := protocal.ComposeCommand(
@@ -85,6 +87,180 @@ func TestEcho(t *testing.T) {
 	}
 	if !strings.Contains(string(log), "echo hello world") {
 		t.Fatalf("console log dos not contain echo content: %v", string(log))
+	}
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestExport(t *testing.T) {
+	buildId = "TestExport"
+	done := startAgent(t)
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.ExportCommand(map[string]string{
+			"env1": "value1",
+			"env2": "value2",
+			"env3": "value3",
+		}),
+		protocal.ExportCommand(nil),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	if !strings.Contains(string(log), "export env1=value1") {
+		t.Fatalf("no export env1: \n%v", string(log))
+	}
+	if !strings.Contains(string(log), "export env2=value2") {
+		t.Fatalf("no export env2: \n%v", string(log))
+	}
+	if !strings.Contains(string(log), "export env3=value3") {
+		t.Fatalf("no export env3: \n%v", string(log))
+	}
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestTestCommand(t *testing.T) {
+	buildId = "TestTestCommand"
+	done := startAgent(t)
+	_, file, _, _ := runtime.Caller(0)
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.EchoCommand("file exist").SetTest(protocal.TestCommand("-d", file)),
+		protocal.EchoCommand("file not exist").SetTest(protocal.TestCommand("-d", "no"+file)),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	if !strings.Contains(string(log), "file exist") {
+		t.Fatalf("should have 'file exist': \n%v", string(log))
+	}
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestExecCommand(t *testing.T) {
+	buildId = "TestExecCommand"
+	done := startAgent(t)
+
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.ExecCommand("echo 'echo from exec echo'"),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	if !strings.Contains(string(log), "echo from exec echo") {
+		t.Fatalf("No `go help` output: %v", string(log))
+	}
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestRunIfConfig(t *testing.T) {
+	buildId = "TestRunIfConfig"
+	done := startAgent(t)
+
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.EchoCommand("should not echo if failed when passed").RunIf("failed"),
+		protocal.EchoCommand("should echo if any when passed").RunIf("any"),
+		protocal.EchoCommand("should echo if passed when passed").RunIf("passed"),
+		protocal.ExecCommand("cmdnotexist"),
+		protocal.EchoCommand("should echo if failed when failed").RunIf("failed"),
+		protocal.EchoCommand("should echo if any when failed").RunIf("any"),
+		protocal.EchoCommand("should not echo if passed when failed").RunIf("passed"),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	consoleLog := string(log)
+
+	expected := `should echo if any when passed
+should echo if passed when passed
+should echo if failed when failed
+should echo if any when failed`
+	for _, expt := range strings.Split(expected, "\n") {
+		if !strings.Contains(consoleLog, expt) {
+			t.Fatalf("should contain '%v', but not, log: \n%v", expt, consoleLog)
+		}
+	}
+
+	unexpected := `should not echo if failed when passed
+should not echo if passed when failed`
+	for _, unexpt := range strings.Split(unexpected, "\n") {
+		if strings.Contains(consoleLog, unexpt) {
+			t.Fatalf("should not contain '%v', log: \n%v", unexpt, consoleLog)
+		}
+	}
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestComposeCommandWithRunIfConfig(t *testing.T) {
+	buildId = "TestComposeCommand"
+	done := startAgent(t)
+
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.ComposeCommand(
+			protocal.ComposeCommand(
+				protocal.EchoCommand("hello world1"),
+				protocal.EchoCommand("hello world2"),
+			).RunIf("any"),
+			protocal.ComposeCommand(
+				protocal.EchoCommand("hello world3"),
+				protocal.EchoCommand("hello world4"),
+			),
+		).RunIf("failed"),
+		protocal.ComposeCommand(
+			protocal.EchoCommand("hello world5").RunIf("failed"),
+			protocal.EchoCommand("hello world6"),
+		),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Idle")
+
+	log, err := goServer.ConsoleLog(buildId)
+	if err != nil {
+		t.Fatal("can't get console log: ", err)
+	}
+	consoleLog := string(log)
+	lines := strings.Split(consoleLog, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("should have 2 line log: %v", consoleLog)
+	}
+	if !strings.Contains(lines[0], "hello world6") {
+		t.Fatalf("should contain hello world6, but not: %v", consoleLog)
+	}
+	if "" != lines[1] {
+		t.Fatalf("unexpected log: '%v'", lines[1])
 	}
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())

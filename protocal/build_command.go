@@ -61,6 +61,16 @@ func EndCommand() *BuildCommand {
 	return NewBuildCommand("end").RunIf("any")
 }
 
+func ExecCommand(cmd string, execArgs ...string) *BuildCommand {
+	args := listMap(execArgs...)
+	args["command"] = cmd
+	return NewBuildCommand("exec").SetArgs(args)
+}
+
+func ExportCommand(envs map[string]string) *BuildCommand {
+	return NewBuildCommand("export").SetArgs(envs)
+}
+
 func ReportCurrentStatusCommand(jobState string) *BuildCommand {
 	args := map[string]string{"jobState": jobState}
 	return NewBuildCommand("reportCurrentStatus").SetArgs(args)
@@ -72,6 +82,14 @@ func ReportCompletingCommand() *BuildCommand {
 
 func ReportCompletedCommand() *BuildCommand {
 	return NewBuildCommand("reportCompleted")
+}
+
+func TestCommand(flag, path string) *BuildCommand {
+	args := map[string]string{
+		"flag": flag,
+		"path": path,
+	}
+	return NewBuildCommand("test").SetArgs(args)
 }
 
 func Parse(command map[string]interface{}) *BuildCommand {
@@ -88,6 +106,14 @@ func (cmd *BuildCommand) AddCommands(commands ...*BuildCommand) *BuildCommand {
 
 func (cmd *BuildCommand) SetArgs(args map[string]string) *BuildCommand {
 	cmd.Args = args
+	return cmd
+}
+
+func (cmd *BuildCommand) SetTest(test *BuildCommand) *BuildCommand {
+	cmd.Test = &CommandTest{
+		Command:     test,
+		Expectation: true,
+	}
 	return cmd
 }
 

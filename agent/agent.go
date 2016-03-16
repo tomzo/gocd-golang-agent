@@ -114,7 +114,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		return errors.New("received reregister message")
 	case "cmd":
 		closeBuildSession()
-		buildSession = MakeBuildSession(httpClient, send)
+		buildSession = MakeBuildSession(httpClient, send, config)
 		go processBuildCommandMessage(msg, buildSession)
 	default:
 		logger.Error.Printf("ERROR: unknown message action %v", msg)

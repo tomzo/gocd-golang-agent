@@ -30,22 +30,24 @@ type BuildSession struct {
 	HttpClient *http.Client
 	Send       chan *protocal.Message
 
+	config                *Config
 	buildStatus           string
 	console               *BuildConsole
 	artifactUploadBaseUrl string
 	propertyBaseUrl       string
 	buildId               string
 	envs                  map[string]string
-	cancel                chan int
-	done                  chan int
+	cancel                chan bool
+	done                  chan bool
 }
 
-func MakeBuildSession(httpClient *http.Client, send chan *protocal.Message) *BuildSession {
+func MakeBuildSession(httpClient *http.Client, send chan *protocal.Message, config *Config) *BuildSession {
 	return &BuildSession{
 		HttpClient: httpClient,
 		Send:       send,
-		cancel:     make(chan int),
-		done:       make(chan int),
+		config:     config,
+		cancel:     make(chan bool),
+		done:       make(chan bool),
 	}
 }
 
@@ -65,9 +67,7 @@ func (s *BuildSession) isCanceled() bool {
 
 func (s *BuildSession) Process(cmd *protocal.BuildCommand) error {
 	defer func() {
-		if s.console != nil {
-			s.console.Close()
-		}
+		s.console.Close()
 		close(s.done)
 	}()
 	return s.process(cmd)
@@ -108,7 +108,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		jobState := cmd.Args["jobState"]
 		s.Send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	case "end":
-		// nothing to do
+		// do nothing
 	default:
 		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
@@ -209,9 +209,10 @@ func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	settings := cmd.Args
 	SetState("buildLocator", settings["buildLocator"])
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
-	s.console = MakeBuildConsole(AgentId, s.HttpClient, config.MakeFullServerURL(settings["consoleURI"]))
-	s.artifactUploadBaseUrl = config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
-	s.propertyBaseUrl = config.MakeFullServerURL(settings["propertyBaseUrl"])
+
+	s.console = MakeBuildConsole(AgentId, s.HttpClient, s.config.MakeFullServerURL(settings["consoleURI"]))
+	s.artifactUploadBaseUrl = s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
+	s.propertyBaseUrl = s.config.MakeFullServerURL(settings["propertyBaseUrl"])
 	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"
