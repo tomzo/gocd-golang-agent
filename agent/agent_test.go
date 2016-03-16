@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -41,6 +42,7 @@ var (
 
 func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 	buildId = "TestReportStatusAndSetCookieAfterConnected"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 	compose := protocal.ComposeCommand(
 		startCmd(),
@@ -69,6 +71,7 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 
 func TestEcho(t *testing.T) {
 	buildId = "TestEcho"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 
 	compose := protocal.ComposeCommand(
@@ -94,6 +97,7 @@ func TestEcho(t *testing.T) {
 
 func TestExport(t *testing.T) {
 	buildId = "TestExport"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 	compose := protocal.ComposeCommand(
 		startCmd(),
@@ -129,6 +133,7 @@ func TestExport(t *testing.T) {
 
 func TestTestCommand(t *testing.T) {
 	buildId = "TestTestCommand"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 	_, file, _, _ := runtime.Caller(0)
 	compose := protocal.ComposeCommand(
@@ -155,6 +160,7 @@ func TestTestCommand(t *testing.T) {
 
 func TestExecCommand(t *testing.T) {
 	buildId = "TestExecCommand"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 
 	compose := protocal.ComposeCommand(
@@ -180,6 +186,7 @@ func TestExecCommand(t *testing.T) {
 
 func TestRunIfConfig(t *testing.T) {
 	buildId = "TestRunIfConfig"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 
 	compose := protocal.ComposeCommand(
@@ -227,6 +234,7 @@ should not echo if passed when failed`
 
 func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	buildId = "TestComposeCommand"
+	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)
 
 	compose := protocal.ComposeCommand(
@@ -381,27 +389,38 @@ func waitForServerStarted(url string) error {
 }
 
 type StateLog struct {
-	states chan string
+	states           chan string
+	mu               sync.Mutex
+	buildId, agentId string
 }
 
-func (as *StateLog) Notify(class, id, state string) {
+func (log *StateLog) Notify(class, id, state string) {
+	log.mu.Lock()
+	defer log.mu.Unlock()
 	switch class {
 	case "agent":
-		if id == AgentId {
-			as.states <- "agent " + state
+		if id == log.agentId {
+			log.states <- "agent " + state
 		}
 	case "build":
-		if id == buildId {
-			as.states <- "build " + state
+		if id == log.buildId {
+			log.states <- "build " + state
 		}
 	}
 }
 
-func (as *StateLog) Next() string {
+func (log *StateLog) Next() string {
 	select {
-	case state := <-as.states:
+	case state := <-log.states:
 		return state
 	case <-time.After(5 * time.Second):
 		return "timeout"
 	}
+}
+
+func (log *StateLog) Reset(buildId, agentId string) {
+	log.mu.Lock()
+	defer log.mu.Unlock()
+	log.buildId = buildId
+	log.agentId = agentId
 }
