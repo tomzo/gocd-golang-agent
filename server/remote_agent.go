@@ -29,13 +29,13 @@ type RemoteAgent struct {
 	id   string
 }
 
-func (agent *RemoteAgent) Listen(server *Server) {
+func (agent *RemoteAgent) Listen(server *Server) error {
 	for {
 		msg, err := protocal.ReceiveMessage(agent.conn)
 		if err == io.EOF {
-			return
+			return err
 		} else if err != nil {
-			server.Error("receive error: %v", err)
+			server.error("receive error: %v", err)
 		} else {
 			agent.processMessage(server, msg)
 		}
@@ -43,34 +43,34 @@ func (agent *RemoteAgent) Listen(server *Server) {
 }
 
 func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) {
-	server.Log("received message: %v", msg.Action)
+	server.log("received message: %v", msg.Action)
 	err := agent.Ack(msg)
 	if err != nil {
-		server.Error("ack error: %v", err)
+		server.error("ack error: %v", err)
 	}
 	switch msg.Action {
 	case "ping":
 		if agent.id == "" {
 			agent.id = protocal.AgentId(msg.Data["data"])
-			server.Add(agent)
+			server.add(agent)
 			agent.SetCookie()
 		}
 		agentState := protocal.AgentRuntimeStatus(msg.Data["data"])
-		server.NotifyAgent(agent.id, agentState)
+		server.notifyAgent(agent.id, agentState)
 	case "reportCurrentStatus":
 		report := msg.Data["data"].(map[string]interface{})
 		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.id, agentState)
+		server.notifyAgent(agent.id, agentState)
 		buildId, _ := report["buildId"].(string)
 		jobState, _ := report["jobState"].(string)
-		server.NotifyBuild(buildId, jobState)
+		server.notifyBuild(buildId, jobState)
 	case "reportCompleting", "reportCompleted":
 		report := msg.Data["data"].(map[string]interface{})
 		agentState := protocal.AgentRuntimeStatus(report["agentRuntimeInfo"])
-		server.NotifyAgent(agent.id, agentState)
+		server.notifyAgent(agent.id, agentState)
 		buildId, _ := report["buildId"].(string)
 		jobResult, _ := report["result"].(string)
-		server.NotifyBuild(buildId, jobResult)
+		server.notifyBuild(buildId, jobResult)
 	}
 }
 

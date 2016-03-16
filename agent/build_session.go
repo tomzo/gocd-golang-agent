@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"unicode"
@@ -207,14 +208,23 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 
 func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	settings := cmd.Args
+
 	SetState("buildLocator", settings["buildLocator"])
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
 
-	s.console = MakeBuildConsole(AgentId, s.HttpClient, s.config.MakeFullServerURL(settings["consoleURI"]))
+	s.console = MakeBuildConsole(s.HttpClient, appendAgentId(s.config.MakeFullServerURL(settings["consoleURI"])))
 	s.artifactUploadBaseUrl = s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
 	s.propertyBaseUrl = s.config.MakeFullServerURL(settings["propertyBaseUrl"])
 	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"
 	return nil
+}
+
+func appendAgentId(rawUrl string) *url.URL {
+	u, _ := url.Parse(rawUrl)
+	values := u.Query()
+	values.Set("agentId", AgentId)
+	u.RawQuery = values.Encode()
+	return u
 }

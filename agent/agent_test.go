@@ -16,11 +16,14 @@
 package agent_test
 
 import (
+	"crypto/tls"
+	"errors"
 	"flag"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -30,9 +33,10 @@ import (
 )
 
 var (
-	goServer *server.Server
-	stateLog *StateLog
-	buildId  string
+	goServerUrl string
+	goServer    *server.Server
+	stateLog    *StateLog
+	buildId     string
 )
 
 func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
@@ -82,7 +86,7 @@ func TestEcho(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -110,7 +114,7 @@ func TestExport(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -141,7 +145,7 @@ func TestTestCommand(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -165,7 +169,7 @@ func TestExecCommand(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -195,7 +199,7 @@ func TestRunIfConfig(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -248,7 +252,7 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 	waitForNextState(t, "agent Idle")
 
-	log, err := goServer.ConsoleLog(buildId)
+	log, err := goServer.ConsoleLog(buildId, AgentId)
 	if err != nil {
 		t.Fatal("can't get console log: ", err)
 	}
@@ -292,14 +296,7 @@ func waitForNextState(t *testing.T, expected string) {
 }
 
 func startCmd() *protocal.BuildCommand {
-	return protocal.StartCommand(map[string]string{
-		"buildId":                buildId,
-		"buildLocator":           "p/1/s/1/j",
-		"buildLocatorForDisplay": "p/1/s/1/j",
-		"consoleURI":             goServer.ConsoleUrl(buildId),
-		"artifactUploadBaseUrl":  goServer.ArtifactUploadBaseUrl(buildId),
-		"propertyBaseUrl":        goServer.PropertyBaseUrl(buildId),
-	})
+	return protocal.StartCommand(goServer.BuildContext(buildId))
 }
 
 func TestMain(m *testing.M) {
@@ -324,9 +321,9 @@ func TestMain(m *testing.M) {
 
 	startServer(serverWorkingDir)
 	os.Setenv("DEBUG", "t")
-	os.Setenv("GOCD_SERVER_URL", goServer.URL)
-	os.Setenv("GOCD_SERVER_WEB_SOCKET_PATH", goServer.WebSocketPath())
-	os.Setenv("GOCD_SERVER_REGISTRATION_PATH", goServer.RegistrationPath())
+	os.Setenv("GOCD_SERVER_URL", goServerUrl)
+	os.Setenv("GOCD_SERVER_WEB_SOCKET_PATH", server.WebSocketPath)
+	os.Setenv("GOCD_SERVER_REGISTRATION_PATH", server.RegistrationPath)
 	os.Setenv("GOCD_AGENT_WORK_DIR", agentWorkingDir)
 	os.Setenv("GOCD_AGENT_LOG_DIR", agentWorkingDir)
 
@@ -345,8 +342,8 @@ func startServer(workingDir string) {
 	}
 	port := "1234"
 	stateLog = &StateLog{states: make(chan string)}
+	goServerUrl = "https://" + cert.Host + ":" + port
 	goServer = server.New(port,
-		"https://"+cert.Host+":"+port,
 		certFile,
 		keyFile,
 		workingDir,
@@ -359,10 +356,29 @@ func startServer(workingDir string) {
 	}()
 
 	println("wait for server started")
-	if err := goServer.WaitForStarted(); err != nil {
+	if err := waitForServerStarted(goServerUrl + server.StatusPath); err != nil {
 		panic(err)
 	}
 	println("server started")
+}
+
+func waitForServerStarted(url string) error {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return errors.New("wait for server start timeout")
+		default:
+			_, err := client.Get(url)
+			if err == nil {
+				return nil
+			}
+		}
+	}
 }
 
 type StateLog struct {

@@ -17,9 +17,7 @@
 package server
 
 import (
-	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"golang.org/x/net/websocket"
 	"io"
@@ -28,20 +26,30 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
+	"strings"
+)
+
+var (
+	WebSocketPath    = "/agent-websocket"
+	RegistrationPath = "/agent-register"
+	StatusPath       = "/status"
+
+	ConsoleLogPath = "/console"
+	ArtifactsPath  = "/artifacts"
+	PropertiesPath = "/properties"
 )
 
 type StateListener interface {
 	Notify(class, id, state string)
 }
 
-type RemoteAgentMessage struct {
+type AgentMessage struct {
 	agentId string
 	Msg     *protocal.Message
 }
+
 type Server struct {
 	Port           string
-	URL            string
 	CertPemFile    string
 	KeyPemFile     string
 	WorkingDir     string
@@ -50,68 +58,113 @@ type Server struct {
 
 	addAgent    chan *RemoteAgent
 	delAgent    chan *RemoteAgent
-	sendMessage chan *RemoteAgentMessage
+	sendMessage chan *AgentMessage
 }
 
-func New(port, url, certFile, keyFile, workingDir string, logger *log.Logger) *Server {
+func New(port, certFile, keyFile, workingDir string, logger *log.Logger) *Server {
 	return &Server{
 		Port:        port,
-		URL:         url,
 		CertPemFile: certFile,
 		KeyPemFile:  keyFile,
 		WorkingDir:  workingDir,
 		Logger:      logger,
 		addAgent:    make(chan *RemoteAgent),
 		delAgent:    make(chan *RemoteAgent),
-		sendMessage: make(chan *RemoteAgentMessage),
+		sendMessage: make(chan *AgentMessage),
 	}
 
 }
 
 func (s *Server) Start() error {
-	go s.manageAgents()
-	http.HandleFunc(s.RegistrationPath(), s.registorHandler())
-	http.Handle(s.WebSocketPath(), s.websocketHandler())
-	http.HandleFunc("/console", s.consoleHandler())
-	http.HandleFunc("/status", s.statusHandler())
-	s.Log("listen to %v", s.Port)
+	go manageAgents(s)
+	http.HandleFunc(RegistrationPath, registorHandler(s))
+	http.Handle(WebSocketPath, websocketHandler(s))
+	http.HandleFunc(ConsoleLogPath+"/", consoleHandler(s))
+	http.HandleFunc(StatusPath, statusHandler())
+	s.log("listen to %v", s.Port)
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
 }
 
-func (s *Server) ConsoleUrl(buildId string) string {
-	return s.URL + "/console?buildId=" + buildId
+func (s *Server) BuildContext(id string) map[string]string {
+	locator := "/builds/" + id
+	return map[string]string{
+		"buildId":                id,
+		"buildLocator":           locator,
+		"buildLocatorForDisplay": locator,
+		"consoleURI":             ConsoleLogPath + locator,
+		"artifactUploadBaseUrl":  ArtifactsPath + locator,
+		"propertyBaseUrl":        PropertiesPath + locator,
+	}
 }
 
-func (s *Server) ArtifactUploadBaseUrl(buildId string) string {
-	return s.URL + "/artifacts/" + buildId
-}
-func (s *Server) PropertyBaseUrl(buildId string) string {
-	return s.URL + "/property/" + buildId
+func (s *Server) ConsoleLog(buildId, agentId string) ([]byte, error) {
+	return ioutil.ReadFile(s.consoleLogFile(buildId, agentId))
 }
 
-func (s *Server) StatusUrl() string {
-	return s.URL + "/status"
+func (s *Server) Send(agentId string, msg *protocal.Message) {
+	s.sendMessage <- &AgentMessage{agentId: agentId, Msg: msg}
 }
 
-func (s *Server) WebSocketPath() string {
-	return "/agent-websocket"
+func (s *Server) log(format string, v ...interface{}) {
+	s.Logger.Printf(format, v...)
 }
 
-func (s *Server) RegistrationPath() string {
-	return "/agent-register"
+func (s *Server) error(format string, v ...interface{}) {
+	s.Logger.Printf(format, v...)
 }
 
-func (s *Server) manageAgents() {
+func (s *Server) add(agent *RemoteAgent) {
+	s.addAgent <- agent
+}
+
+func (s *Server) del(agent *RemoteAgent) {
+	s.delAgent <- agent
+}
+
+func (s *Server) notifyAgent(uuid, state string) {
+	s.notify("agent", uuid, state)
+}
+
+func (s *Server) notifyBuild(uuid, state string) {
+	s.notify("build", uuid, state)
+}
+
+func (s *Server) notify(class, uuid, state string) {
+	for _, listener := range s.StateListeners {
+		listener.Notify(class, uuid, state)
+	}
+}
+
+func (s *Server) consoleLogFile(buildId, agentId string) string {
+	return filepath.Join(s.WorkingDir, buildId, agentId, "console.log")
+}
+
+func (s *Server) appendConsoleLog(filename string, data []byte) error {
+	err := os.MkdirAll(filepath.Dir(filename), 0744)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0744)
+	if err != nil {
+		return err
+	}
+	s.log("append data(%v) to %v", len(data), filename)
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
+func manageAgents(s *Server) {
 	agents := make(map[string]*RemoteAgent)
-	messages := make(map[string][]*protocal.Message)
 	for {
 		select {
 		case agent := <-s.addAgent:
 			agents[agent.id] = agent
-			for _, msg := range messages[agent.id] {
-				agent.Send(msg)
-			}
-			delete(messages, agent.id)
 		case agent := <-s.delAgent:
 			delete(agents, agent.id)
 		case am := <-s.sendMessage:
@@ -119,32 +172,13 @@ func (s *Server) manageAgents() {
 			if agent != nil {
 				agent.Send(am.Msg)
 			} else {
-				messages[am.agentId] = append(messages[am.agentId], am.Msg)
+				s.log("could not find agent by id %v for sending message: %v", am.agentId, am.Msg.Action)
 			}
 		}
 	}
 }
 
-func (s *Server) WaitForStarted() error {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	timeout := time.After(5 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			return errors.New("wait for server start timeout")
-		default:
-			_, err := client.Get(s.StatusUrl())
-			if err == nil {
-				return nil
-			}
-		}
-	}
-}
-
-func (s *Server) statusHandler() func(http.ResponseWriter, *http.Request) {
+func statusHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("ok"))
 	}
@@ -152,7 +186,7 @@ func (s *Server) statusHandler() func(http.ResponseWriter, *http.Request) {
 
 // todo: does not generate real agent cert and private key yet, just
 // use server cert and private key for testing environment.
-func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
+func registorHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var agentPrivateKey, agentCert, regJson []byte
 		var err error
@@ -177,102 +211,46 @@ func (s *Server) registorHandler() func(http.ResponseWriter, *http.Request) {
 		w.Write(regJson)
 		return
 	responseError:
-		s.Log("register failed: %v", err.Error())
+		s.error("register failed: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 	}
 }
 
-func (s *Server) websocketHandler() websocket.Handler {
+func websocketHandler(s *Server) websocket.Handler {
 	return websocket.Handler(func(ws *websocket.Conn) {
 		agent := &RemoteAgent{conn: ws}
-		defer func() {
-			s.Del(agent)
-			s.Log("close websocket connection for %v", agent)
+		s.log("websocket connection is open for %v", agent)
+		err := agent.Listen(s)
+		s.del(agent)
+		if err != io.EOF {
+			s.log("close websocket connection for %v", agent)
 			err := agent.Close()
 			if err != nil {
-				s.Log("error when closing websocket connection for %v: %v", agent, err)
+				s.error("error when closing websocket connection for %v: %v", agent, err)
 			}
-		}()
-		s.Log("websocket connection is open for %v", agent)
-		agent.Listen(s)
+		}
 	})
 }
 
-func (s *Server) ConsoleLog(buildId string) ([]byte, error) {
-	return ioutil.ReadFile(s.consoleLogFile(buildId))
-}
-
-func (s *Server) consoleHandler() func(http.ResponseWriter, *http.Request) {
+func consoleHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		bytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			s.Log("read request body error: %v", err)
+			s.error("read request body error: %v", err)
 			return
 		}
-		buildId := req.URL.Query().Get("buildId")
-		err = s.appendConsoleLog(s.consoleLogFile(buildId), bytes)
+		buildId := parseBuildId(req.URL.Path)
+		agentId := req.URL.Query().Get("agentId")
+		err = s.appendConsoleLog(s.consoleLogFile(buildId, agentId), bytes)
 		if err != nil {
-			s.Log("append console log error: %v", err)
+			s.error("append console log error: %v", err)
 			return
 		}
 	}
 }
 
-func (s *Server) consoleLogFile(buildId string) string {
-	return filepath.Join(s.WorkingDir, buildId, "console.log")
-}
-
-func (s *Server) appendConsoleLog(filename string, data []byte) error {
-	err := os.MkdirAll(filepath.Dir(filename), 0744)
-	if err != nil {
-		return err
-	}
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0744)
-	if err != nil {
-		return err
-	}
-	s.Log("append data(%v) to %v", len(data), filename)
-	n, err := f.Write(data)
-	if err == nil && n < len(data) {
-		err = io.ErrShortWrite
-	}
-	if err1 := f.Close(); err == nil {
-		err = err1
-	}
-	return err
-}
-
-func (s *Server) Log(format string, v ...interface{}) {
-	s.Logger.Printf(format, v...)
-}
-
-func (s *Server) Error(format string, v ...interface{}) {
-	s.Logger.Printf(format, v...)
-}
-
-func (s *Server) Send(agentId string, msg *protocal.Message) {
-	s.sendMessage <- &RemoteAgentMessage{agentId: agentId, Msg: msg}
-}
-
-func (s *Server) Add(agent *RemoteAgent) {
-	s.addAgent <- agent
-}
-
-func (s *Server) Del(agent *RemoteAgent) {
-	s.delAgent <- agent
-}
-
-func (s *Server) NotifyAgent(uuid, state string) {
-	s.notify("agent", uuid, state)
-}
-
-func (s *Server) NotifyBuild(uuid, state string) {
-	s.notify("build", uuid, state)
-}
-
-func (s *Server) notify(class, uuid, state string) {
-	for _, listener := range s.StateListeners {
-		listener.Notify(class, uuid, state)
-	}
+func parseBuildId(path string) string {
+	parts := strings.Split(path, "/")
+	return parts[len(parts)-1]
 }

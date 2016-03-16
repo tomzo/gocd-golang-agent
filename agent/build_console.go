@@ -35,11 +35,10 @@ type BuildConsole struct {
 	write      chan []byte
 }
 
-func MakeBuildConsole(agentId string, httpClient *http.Client, uri string) *BuildConsole {
-	u, _ := url.Parse(uri + "&agentId=" + agentId)
+func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 	console := BuildConsole{
 		HttpClient: httpClient,
-		Url:        u,
+		Url:        url,
 		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
 		stop:       make(chan bool),
 		closed:     &sync.WaitGroup{},
