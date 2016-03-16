@@ -129,6 +129,7 @@ func processBuildCommandMessage(msg *protocal.Message, buildSession *BuildSessio
 		logger.Debug.Printf("! exit goroutine: process build command message")
 	}()
 	SetState("runtimeStatus", "Building")
+	ping(buildSession.Send)
 	command, _ := msg.Data["data"].(map[string]interface{})
 	buildCmd := protocal.Parse(command)
 	LogInfo("start process build command:")

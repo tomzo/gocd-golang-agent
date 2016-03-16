@@ -58,18 +58,11 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 	}
 
 	waitForNextState(t, "build Preparing")
-
-	waitForNextState(t, "agent Building")
 	waitForNextState(t, "build Building")
-
-	waitForNextState(t, "agent Building")
 	waitForNextState(t, "build Passed")
-
-	waitForNextState(t, "agent Building")
 	waitForNextState(t, "build Passed")
 
 	waitForNextState(t, "agent Idle")
-
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
 }
@@ -84,6 +77,7 @@ func TestEcho(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
@@ -112,6 +106,7 @@ func TestExport(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
@@ -143,6 +138,7 @@ func TestTestCommand(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
@@ -167,6 +163,7 @@ func TestExecCommand(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
@@ -197,6 +194,7 @@ func TestRunIfConfig(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
@@ -250,6 +248,7 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	waitForNextState(t, "agent Building")
 	waitForNextState(t, "agent Idle")
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
