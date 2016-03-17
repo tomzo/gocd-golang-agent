@@ -92,6 +92,14 @@ func TestCommand(flag, path string) *BuildCommand {
 	return NewBuildCommand("test").SetArgs(args)
 }
 
+func UploadArtifactCommand(src, dest string) *BuildCommand {
+	args := map[string]string{
+		"src":  src,
+		"dest": dest,
+	}
+	return NewBuildCommand("uploadArtifact").SetArgs(args)
+}
+
 func Parse(command map[string]interface{}) *BuildCommand {
 	var cmd BuildCommand
 	str, _ := json.Marshal(command)
@@ -114,6 +122,11 @@ func (cmd *BuildCommand) SetTest(test *BuildCommand) *BuildCommand {
 		Command:     test,
 		Expectation: true,
 	}
+	return cmd
+}
+
+func (cmd *BuildCommand) Setwd(wd string) *BuildCommand {
+	cmd.WorkingDirectory = wd
 	return cmd
 }
 

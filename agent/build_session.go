@@ -32,15 +32,15 @@ type BuildSession struct {
 	HttpClient *http.Client
 	Send       chan *protocal.Message
 
-	config                *Config
-	buildStatus           string
-	console               *BuildConsole
-	artifactUploadBaseUrl string
-	propertyBaseUrl       string
-	buildId               string
-	envs                  map[string]string
-	cancel                chan bool
-	done                  chan bool
+	config      *Config
+	buildStatus string
+	console     *BuildConsole
+	artifacts   *Uploader
+	properties  *Uploader
+	buildId     string
+	envs        map[string]string
+	cancel      chan bool
+	done        chan bool
 }
 
 func MakeBuildSession(httpClient *http.Client, send chan *protocal.Message, config *Config) *BuildSession {
@@ -106,6 +106,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processExec(cmd)
 	case "echo":
 		return s.processEcho(cmd)
+	case "uploadArtifact":
+		return s.processUploadArtifact(cmd)
 	case "reportCurrentStatus", "reportCompleting", "reportCompleted":
 		jobState := cmd.Args["jobState"]
 		s.Send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
@@ -113,6 +115,16 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		// do nothing
 	default:
 		s.console.WriteLn("TBI command: %v", cmd.Name)
+	}
+	return nil
+}
+
+func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) error {
+	src := cmd.Args["src"]
+	dest := cmd.Args["dest"]
+	err := s.artifacts.Upload(cmd.WorkingDirectory, src, dest, s.buildId)
+	if err != nil {
+		s.console.WriteLn(err.Error())
 	}
 	return nil
 }
@@ -193,7 +205,9 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 			i++
 		}
 		sort.Strings(exports)
-		s.process(protocal.EchoCommand(exports...))
+		for _, exp := range exports {
+			s.console.WriteLn(exp)
+		}
 	}
 	return nil
 }
@@ -214,19 +228,17 @@ func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	SetState("buildLocator", settings["buildLocator"])
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
 
-	s.console = MakeBuildConsole(s.HttpClient, appendAgentId(s.config.MakeFullServerURL(settings["consoleURI"])))
-	s.artifactUploadBaseUrl = s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
-	s.propertyBaseUrl = s.config.MakeFullServerURL(settings["propertyBaseUrl"])
+	curl, err := url.Parse(s.config.MakeFullServerURL(settings["consoleURI"]))
+	if err != nil {
+		return err
+	}
+	s.console = MakeBuildConsole(s.HttpClient, curl)
+	s.artifacts = NewUploader(s.console, s.HttpClient,
+		s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"]))
+	s.properties = NewUploader(s.console, s.HttpClient,
+		s.config.MakeFullServerURL(settings["propertyBaseUrl"]))
 	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"
 	return nil
-}
-
-func appendAgentId(rawUrl string) *url.URL {
-	u, _ := url.Parse(rawUrl)
-	values := u.Query()
-	values.Set("agentId", AgentId)
-	u.RawQuery = values.Encode()
-	return u
 }

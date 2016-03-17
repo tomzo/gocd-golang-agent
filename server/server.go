@@ -80,6 +80,7 @@ func (s *Server) Start() error {
 	http.HandleFunc(RegistrationPath, registorHandler(s))
 	http.Handle(WebSocketPath, websocketHandler(s))
 	http.HandleFunc(ConsoleLogPath+"/", consoleHandler(s))
+	http.HandleFunc(ArtifactsPath+"/", artifactsHandler(s))
 	http.HandleFunc(StatusPath, statusHandler())
 	s.log("listen to %v", s.Port)
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
@@ -97,9 +98,26 @@ func (s *Server) BuildContext(id string) map[string]string {
 	}
 }
 
-func (s *Server) ConsoleLog(buildId, agentId string) (string, error) {
-	bytes, err := ioutil.ReadFile(s.consoleLogFile(buildId, agentId))
+func (s *Server) ConsoleLog(buildId string) (string, error) {
+	bytes, err := ioutil.ReadFile(s.ConsoleLogFile(buildId))
 	return string(bytes), err
+}
+
+func (s *Server) Checksum(buildId string) (string, error) {
+	bytes, err := ioutil.ReadFile(s.ChecksumFile(buildId))
+	return string(bytes), err
+}
+
+func (s *Server) ArtifactFile(buildId, file string) string {
+	return filepath.Join(s.WorkingDir, buildId, "artifacts", file)
+}
+
+func (s *Server) ChecksumFile(buildId string) string {
+	return filepath.Join(s.WorkingDir, buildId, "md5.checksum")
+}
+
+func (s *Server) ConsoleLogFile(buildId string) string {
+	return filepath.Join(s.WorkingDir, buildId, "console.log")
 }
 
 func (s *Server) Send(agentId string, msg *protocal.Message) {
@@ -136,11 +154,7 @@ func (s *Server) notify(class, uuid, state string) {
 	}
 }
 
-func (s *Server) consoleLogFile(buildId, agentId string) string {
-	return filepath.Join(s.WorkingDir, buildId, agentId, "console.log")
-}
-
-func (s *Server) appendConsoleLog(filename string, data []byte) error {
+func (s *Server) appendToFile(filename string, data []byte) error {
 	err := os.MkdirAll(filepath.Dir(filename), 0744)
 	if err != nil {
 		return err
@@ -195,26 +209,25 @@ func registorHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 
 		agentPrivateKey, err = ioutil.ReadFile(s.KeyPemFile)
 		if err != nil {
-			goto responseError
+			s.responseInternalError(err, w)
+			return
 		}
 		agentCert, err = ioutil.ReadFile(s.CertPemFile)
 		if err != nil {
-			goto responseError
+			s.responseInternalError(err, w)
+			return
 		}
+
 		reg = &protocal.Registration{
 			AgentPrivateKey:  string(agentPrivateKey),
 			AgentCertificate: string(agentCert),
 		}
 		regJson, err = json.Marshal(reg)
 		if err != nil {
-			goto responseError
+			s.responseInternalError(err, w)
+			return
 		}
 		w.Write(regJson)
-		return
-	responseError:
-		s.error("register failed: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
 	}
 }
 
@@ -232,23 +245,6 @@ func websocketHandler(s *Server) websocket.Handler {
 			}
 		}
 	})
-}
-
-func consoleHandler(s *Server) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, req *http.Request) {
-		bytes, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			s.error("read request body error: %v", err)
-			return
-		}
-		buildId := parseBuildId(req.URL.Path)
-		agentId := req.URL.Query().Get("agentId")
-		err = s.appendConsoleLog(s.consoleLogFile(buildId, agentId), bytes)
-		if err != nil {
-			s.error("append console log error: %v", err)
-			return
-		}
-	}
 }
 
 func parseBuildId(path string) string {

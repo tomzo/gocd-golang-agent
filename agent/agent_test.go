@@ -20,10 +20,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
 	"github.com/xli/assert"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -83,7 +85,7 @@ func TestEcho(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	assert.Equal(t, "echo hello world\n", trimTimestamp(log))
 
@@ -109,7 +111,7 @@ func TestExport(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	expected := `export env1=value1
 export env2=value2
@@ -136,7 +138,7 @@ func TestTestCommand(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	assert.Equal(t, "file exist\n", trimTimestamp(log))
 
@@ -158,7 +160,7 @@ func TestExecCommand(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	assert.Equal(t, "abcd\n", trimTimestamp(log))
 
@@ -186,7 +188,7 @@ func TestRunIfConfig(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 
 	expected := `should echo if any when passed
@@ -228,9 +230,54 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId, AgentId)
+	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	assert.Equal(t, "hello world6\n", trimTimestamp(log))
+
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-done
+}
+
+func TestUploadArtifact(t *testing.T) {
+	buildId = "TestUploadArtifact"
+	stateLog.Reset(buildId, AgentId)
+	done := startAgent(t)
+
+	artifactWd := newPipelineDir()
+	err := os.MkdirAll(artifactWd, 0777)
+	assert.Nil(t, err)
+
+	fname := "artifact.txt"
+	err = writeFile(artifactWd, fname)
+	assert.Nil(t, err)
+
+	compose := protocal.ComposeCommand(
+		startCmd(),
+		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd),
+		protocal.EndCommand(),
+	)
+	goServer.Send(AgentId, protocal.CmdMessage(compose))
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := fmt.Sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", artifactWd, fname)
+	assert.Equal(t, expected, trimTimestamp(log))
+
+	f := goServer.ArtifactFile(buildId, fname)
+	finfo, err := os.Stat(f)
+	assert.Nil(t, err)
+	assert.Equal(t, fname, finfo.Name())
+
+	content, err := ioutil.ReadFile(f)
+	assert.Nil(t, err)
+	assert.Equal(t, "file created for test", string(content))
+
+	checksum, err := goServer.Checksum(buildId)
+	assert.Nil(t, err)
+	assert.True(t, strings.Contains(checksum, fname+"="),
+		"checksum: %v", checksum)
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -386,4 +433,26 @@ func trimTimestamp(log string) string {
 		}
 	}
 	return buf.String()
+}
+
+func newPipelineDir() string {
+	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/pipeline"
+}
+
+func writeFile(dir, fname string) error {
+	err := os.MkdirAll(dir, 0744)
+	if err != nil {
+		return err
+	}
+	fpath := filepath.Join(dir, fname)
+	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0744)
+	if err != nil {
+		return err
+	}
+	data := []byte("file created for test")
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		return io.ErrShortWrite
+	}
+	return f.Close()
 }
