@@ -44,6 +44,8 @@ then
     rm *.deb
 fi
 
+eval $(docker-machine env)
+
 sed -i '' '/^Version:.*$/d' $CONTROL_FILE
 echo "Version: $GGA_VERSION-$GGA_DEB_VERSION" >> $CONTROL_FILE
 docker build -t gocd/deb-maker .
