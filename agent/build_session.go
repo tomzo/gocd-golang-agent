@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"unicode"
 )
 
@@ -191,6 +192,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 			exports[i] = fmt.Sprintf("export %v=%v", key, value)
 			i++
 		}
+		sort.Strings(exports)
 		s.process(protocal.EchoCommand(exports...))
 	}
 	return nil

@@ -97,8 +97,9 @@ func (s *Server) BuildContext(id string) map[string]string {
 	}
 }
 
-func (s *Server) ConsoleLog(buildId, agentId string) ([]byte, error) {
-	return ioutil.ReadFile(s.consoleLogFile(buildId, agentId))
+func (s *Server) ConsoleLog(buildId, agentId string) (string, error) {
+	bytes, err := ioutil.ReadFile(s.consoleLogFile(buildId, agentId))
+	return string(bytes), err
 }
 
 func (s *Server) Send(agentId string, msg *protocal.Message) {

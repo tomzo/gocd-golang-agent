@@ -18,23 +18,18 @@ package protocal_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/xli/assert"
 	"testing"
 )
 
 func TestExtractArgList(t *testing.T) {
 	cmd := EchoCommand("hello", "world")
 	cmd.Args["2"] = "!"
+	cmd.Args["3"] = "not extracted"
+	cmd.Args["key"] = "value"
 	list := cmd.ExtractArgList(3)
-	if len(list) != 3 {
-		t.Fatal("expected 3, but: ", len(list))
-	}
-	if list[0] != "hello" {
-		t.Error("expected hello, but: ", list[0])
-	}
-	if list[1] != "world" {
-		t.Error("expected world, but: ", list[1])
-	}
-	if list[2] != "!" {
-		t.Error("expected !, but: ", list[2])
-	}
+	assert.Equal(t, 3, len(list))
+	assert.Equal(t, "hello", list[0])
+	assert.Equal(t, "world", list[1])
+	assert.Equal(t, "!", list[2])
 }

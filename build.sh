@@ -22,4 +22,6 @@ set -e
 export GOPATH=`pwd`/../../../../
 go get golang.org/x/net/websocket
 go get github.com/satori/go.uuid
+go get github.com/xli/assert
+# go get -u all
 go test -test.v ./...

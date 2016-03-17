@@ -27,22 +27,24 @@ import (
 )
 
 type BuildConsole struct {
-	Url        *url.URL
-	HttpClient *http.Client
-	Buffer     *bytes.Buffer
-	stop       chan bool
-	closed     *sync.WaitGroup
-	write      chan []byte
+	Url            *url.URL
+	HttpClient     *http.Client
+	Buffer         *bytes.Buffer
+	stop           chan bool
+	closed         *sync.WaitGroup
+	write          chan []byte
+	writeTimestamp bool
 }
 
 func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 	console := BuildConsole{
-		HttpClient: httpClient,
-		Url:        url,
-		Buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
-		stop:       make(chan bool),
-		closed:     &sync.WaitGroup{},
-		write:      make(chan []byte),
+		HttpClient:     httpClient,
+		Url:            url,
+		Buffer:         bytes.NewBuffer(make([]byte, 0, 10*1024)),
+		stop:           make(chan bool),
+		closed:         &sync.WaitGroup{},
+		write:          make(chan []byte),
+		writeTimestamp: true,
 	}
 	console.closed.Add(1)
 	go func() {
@@ -73,13 +75,15 @@ func (console *BuildConsole) Close() {
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {
+	console.write <- []byte(time.Now().Format("15:04:05.000"))
+	console.write <- []byte(" ")
 	console.write <- data
 	return len(data), nil
 }
 
 func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
 	ln := fmt.Sprintf(format, a...)
-	console.Write([]byte(fmt.Sprintf("%v %v\n", time.Now().Format("15:04:05.000"), ln)))
+	console.Write([]byte(fmt.Sprintf("%v\n", ln)))
 }
 
 func (console *BuildConsole) Flush() {

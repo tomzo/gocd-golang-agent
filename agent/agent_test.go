@@ -16,12 +16,14 @@
 package agent_test
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"flag"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
+	"github.com/xli/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -54,17 +56,15 @@ func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
 
-	waitForNextState(t, "agent Building")
-	if GetState("cookie") == "" {
-		t.Fatal("cookie is not set")
-	}
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.NotEqual(t, "", GetState("cookie"))
 
-	waitForNextState(t, "build Preparing")
-	waitForNextState(t, "build Building")
-	waitForNextState(t, "build Passed")
-	waitForNextState(t, "build Passed")
+	assert.Equal(t, "build Preparing", stateLog.Next())
+	assert.Equal(t, "build Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Idle", stateLog.Next())
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
 }
@@ -80,16 +80,12 @@ func TestEcho(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	if !strings.Contains(string(log), "echo hello world") {
-		t.Fatalf("console log dos not contain echo content: %v", string(log))
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, "echo hello world\n", trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -110,22 +106,16 @@ func TestExport(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	if !strings.Contains(string(log), "export env1=value1") {
-		t.Fatalf("no export env1: \n%v", string(log))
-	}
-	if !strings.Contains(string(log), "export env2=value2") {
-		t.Fatalf("no export env2: \n%v", string(log))
-	}
-	if !strings.Contains(string(log), "export env3=value3") {
-		t.Fatalf("no export env3: \n%v", string(log))
-	}
+	assert.Nil(t, err)
+	expected := `export env1=value1
+export env2=value2
+export env3=value3
+`
+	assert.Equal(t, expected, trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -143,16 +133,12 @@ func TestTestCommand(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	if !strings.Contains(string(log), "file exist") {
-		t.Fatalf("should have 'file exist': \n%v", string(log))
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, "file exist\n", trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -165,20 +151,16 @@ func TestExecCommand(t *testing.T) {
 
 	compose := protocal.ComposeCommand(
 		startCmd(),
-		protocal.ExecCommand("echo 'echo from exec echo'"),
+		protocal.ExecCommand("echo", "abcd"),
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	if !strings.Contains(string(log), "echo from exec echo") {
-		t.Fatalf("No `go help` output: %v", string(log))
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, "abcd\n", trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -201,32 +183,19 @@ func TestRunIfConfig(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	consoleLog := string(log)
+	assert.Nil(t, err)
 
 	expected := `should echo if any when passed
 should echo if passed when passed
+exec: "cmdnotexist": executable file not found in $PATH
 should echo if failed when failed
-should echo if any when failed`
-	for _, expt := range strings.Split(expected, "\n") {
-		if !strings.Contains(consoleLog, expt) {
-			t.Fatalf("should contain '%v', but not, log: \n%v", expt, consoleLog)
-		}
-	}
-
-	unexpected := `should not echo if failed when passed
-should not echo if passed when failed`
-	for _, unexpt := range strings.Split(unexpected, "\n") {
-		if strings.Contains(consoleLog, unexpt) {
-			t.Fatalf("should not contain '%v', log: \n%v", unexpt, consoleLog)
-		}
-	}
+should echo if any when failed
+`
+	assert.Equal(t, expected, trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -256,24 +225,12 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 		protocal.EndCommand(),
 	)
 	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	waitForNextState(t, "agent Building")
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId, AgentId)
-	if err != nil {
-		t.Fatal("can't get console log: ", err)
-	}
-	consoleLog := string(log)
-	lines := strings.Split(consoleLog, "\n")
-	if len(lines) != 2 {
-		t.Fatalf("should have 2 line log: %v", consoleLog)
-	}
-	if !strings.Contains(lines[0], "hello world6") {
-		t.Fatalf("should contain hello world6, but not: %v", consoleLog)
-	}
-	if "" != lines[1] {
-		t.Fatalf("unexpected log: '%v'", lines[1])
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, "hello world6\n", trimTimestamp(log))
 
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-done
@@ -282,24 +239,14 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 func startAgent(t *testing.T) chan bool {
 	done := make(chan bool)
 	go func() {
-		t.Log("start agent")
 		err := Start()
 		if err.Error() != "received reregister message" {
 			t.Error("Unexpected error to quit agent: ", err)
 		}
 		close(done)
 	}()
-	waitForNextState(t, "agent Idle")
+	assert.Equal(t, "agent Idle", stateLog.Next())
 	return done
-}
-
-func waitForNextState(t *testing.T, expected string) {
-	state := stateLog.Next()
-	if expected != state {
-		_, file, line, _ := runtime.Caller(1)
-		finfo, _ := os.Stat(file)
-		t.Fatalf("expected agent state: %v, but get: %v\n%v:%v:", expected, state, finfo.Name(), line)
-	}
 }
 
 func startCmd() *protocal.BuildCommand {
@@ -423,4 +370,20 @@ func (log *StateLog) Reset(buildId, agentId string) {
 	defer log.mu.Unlock()
 	log.buildId = buildId
 	log.agentId = agentId
+}
+
+func contains(s1, s2 string) bool {
+	return strings.Contains(s1, s2)
+}
+
+func trimTimestamp(log string) string {
+	lines := strings.Split(log, "\n")
+	var buf bytes.Buffer
+	for _, l := range lines {
+		if len(l) > 13 {
+			buf.WriteString(l[13:])
+			buf.WriteString("\n")
+		}
+	}
+	return buf.String()
 }
