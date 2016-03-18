@@ -20,12 +20,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
-	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
 	"github.com/xli/assert"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -38,266 +36,21 @@ import (
 )
 
 var (
-	goServerUrl string
-	goServer    *server.Server
-	stateLog    *StateLog
-	buildId     string
+	goServerUrl  string
+	goServer     *server.Server
+	stateLog     *StateLog
+	buildId      string
+	agentStopped chan bool
 )
 
-func TestReportStatusAndSetCookieAfterConnected(t *testing.T) {
-	buildId = "TestReportStatusAndSetCookieAfterConnected"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.ReportCurrentStatusCommand("Preparing"),
-		protocal.ReportCurrentStatusCommand("Building"),
-		protocal.ReportCompletingCommand(),
-		protocal.ReportCompletedCommand(),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
+func TestSetCookieAfterConnected(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	goServer.SendBuild(AgentId, buildId, protocal.EchoCommand("hello"))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.NotEqual(t, "", GetState("cookie"))
-
-	assert.Equal(t, "build Preparing", stateLog.Next())
-	assert.Equal(t, "build Building", stateLog.Next())
-	assert.Equal(t, "build Passed", stateLog.Next())
-	assert.Equal(t, "build Passed", stateLog.Next())
-
 	assert.Equal(t, "agent Idle", stateLog.Next())
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestEcho(t *testing.T) {
-	buildId = "TestEcho"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.EchoCommand("echo hello world"),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "echo hello world\n", trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestExport(t *testing.T) {
-	buildId = "TestExport"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.ExportCommand(map[string]string{
-			"env1": "value1",
-			"env2": "value2",
-			"env3": "value3",
-		}),
-		protocal.ExportCommand(nil),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	expected := `export env1=value1
-export env2=value2
-export env3=value3
-`
-	assert.Equal(t, expected, trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestTestCommand(t *testing.T) {
-	buildId = "TestTestCommand"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-	_, file, _, _ := runtime.Caller(0)
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.EchoCommand("file exist").SetTest(protocal.TestCommand("-d", file)),
-		protocal.EchoCommand("file not exist").SetTest(protocal.TestCommand("-d", "no"+file)),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "file exist\n", trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestExecCommand(t *testing.T) {
-	buildId = "TestExecCommand"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.ExecCommand("echo", "abcd"),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "abcd\n", trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestRunIfConfig(t *testing.T) {
-	buildId = "TestRunIfConfig"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.EchoCommand("should not echo if failed when passed").RunIf("failed"),
-		protocal.EchoCommand("should echo if any when passed").RunIf("any"),
-		protocal.EchoCommand("should echo if passed when passed").RunIf("passed"),
-		protocal.ExecCommand("cmdnotexist"),
-		protocal.EchoCommand("should echo if failed when failed").RunIf("failed"),
-		protocal.EchoCommand("should echo if any when failed").RunIf("any"),
-		protocal.EchoCommand("should not echo if passed when failed").RunIf("passed"),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-
-	expected := `should echo if any when passed
-should echo if passed when passed
-exec: "cmdnotexist": executable file not found in $PATH
-should echo if failed when failed
-should echo if any when failed
-`
-	assert.Equal(t, expected, trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestComposeCommandWithRunIfConfig(t *testing.T) {
-	buildId = "TestComposeCommand"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.ComposeCommand(
-			protocal.ComposeCommand(
-				protocal.EchoCommand("hello world1"),
-				protocal.EchoCommand("hello world2"),
-			).RunIf("any"),
-			protocal.ComposeCommand(
-				protocal.EchoCommand("hello world3"),
-				protocal.EchoCommand("hello world4"),
-			),
-		).RunIf("failed"),
-		protocal.ComposeCommand(
-			protocal.EchoCommand("hello world5").RunIf("failed"),
-			protocal.EchoCommand("hello world6"),
-		),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "hello world6\n", trimTimestamp(log))
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func TestUploadArtifactFile(t *testing.T) {
-	buildId = "TestUploadArtifact"
-	stateLog.Reset(buildId, AgentId)
-	done := startAgent(t)
-
-	artifactWd := newPipelineDir()
-	err := os.MkdirAll(artifactWd, 0777)
-	assert.Nil(t, err)
-
-	fname := "artifact.txt"
-	err = writeFile(artifactWd, fname)
-	assert.Nil(t, err)
-
-	compose := protocal.ComposeCommand(
-		startCmd(),
-		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd),
-		protocal.EndCommand(),
-	)
-	goServer.Send(AgentId, protocal.CmdMessage(compose))
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	expected := fmt.Sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", artifactWd, fname)
-	assert.Equal(t, expected, trimTimestamp(log))
-
-	f := goServer.ArtifactFile(buildId, fname)
-	finfo, err := os.Stat(f)
-	assert.Nil(t, err)
-	assert.Equal(t, fname, finfo.Name())
-
-	content, err := ioutil.ReadFile(f)
-	assert.Nil(t, err)
-	assert.Equal(t, "file created for test", string(content))
-
-	checksum, err := goServer.Checksum(buildId)
-	assert.Nil(t, err)
-	assert.True(t, strings.Contains(checksum, fname+"="),
-		"checksum: %v", checksum)
-
-	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-done
-}
-
-func startAgent(t *testing.T) chan bool {
-	done := make(chan bool)
-	go func() {
-		err := Start()
-		if err.Error() != "received reregister message" {
-			t.Error("Unexpected error to quit agent: ", err)
-		}
-		close(done)
-	}()
-	assert.Equal(t, "agent Idle", stateLog.Next())
-	return done
-}
-
-func startCmd() *protocal.BuildCommand {
-	return protocal.StartCommand(goServer.BuildContext(buildId))
 }
 
 func TestMain(m *testing.M) {
@@ -435,24 +188,43 @@ func trimTimestamp(log string) string {
 	return buf.String()
 }
 
+func createPipelineDir() string {
+	dir := newPipelineDir()
+	err := os.MkdirAll(dir, 0777)
+	if err != nil {
+		panic(err)
+	}
+	return dir
+}
+
 func newPipelineDir() string {
 	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/pipeline"
 }
 
-func writeFile(dir, fname string) error {
-	err := os.MkdirAll(dir, 0744)
-	if err != nil {
-		return err
-	}
-	fpath := filepath.Join(dir, fname)
-	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0744)
-	if err != nil {
-		return err
-	}
-	data := []byte("file created for test")
-	n, err := f.Write(data)
-	if err == nil && n < len(data) {
-		return io.ErrShortWrite
-	}
-	return f.Close()
+func startAgent(t *testing.T) chan bool {
+	done := make(chan bool)
+	go func() {
+		err := Start()
+		if err.Error() != "received reregister message" {
+			t.Error("Unexpected error to quit agent: ", err)
+		}
+		close(done)
+	}()
+	assert.Equal(t, "agent Idle", stateLog.Next())
+	return done
+}
+
+func setUp(t *testing.T) {
+	pc, _, _, _ := runtime.Caller(1)
+	_func := runtime.FuncForPC(pc)
+	parts := strings.Split(_func.Name(), ".")
+
+	buildId = parts[len(parts)-1]
+	stateLog.Reset(buildId, AgentId)
+	agentStopped = startAgent(t)
+}
+
+func tearDown() {
+	goServer.Send(AgentId, protocal.ReregisterMessage())
+	<-agentStopped
 }

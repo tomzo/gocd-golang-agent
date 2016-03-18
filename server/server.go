@@ -86,16 +86,9 @@ func (s *Server) Start() error {
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
 }
 
-func (s *Server) BuildContext(id string) map[string]string {
-	locator := "/builds/" + id
-	return map[string]string{
-		"buildId":                id,
-		"buildLocator":           locator,
-		"buildLocatorForDisplay": locator,
-		"consoleURI":             ConsoleLogPath + locator,
-		"artifactUploadBaseUrl":  ArtifactsPath + locator,
-		"propertyBaseUrl":        PropertiesPath + locator,
-	}
+func (s *Server) SendBuild(agentId, buildId string, commands ...*protocal.BuildCommand) {
+	build := protocal.NewBuild(s.buildContext(buildId), commands...)
+	s.Send(agentId, protocal.CmdMessage(build))
 }
 
 func (s *Server) ConsoleLog(buildId string) (string, error) {
@@ -122,6 +115,18 @@ func (s *Server) ConsoleLogFile(buildId string) string {
 
 func (s *Server) Send(agentId string, msg *protocal.Message) {
 	s.sendMessage <- &AgentMessage{agentId: agentId, Msg: msg}
+}
+
+func (s *Server) buildContext(id string) map[string]string {
+	locator := "/builds/" + id
+	return map[string]string{
+		"buildId":                id,
+		"buildLocator":           locator,
+		"buildLocatorForDisplay": locator,
+		"consoleURI":             ConsoleLogPath + locator,
+		"artifactUploadBaseUrl":  ArtifactsPath + locator,
+		"propertyBaseUrl":        PropertiesPath + locator,
+	}
 }
 
 func (s *Server) log(format string, v ...interface{}) {

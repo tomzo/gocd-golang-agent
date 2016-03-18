@@ -45,6 +45,10 @@ func NewBuildCommand(name string) *BuildCommand {
 	}
 }
 
+func NewBuild(context map[string]string, commands ...*BuildCommand) *BuildCommand {
+	return ComposeCommand(append([]*BuildCommand{StartCommand(context)}, commands...)...)
+}
+
 func StartCommand(args map[string]string) *BuildCommand {
 	return NewBuildCommand("start").SetArgs(args).RunIf("any")
 }
