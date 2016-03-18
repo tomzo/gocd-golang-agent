@@ -238,7 +238,7 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	<-done
 }
 
-func TestUploadArtifact(t *testing.T) {
+func TestUploadArtifactFile(t *testing.T) {
 	buildId = "TestUploadArtifact"
 	stateLog.Reset(buildId, AgentId)
 	done := startAgent(t)

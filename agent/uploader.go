@@ -35,46 +35,18 @@ import (
 type Uploader struct {
 	baseURL    string
 	httpClient *http.Client
-	console    *BuildConsole
 }
 
-func NewUploader(console *BuildConsole, httpClient *http.Client, baseURL string) *Uploader {
-	return &Uploader{console: console, baseURL: baseURL, httpClient: httpClient}
+func NewUploader(httpClient *http.Client, baseURL string) *Uploader {
+	return &Uploader{baseURL: baseURL, httpClient: httpClient}
 }
 
-func (u *Uploader) Upload(workingDir, src, destDir, buildId string) (err error) {
-	wd, err := filepath.Abs(workingDir)
+func (u *Uploader) Upload(source, destFile, destURL string) (err error) {
+	zipped, err := u.zipSource(source, destFile)
 	if err != nil {
 		return
 	}
-	source := filepath.Join(wd, src)
-
-	finfo, err := os.Stat(source)
-	if err != nil {
-		return errors.New("Failed to find " + src)
-	}
-	if finfo.IsDir() {
-		return errors.New("Can't handle directory upload yet")
-	}
-	u.console.WriteLn("Uploading artifacts from %v to %v",
-		source, destDescription(destDir))
-
-	var destURI string
-	if destDir != "" {
-		destURI = filepath.Join(destDir, finfo.Name())
-	} else {
-		destURI = finfo.Name()
-	}
-
-	zipped, err := zipSource(source, destURI)
-	if err != nil {
-		return
-	}
-	contentType, body, err := requestBody(zipped, destURI, destDir)
-	if err != nil {
-		return
-	}
-	destURL, err := u.buildDestURL(destDir, buildId)
+	contentType, body, err := u.requestBody(zipped, destFile)
 	if err != nil {
 		return
 	}
@@ -93,7 +65,8 @@ func (u *Uploader) Upload(workingDir, src, destDir, buildId string) (err error) 
 	}
 	switch resp.StatusCode {
 	case http.StatusRequestEntityTooLarge:
-		err = errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %s) was denied by the server. This usually happens when server runs out of disk space.", source, finfo.Size()))
+		info, _ := os.Stat(zipped)
+		err = errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %s) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
 	default:
 		err = errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, resp.Status))
 	}
@@ -113,16 +86,16 @@ func (u *Uploader) buildDestURL(destDir, buildId string) (string, error) {
 	return url.String(), nil
 }
 
-func requestBody(source, destURI, destDir string) (contentType string, body bytes.Buffer, err error) {
-	md5, err := computeMd5(source)
+func (u *Uploader) requestBody(source, destFile string) (contentType string, body bytes.Buffer, err error) {
+	md5, err := u.computeMd5(source)
 
-	checksum := fmt.Sprintf("#\n#%v\n%v=%x", time.Now(), destURI, md5)
+	checksum := fmt.Sprintf("#\n#%v\n%v=%x", time.Now(), destFile, md5)
 	writer := multipart.NewWriter(&body)
-	err = writeFilePart(writer, source, "zipfile")
+	err = u.writeFilePart(writer, source, "zipfile")
 	if err != nil {
 		return
 	}
-	err = writePart(writer, bytes.NewBufferString(checksum), "file_checksum", "checksum_file")
+	err = u.writePart(writer, bytes.NewBufferString(checksum), "file_checksum", "checksum_file")
 	if err != nil {
 		return
 	}
@@ -131,16 +104,16 @@ func requestBody(source, destURI, destDir string) (contentType string, body byte
 	return
 }
 
-func writeFilePart(writer *multipart.Writer, path, paramName string) error {
+func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	return writePart(writer, file, paramName, filepath.Base(path))
+	return u.writePart(writer, file, paramName, filepath.Base(path))
 }
 
-func writePart(writer *multipart.Writer, src io.Reader, fieldname, filename string) error {
+func (u *Uploader) writePart(writer *multipart.Writer, src io.Reader, fieldname, filename string) error {
 	part, err := writer.CreateFormFile(fieldname, filename)
 	if err != nil {
 		return err
@@ -149,7 +122,7 @@ func writePart(writer *multipart.Writer, src io.Reader, fieldname, filename stri
 	return err
 }
 
-func computeMd5(filePath string) ([]byte, error) {
+func (u *Uploader) computeMd5(filePath string) ([]byte, error) {
 	var result []byte
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -165,15 +138,7 @@ func computeMd5(filePath string) ([]byte, error) {
 	return hash.Sum(result), nil
 }
 
-func destDescription(path string) string {
-	if path == "" {
-		return "[defaultRoot]"
-	} else {
-		return path
-	}
-}
-
-func zipSource(path string, dest string) (string, error) {
+func (u *Uploader) zipSource(path string, dest string) (string, error) {
 	zipfile, err := ioutil.TempFile("", "tmp.zip")
 	if err != nil {
 		return "", err

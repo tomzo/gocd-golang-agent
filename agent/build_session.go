@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"unicode"
 )
@@ -72,7 +73,11 @@ func (s *BuildSession) Process(cmd *protocal.BuildCommand) error {
 		s.console.Close()
 		close(s.done)
 	}()
-	return s.process(cmd)
+	err := s.process(cmd)
+	if err != nil {
+		s.console.WriteLn(err.Error())
+	}
+	return err
 }
 
 func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
@@ -119,14 +124,33 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	return nil
 }
 
-func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err error) {
 	src := cmd.Args["src"]
-	dest := cmd.Args["dest"]
-	err := s.artifacts.Upload(cmd.WorkingDirectory, src, dest, s.buildId)
+	destDir := cmd.Args["dest"]
+
+	wd, err := filepath.Abs(cmd.WorkingDirectory)
 	if err != nil {
-		s.console.WriteLn(err.Error())
+		return
 	}
-	return nil
+	absSrc := filepath.Join(wd, src)
+
+	srcInfo, err := os.Stat(absSrc)
+	if err != nil {
+		return
+	}
+	s.console.WriteLn("Uploading artifacts from %v to %v", absSrc, destDescription(destDir))
+
+	var destFile string
+	if destDir != "" {
+		destFile = filepath.Join(destDir, srcInfo.Name())
+	} else {
+		destFile = srcInfo.Name()
+	}
+	destURL, err := s.artifacts.buildDestURL(destDir, s.buildId)
+	if err != nil {
+		return
+	}
+	return s.artifacts.Upload(absSrc, destFile, destURL)
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
@@ -233,12 +257,18 @@ func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 		return err
 	}
 	s.console = MakeBuildConsole(s.HttpClient, curl)
-	s.artifacts = NewUploader(s.console, s.HttpClient,
-		s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"]))
-	s.properties = NewUploader(s.console, s.HttpClient,
-		s.config.MakeFullServerURL(settings["propertyBaseUrl"]))
+	s.artifacts = NewUploader(s.HttpClient, s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"]))
+	s.properties = NewUploader(s.HttpClient, s.config.MakeFullServerURL(settings["propertyBaseUrl"]))
 	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"
 	return nil
+}
+
+func destDescription(path string) string {
+	if path == "" {
+		return "[defaultRoot]"
+	} else {
+		return path
+	}
 }
