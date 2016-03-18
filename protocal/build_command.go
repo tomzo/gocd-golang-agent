@@ -81,11 +81,11 @@ func ReportCurrentStatusCommand(jobState string) *BuildCommand {
 }
 
 func ReportCompletingCommand() *BuildCommand {
-	return NewBuildCommand("reportCompleting")
+	return NewBuildCommand("reportCompleting").RunIf("any")
 }
 
 func ReportCompletedCommand() *BuildCommand {
-	return NewBuildCommand("reportCompleted")
+	return NewBuildCommand("reportCompleted").RunIf("any")
 }
 
 func TestCommand(flag, path string) *BuildCommand {

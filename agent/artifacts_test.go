@@ -20,6 +20,7 @@ import (
 	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/satori/go.uuid"
 	"github.com/xli/assert"
 	"io"
 	"io/ioutil"
@@ -33,10 +34,7 @@ func TestUploadArtifactFile(t *testing.T) {
 	defer tearDown()
 
 	artifactWd := createPipelineDir()
-
-	fname := "artifact.txt"
-	err := writeFile(artifactWd, fname)
-	assert.Nil(t, err)
+	fname := createTestFile(artifactWd)
 
 	goServer.SendBuild(AgentId, buildId,
 		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd))
@@ -63,7 +61,38 @@ func TestUploadArtifactFile(t *testing.T) {
 	assert.True(t, contains(checksum, fname+"="), "checksum: %v", checksum)
 }
 
-func writeFile(dir, fname string) error {
+func TestUploadArtifactFailed(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	artifactWd := createPipelineDir()
+	fname := "nofile"
+
+	goServer.SendBuild(AgentId, buildId,
+		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd),
+		protocal.ReportCompletedCommand(),
+	)
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := fmt.Sprintf("stat %v/%v: no such file or directory\n", artifactWd, fname)
+	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func createTestFile(dir string) string {
+	fname := uuid.NewV4().String()
+	err := writeFile(dir, fname, "file created for test")
+	if err != nil {
+		panic(err)
+	}
+	return fname
+}
+
+func writeFile(dir, fname, content string) error {
 	err := os.MkdirAll(dir, 0744)
 	if err != nil {
 		return err
@@ -73,7 +102,7 @@ func writeFile(dir, fname string) error {
 	if err != nil {
 		return err
 	}
-	data := []byte("file created for test")
+	data := []byte(content)
 	n, err := f.Write(data)
 	if err == nil && n < len(data) {
 		return io.ErrShortWrite
