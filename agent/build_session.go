@@ -75,7 +75,7 @@ func (s *BuildSession) Process(cmd *protocal.BuildCommand) error {
 	}()
 	err := s.process(cmd)
 	if err != nil {
-		s.console.WriteLn(err.Error())
+		s.fail(err)
 	}
 	return err
 }
@@ -176,9 +176,6 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 		}
 		return errors.New(fmt.Sprintf("%v is canceled", cmd.Args))
 	case err := <-done:
-		if err != nil {
-			s.console.WriteLn(err.Error())
-		}
 		return err
 	}
 }
@@ -240,10 +237,17 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 	var err error
 	for _, sub := range cmd.SubCommands {
 		if err = s.process(sub); err != nil {
-			s.buildStatus = "failed"
+			s.fail(err)
 		}
 	}
 	return err
+}
+
+func (s *BuildSession) fail(err error) {
+	if s.buildStatus != "failed" {
+		s.console.WriteLn(err.Error())
+		s.buildStatus = "failed"
+	}
 }
 
 func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {

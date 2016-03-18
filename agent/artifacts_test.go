@@ -17,7 +17,6 @@
 package agent_test
 
 import (
-	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/satori/go.uuid"
@@ -44,7 +43,7 @@ func TestUploadArtifactFile(t *testing.T) {
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := fmt.Sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", artifactWd, fname)
+	expected := sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", artifactWd, fname)
 	assert.Equal(t, expected, trimTimestamp(log))
 
 	f := goServer.ArtifactFile(buildId, fname)
@@ -79,7 +78,8 @@ func TestUploadArtifactFailed(t *testing.T) {
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := fmt.Sprintf("stat %v/%v: no such file or directory\n", artifactWd, fname)
+	expected := sprintf("stat %v/%v: no such file or directory\n",
+		artifactWd, fname)
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 

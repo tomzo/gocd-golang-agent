@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"flag"
+	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
@@ -174,6 +175,10 @@ func (log *StateLog) Reset(buildId, agentId string) {
 
 func contains(s1, s2 string) bool {
 	return strings.Contains(s1, s2)
+}
+
+func sprintf(f string, args ...interface{}) string {
+	return fmt.Sprintf(f, args...)
 }
 
 func trimTimestamp(log string) string {
