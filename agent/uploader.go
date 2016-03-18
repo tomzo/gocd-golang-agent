@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -41,21 +42,31 @@ func NewUploader(httpClient *http.Client, baseURL string) *Uploader {
 	return &Uploader{baseURL: baseURL, httpClient: httpClient}
 }
 
-func (u *Uploader) Upload(source, destFile, destURL string) (err error) {
-	zipped, err := u.zipSource(source, destFile)
+func (u *Uploader) Upload(source, destPath, destURL string) (err error) {
+	zipped, checksum, err := u.zipSource(source, destPath)
 	if err != nil {
 		return
 	}
-	contentType, body, err := u.requestBody(zipped, destFile)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	err = u.writeFilePart(writer, zipped, "zipfile")
 	if err != nil {
 		return
 	}
-
+	err = u.writePart(writer, bytes.NewBufferString(checksum), "file_checksum", "checksum_file")
+	if err != nil {
+		return
+	}
+	err = writer.Close()
+	if err != nil {
+		return
+	}
 	req, err := http.NewRequest("POST", destURL, &body)
 	if err != nil {
 		return
 	}
-	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
 		return
@@ -84,24 +95,6 @@ func (u *Uploader) buildDestURL(destDir, buildId string) (string, error) {
 	url.RawQuery = values.Encode()
 
 	return url.String(), nil
-}
-
-func (u *Uploader) requestBody(source, destFile string) (contentType string, body bytes.Buffer, err error) {
-	md5, err := u.computeMd5(source)
-
-	checksum := fmt.Sprintf("#\n#%v\n%v=%x", time.Now(), destFile, md5)
-	writer := multipart.NewWriter(&body)
-	err = u.writeFilePart(writer, source, "zipfile")
-	if err != nil {
-		return
-	}
-	err = u.writePart(writer, bytes.NewBufferString(checksum), "file_checksum", "checksum_file")
-	if err != nil {
-		return
-	}
-	err = writer.Close()
-	contentType = writer.FormDataContentType()
-	return
 }
 
 func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName string) error {
@@ -138,23 +131,56 @@ func (u *Uploader) computeMd5(filePath string) ([]byte, error) {
 	return hash.Sum(result), nil
 }
 
-func (u *Uploader) zipSource(path string, dest string) (string, error) {
+func (u *Uploader) zipSource(source string, dest string) (string, string, error) {
 	zipfile, err := ioutil.TempFile("", "tmp.zip")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer zipfile.Close()
 	w := zip.NewWriter(zipfile)
 	defer w.Close()
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	writer, err := w.Create(dest)
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(writer, file)
-	return zipfile.Name(), err
+
+	var checksum bytes.Buffer
+	checksum.WriteString(fmt.Sprintf("#\n#%v\n", time.Now()))
+	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		destFile := dest
+		if path != source {
+			rel := path[len(source):]
+			if strings.HasPrefix(rel, "/") {
+				rel = rel[1:]
+			}
+			if dest == "" {
+				destFile = rel
+			} else {
+				destFile = dest + "/" + rel
+			}
+		}
+
+		md5, err := u.computeMd5(path)
+		if err != nil {
+			return err
+		}
+		checksum.WriteString(fmt.Sprintf("%v=%x\n", destFile, md5))
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		writer, err := w.Create(destFile)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(writer, file)
+		return err
+	})
+	return zipfile.Name(), checksum.String(), err
 }

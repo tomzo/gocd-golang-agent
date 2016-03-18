@@ -140,17 +140,23 @@ func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err er
 	}
 	s.console.WriteLn("Uploading artifacts from %v to %v", absSrc, destDescription(destDir))
 
-	var destFile string
-	if destDir != "" {
-		destFile = filepath.Join(destDir, srcInfo.Name())
+	var destPath string
+	if srcInfo.IsDir() {
+		if destDir != "" {
+			destPath = destDir
+		}
 	} else {
-		destFile = srcInfo.Name()
+		if destDir != "" {
+			destPath = filepath.Join(destDir, srcInfo.Name())
+		} else {
+			destPath = srcInfo.Name()
+		}
 	}
 	destURL, err := s.artifacts.buildDestURL(destDir, s.buildId)
 	if err != nil {
 		return
 	}
-	return s.artifacts.Upload(absSrc, destFile, destURL)
+	return s.artifacts.Upload(absSrc, destPath, destURL)
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {

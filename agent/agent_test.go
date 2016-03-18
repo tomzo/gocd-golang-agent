@@ -25,6 +25,7 @@ import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
 	"github.com/xli/assert"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -37,6 +38,8 @@ import (
 )
 
 var (
+	testFileContentMD5 = "41e43efb30d3fbfcea93542157809ac0"
+
 	goServerUrl  string
 	goServer     *server.Server
 	stateLog     *StateLog
@@ -177,6 +180,14 @@ func contains(s1, s2 string) bool {
 	return strings.Contains(s1, s2)
 }
 
+func split(s1, s2 string) []string {
+	return strings.Split(s1, s2)
+}
+
+func startWith(s1, s2 string) bool {
+	return strings.HasPrefix(s1, s2)
+}
+
 func sprintf(f string, args ...interface{}) string {
 	return fmt.Sprintf(f, args...)
 }
@@ -200,6 +211,57 @@ func createPipelineDir() string {
 		panic(err)
 	}
 	return dir
+}
+
+func createTestProjectInPipelineDir() string {
+	root := createPipelineDir()
+	err := os.MkdirAll(root+"/src/hello", 0777)
+	if err != nil {
+		panic(err)
+	}
+	err = os.MkdirAll(root+"/test/world", 0777)
+	if err != nil {
+		panic(err)
+	}
+	createTestFile(root, "0.txt")
+	createTestFile(root+"/src", "1.txt")
+	createTestFile(root+"/src", "2.txt")
+	createTestFile(root+"/src/hello", "3.txt")
+	createTestFile(root+"/src/hello", "4.txt")
+	createTestFile(root+"/test", "5.txt")
+	createTestFile(root+"/test", "6.txt")
+	createTestFile(root+"/test", "7.txt")
+	createTestFile(root+"/test/world", "8.txt")
+	createTestFile(root+"/test/world", "9.txt")
+	createTestFile(root+"/test/world", "10.txt")
+	createTestFile(root+"/test/world", "11.txt")
+	return root
+}
+
+func createTestFile(dir, fname string) string {
+	err := writeFile(dir, fname, "file created for test")
+	if err != nil {
+		panic(err)
+	}
+	return fname
+}
+
+func writeFile(dir, fname, content string) error {
+	err := os.MkdirAll(dir, 0744)
+	if err != nil {
+		return err
+	}
+	fpath := filepath.Join(dir, fname)
+	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0744)
+	if err != nil {
+		return err
+	}
+	data := []byte(content)
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		return io.ErrShortWrite
+	}
+	return f.Close()
 }
 
 func newPipelineDir() string {

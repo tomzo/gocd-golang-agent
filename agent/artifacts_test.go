@@ -17,11 +17,10 @@
 package agent_test
 
 import (
+	"bytes"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
-	"github.com/satori/go.uuid"
 	"github.com/xli/assert"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -33,7 +32,7 @@ func TestUploadArtifactFile(t *testing.T) {
 	defer tearDown()
 
 	artifactWd := createPipelineDir()
-	fname := createTestFile(artifactWd)
+	fname := createTestFile(artifactWd, "file.txt")
 
 	goServer.SendBuild(AgentId, buildId,
 		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd))
@@ -57,7 +56,7 @@ func TestUploadArtifactFile(t *testing.T) {
 
 	checksum, err := goServer.Checksum(buildId)
 	assert.Nil(t, err)
-	assert.True(t, contains(checksum, fname+"="), "checksum: %v", checksum)
+	assert.Equal(t, fname+"=41e43efb30d3fbfcea93542157809ac0\n", filterComments(checksum))
 }
 
 func TestUploadArtifactFailed(t *testing.T) {
@@ -83,29 +82,59 @@ func TestUploadArtifactFailed(t *testing.T) {
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
-func createTestFile(dir string) string {
-	fname := uuid.NewV4().String()
-	err := writeFile(dir, fname, "file created for test")
-	if err != nil {
-		panic(err)
-	}
-	return fname
+func TestUploadDirectory(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	wd := createTestProjectInPipelineDir()
+	dir := "src"
+	goServer.SendBuild(AgentId, buildId,
+		protocal.UploadArtifactCommand(dir, "").Setwd(wd))
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", wd, dir)
+	assert.Equal(t, expected, trimTimestamp(log))
+
+	checksum, err := goServer.Checksum(buildId)
+	assert.Nil(t, err)
+	expectedChecksum := `1.txt=41e43efb30d3fbfcea93542157809ac0
+2.txt=41e43efb30d3fbfcea93542157809ac0
+hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+`
+	assert.Equal(t, expectedChecksum, filterComments(checksum))
+
+	uploadedDir := goServer.ArtifactFile(buildId, "")
+	count := 0
+	err = filepath.Walk(uploadedDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		content, err := ioutil.ReadFile(path)
+		assert.Nil(t, err)
+		assert.Equal(t, "file created for test", string(content))
+		count++
+		return nil
+	})
+	assert.Nil(t, err)
+	assert.Equal(t, 4, count)
 }
 
-func writeFile(dir, fname, content string) error {
-	err := os.MkdirAll(dir, 0744)
-	if err != nil {
-		return err
+func filterComments(str string) string {
+	var ret bytes.Buffer
+	for _, l := range split(str, "\n") {
+		if startWith(l, "#") || l == "" {
+			continue
+		}
+		ret.WriteString(l)
+		ret.WriteString("\n")
 	}
-	fpath := filepath.Join(dir, fname)
-	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0744)
-	if err != nil {
-		return err
-	}
-	data := []byte(content)
-	n, err := f.Write(data)
-	if err == nil && n < len(data) {
-		return io.ErrShortWrite
-	}
-	return f.Close()
+	return ret.String()
 }
