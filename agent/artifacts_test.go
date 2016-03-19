@@ -27,38 +27,6 @@ import (
 	"testing"
 )
 
-func TestUploadArtifactFile(t *testing.T) {
-	setUp(t)
-	defer tearDown()
-
-	artifactWd := createPipelineDir()
-	fname := createTestFile(artifactWd, "file.txt")
-
-	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd))
-
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	expected := sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", artifactWd, fname)
-	assert.Equal(t, expected, trimTimestamp(log))
-
-	f := goServer.ArtifactFile(buildId, fname)
-	finfo, err := os.Stat(f)
-	assert.Nil(t, err)
-	assert.Equal(t, fname, finfo.Name())
-
-	content, err := ioutil.ReadFile(f)
-	assert.Nil(t, err)
-	assert.Equal(t, "file created for test", string(content))
-
-	checksum, err := goServer.Checksum(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, fname+"=41e43efb30d3fbfcea93542157809ac0\n", filterComments(checksum))
-}
-
 func TestUploadArtifactFailed(t *testing.T) {
 	setUp(t)
 	defer tearDown()
@@ -82,31 +50,65 @@ func TestUploadArtifactFailed(t *testing.T) {
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
-func TestUploadDirectory(t *testing.T) {
+func TestUploadDirectory1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
+	testUpload(t, "src", "",
+		`1.txt=41e43efb30d3fbfcea93542157809ac0
+2.txt=41e43efb30d3fbfcea93542157809ac0
+hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+`)
+}
 
+func TestUploadDirectory2(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/hello", "",
+		`3.txt=41e43efb30d3fbfcea93542157809ac0
+4.txt=41e43efb30d3fbfcea93542157809ac0
+`)
+}
+
+func TestUploadDirectory3(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/hello", "dest",
+		`dest/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/4.txt=41e43efb30d3fbfcea93542157809ac0
+`)
+}
+
+func TestUploadFile1(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/hello/4.txt", "",
+		"4.txt=41e43efb30d3fbfcea93542157809ac0\n")
+}
+
+func TestUploadFile2(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/hello/4.txt", "dest/subdir",
+		"dest/subdir/4.txt=41e43efb30d3fbfcea93542157809ac0\n")
+}
+
+func testUpload(t *testing.T, srcDir, destDir, checksum string) {
 	wd := createTestProjectInPipelineDir()
-	dir := "src"
 	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(dir, "").Setwd(wd))
+		protocal.UploadArtifactCommand(srcDir, destDir).Setwd(wd))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := sprintf("Uploading artifacts from %v/%v to [defaultRoot]\n", wd, dir)
+	expected := sprintf("Uploading artifacts from %v/%v to %v\n", wd, srcDir, destDescription(destDir))
 	assert.Equal(t, expected, trimTimestamp(log))
 
-	checksum, err := goServer.Checksum(buildId)
+	uploadedChecksum, err := goServer.Checksum(buildId)
 	assert.Nil(t, err)
-	expectedChecksum := `1.txt=41e43efb30d3fbfcea93542157809ac0
-2.txt=41e43efb30d3fbfcea93542157809ac0
-hello/3.txt=41e43efb30d3fbfcea93542157809ac0
-hello/4.txt=41e43efb30d3fbfcea93542157809ac0
-`
-	assert.Equal(t, expectedChecksum, filterComments(checksum))
+	assert.Equal(t, checksum, filterComments(uploadedChecksum))
 
 	uploadedDir := goServer.ArtifactFile(buildId, "")
 	count := 0
@@ -124,7 +126,7 @@ hello/4.txt=41e43efb30d3fbfcea93542157809ac0
 		return nil
 	})
 	assert.Nil(t, err)
-	assert.Equal(t, 4, count)
+	assert.Equal(t, len(split(checksum, "\n"))-1, count)
 }
 
 func filterComments(str string) string {
@@ -137,4 +139,12 @@ func filterComments(str string) string {
 		ret.WriteString("\n")
 	}
 	return ret.String()
+}
+
+func destDescription(path string) string {
+	if path == "" {
+		return "[defaultRoot]"
+	} else {
+		return path
+	}
 }
