@@ -152,6 +152,8 @@ func (u *Uploader) zipSource(source string, dest string) (string, string, error)
 
 		destFile := dest
 		if path != source {
+			// source is a directory, find relative path
+			// from source and attach to dest path
 			rel := path[len(source):]
 			if strings.HasPrefix(rel, "/") {
 				rel = rel[1:]

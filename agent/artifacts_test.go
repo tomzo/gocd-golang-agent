@@ -54,10 +54,10 @@ func TestUploadDirectory1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src", "",
-		`1.txt=41e43efb30d3fbfcea93542157809ac0
-2.txt=41e43efb30d3fbfcea93542157809ac0
-hello/3.txt=41e43efb30d3fbfcea93542157809ac0
-hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+		`src/1.txt=41e43efb30d3fbfcea93542157809ac0
+src/2.txt=41e43efb30d3fbfcea93542157809ac0
+src/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+src/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
 `)
 }
 
@@ -65,8 +65,8 @@ func TestUploadDirectory2(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/hello", "",
-		`3.txt=41e43efb30d3fbfcea93542157809ac0
-4.txt=41e43efb30d3fbfcea93542157809ac0
+		`hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+hello/4.txt=41e43efb30d3fbfcea93542157809ac0
 `)
 }
 
@@ -74,8 +74,8 @@ func TestUploadDirectory3(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/hello", "dest",
-		`dest/3.txt=41e43efb30d3fbfcea93542157809ac0
-dest/4.txt=41e43efb30d3fbfcea93542157809ac0
+		`dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
 `)
 }
 
