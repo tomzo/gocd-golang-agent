@@ -205,7 +205,7 @@ func trimTimestamp(log string) string {
 }
 
 func createPipelineDir() string {
-	dir := newPipelineDir()
+	dir := pipelineDir()
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
 		panic(err)
@@ -266,7 +266,7 @@ func writeFile(dir, fname, content string) error {
 	return f.Close()
 }
 
-func newPipelineDir() string {
+func pipelineDir() string {
 	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/" + buildId
 }
 
@@ -296,4 +296,8 @@ func setUp(t *testing.T) {
 func tearDown() {
 	goServer.Send(AgentId, protocal.ReregisterMessage())
 	<-agentStopped
+	err := os.RemoveAll(pipelineDir())
+	if err != nil {
+		println(err.Error())
+	}
 }
