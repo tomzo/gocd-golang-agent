@@ -19,6 +19,7 @@ package agent
 import (
 	"errors"
 	"fmt"
+	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"net/http"
 	"os"
@@ -138,7 +139,8 @@ func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err er
 
 func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	if strings.Contains(source, "*") {
-		matches, err := filepath.Glob(source)
+		matches, err := doublestar.Glob(source)
+		sort.Strings(matches)
 		if err != nil {
 			return err
 		}

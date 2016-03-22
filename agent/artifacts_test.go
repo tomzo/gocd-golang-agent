@@ -170,6 +170,89 @@ dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 			"test/world2/10.txt": "dest/world2"})
 }
 
+func TestUploadMatchedFiles4(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/**/*.txt", "dest",
+		`dest/1.txt=41e43efb30d3fbfcea93542157809ac0
+dest/2.txt=41e43efb30d3fbfcea93542157809ac0
+dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"src/1.txt":       "dest",
+			"src/2.txt":       "dest",
+			"src/hello/3.txt": "dest/hello",
+			"src/hello/4.txt": "dest/hello"})
+}
+
+func TestUploadMatchedFiles5(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "**/*.txt", "dest",
+		`dest/0.txt=41e43efb30d3fbfcea93542157809ac0
+dest/src/1.txt=41e43efb30d3fbfcea93542157809ac0
+dest/src/2.txt=41e43efb30d3fbfcea93542157809ac0
+dest/src/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/src/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/5.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/6.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/7.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/11.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/8.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/9.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world2/11.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"0.txt":              "dest",
+			"src/1.txt":          "dest/src",
+			"src/2.txt":          "dest/src",
+			"src/hello/3.txt":    "dest/src/hello",
+			"src/hello/4.txt":    "dest/src/hello",
+			"test/5.txt":         "dest/test",
+			"test/6.txt":         "dest/test",
+			"test/7.txt":         "dest/test",
+			"test/world/8.txt":   "dest/test/world",
+			"test/world/9.txt":   "dest/test/world",
+			"test/world/10.txt":  "dest/test/world",
+			"test/world/11.txt":  "dest/test/world",
+			"test/world2/10.txt": "dest/test/world2",
+			"test/world2/11.txt": "dest/test/world2",
+		})
+}
+
+func TestUploadMatchedFiles6(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "*/*.txt", "dest",
+		`dest/src/1.txt=41e43efb30d3fbfcea93542157809ac0
+dest/src/2.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/5.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/6.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/7.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"src/1.txt":  "dest/src",
+			"src/2.txt":  "dest/src",
+			"test/5.txt": "dest/test",
+			"test/6.txt": "dest/test",
+			"test/7.txt": "dest/test"})
+}
+
+func TestUploadMatchedFiles7(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "*/world/?.txt", "dest",
+		`dest/test/world/8.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/9.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"test/world/8.txt": "dest/test/world",
+			"test/world/9.txt": "dest/test/world"})
+}
+
 func TestUploadDestIsWindowPathFormat(t *testing.T) {
 	setUp(t)
 	defer tearDown()

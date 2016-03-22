@@ -267,7 +267,7 @@ func writeFile(dir, fname, content string) error {
 }
 
 func newPipelineDir() string {
-	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/pipeline"
+	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/" + buildId
 }
 
 func startAgent(t *testing.T) chan bool {

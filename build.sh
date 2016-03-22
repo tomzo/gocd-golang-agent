@@ -23,5 +23,6 @@ export GOPATH=`pwd`/../../../../
 go get golang.org/x/net/websocket
 go get github.com/satori/go.uuid
 go get github.com/xli/assert
+go get github.com/bmatcuk/doublestar
 # go get -u all
 go test -test.v ./...
