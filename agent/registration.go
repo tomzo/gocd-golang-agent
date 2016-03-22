@@ -167,7 +167,11 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	}
 
 	LogInfo("fetching agent key and certificates")
-	resp, err := client.PostForm(config.RegistrationURL(), form)
+	url, err := config.RegistrationURL()
+	if err != nil {
+		return err
+	}
+	resp, err := client.PostForm(url.String(), form)
 	if err != nil {
 		return err
 	}

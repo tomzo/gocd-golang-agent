@@ -18,6 +18,7 @@ package agent
 
 import (
 	"bytes"
+	"net/url"
 	"path/filepath"
 	"strings"
 )
@@ -65,4 +66,18 @@ func BaseDirOfPathWithWildcard(path string) string {
 		return ""
 	}
 	return base[:len(base)-1]
+}
+
+func AppendUrlParam(base *url.URL, paramName, paramValue string) *url.URL {
+	url, _ := url.Parse(base.String())
+	values := url.Query()
+	values.Set(paramName, paramValue)
+	base.RawQuery = values.Encode()
+	return url
+}
+
+func AppendUrlPath(base *url.URL, path string) *url.URL {
+	url, _ := url.Parse(base.String())
+	url.RawPath = Join("/", url.RawPath, path)
+	return url
 }

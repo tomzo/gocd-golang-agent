@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -168,10 +167,8 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	} else {
 		destPath = srcInfo.Name()
 	}
-	destURL, err := s.artifacts.BuildDestURL(destDir, s.buildId)
-	if err != nil {
-		return
-	}
+	destURL := AppendUrlParam(AppendUrlPath(s.artifacts.BaseURL, destDir),
+		"buildId", s.buildId)
 	return s.artifacts.Upload(source, destPath, destURL)
 }
 
@@ -278,13 +275,19 @@ func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
 	SetState("buildLocator", settings["buildLocator"])
 	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
 
-	curl, err := url.Parse(s.config.MakeFullServerURL(settings["consoleURI"]))
+	curl, err := s.config.MakeFullServerURL(settings["consoleURI"])
 	if err != nil {
 		return err
 	}
+	aurl, err := s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
+	if err != nil {
+		return err
+	}
+	purl, err := s.config.MakeFullServerURL(settings["propertyBaseUrl"])
+
 	s.console = MakeBuildConsole(s.HttpClient, curl)
-	s.artifacts = NewUploader(s.HttpClient, s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"]))
-	s.properties = NewUploader(s.HttpClient, s.config.MakeFullServerURL(settings["propertyBaseUrl"]))
+	s.artifacts = NewUploader(s.HttpClient, aurl)
+	s.properties = NewUploader(s.HttpClient, purl)
 	s.buildId = settings["buildId"]
 	s.envs = make(map[string]string)
 	s.buildStatus = "passed"

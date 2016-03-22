@@ -77,15 +77,15 @@ func (c *Config) WssServerURL() string {
 	return "wss://" + c.ServerHostAndPort + c.WebSocketPath
 }
 
-func (c *Config) RegistrationURL() string {
+func (c *Config) RegistrationURL() (*url.URL, error) {
 	return c.MakeFullServerURL(c.RegistrationPath)
 }
 
-func (c *Config) MakeFullServerURL(url string) string {
-	if strings.HasPrefix(url, "/") {
-		return c.HttpsServerURL() + url
+func (c *Config) MakeFullServerURL(u string) (*url.URL, error) {
+	if strings.HasPrefix(u, "/") {
+		return url.Parse(c.HttpsServerURL() + u)
 	} else {
-		return url
+		return url.Parse(u)
 	}
 }
 

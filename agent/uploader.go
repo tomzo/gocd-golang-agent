@@ -29,20 +29,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type Uploader struct {
-	baseURL    string
+	BaseURL    *url.URL
 	httpClient *http.Client
 }
 
-func NewUploader(httpClient *http.Client, baseURL string) *Uploader {
-	return &Uploader{baseURL: baseURL, httpClient: httpClient}
+func NewUploader(httpClient *http.Client, baseURL *url.URL) *Uploader {
+	return &Uploader{BaseURL: baseURL, httpClient: httpClient}
 }
 
-func (u *Uploader) Upload(source, destPath, destURL string) (err error) {
+func (u *Uploader) Upload(source, destPath string, destURL *url.URL) (err error) {
 	zipped, checksum, err := u.zipSource(source, destPath)
 	if err != nil {
 		return
@@ -61,11 +62,19 @@ func (u *Uploader) Upload(source, destPath, destURL string) (err error) {
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequest("POST", destURL, &body)
+
+	return u.post(source, zipped, writer.FormDataContentType(), destURL, &body)
+}
+
+func (u *Uploader) post(source, zipped, contentType string, destURL *url.URL, body *bytes.Buffer) (err error) {
+	attampt := 1
+tryPost:
+
+	req, err := http.NewRequest("POST", u.attamptURL(destURL, attampt), body)
 	if err != nil {
 		return
 	}
-	req.Header.Add("Content-Type", writer.FormDataContentType())
+	req.Header.Add("Content-Type", contentType)
 
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
@@ -74,27 +83,24 @@ func (u *Uploader) Upload(source, destPath, destURL string) (err error) {
 	if resp.StatusCode == http.StatusCreated {
 		return
 	}
-	switch resp.StatusCode {
-	case http.StatusRequestEntityTooLarge:
+	// handle errors
+	if resp.StatusCode == http.StatusRequestEntityTooLarge {
 		info, _ := os.Stat(zipped)
-		err = errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %s) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
-	default:
-		err = errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, resp.Status))
+		return errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %s) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
+	}
+	if resp.StatusCode < http.StatusOK ||
+		resp.StatusCode >= http.StatusMultipleChoices {
+		return errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, resp.Status))
+	}
+	if attampt < 3 {
+		attampt++
+		goto tryPost
 	}
 	return
 }
 
-func (u *Uploader) BuildDestURL(destDir, buildId string) (string, error) {
-	url, err := url.Parse(u.baseURL)
-	if err != nil {
-		return "", err
-	}
-	url.RawPath = url.RawPath + "/" + destDir
-	values := url.Query()
-	values.Set("buildId", buildId)
-	url.RawQuery = values.Encode()
-
-	return url.String(), nil
+func (u *Uploader) attamptURL(destURL *url.URL, attampt int) string {
+	return AppendUrlParam(destURL, "attampt", strconv.Itoa(attampt)).String()
 }
 
 func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName string) error {
