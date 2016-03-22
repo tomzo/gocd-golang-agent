@@ -140,46 +140,44 @@ func TestUploadMatchedFiles1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/hello/*.txt", "dest",
-		`dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
-dest/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+		`dest/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/4.txt=41e43efb30d3fbfcea93542157809ac0
 `,
 		map[string]string{
-			"src/hello/3.txt": "dest/hello",
-			"src/hello/4.txt": "dest/hello"})
+			"src/hello/3.txt": "dest",
+			"src/hello/4.txt": "dest"})
 }
 
 func TestUploadMatchedFiles2(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/**/3.txt", "dest",
-		`dest/src/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+		`dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
 `,
 		map[string]string{
-			"src/hello/3.txt": "dest/src/hello"})
+			"src/hello/3.txt": "dest/hello"})
 }
 
 func TestUploadMatchedFiles3(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "test/w*/10.txt", "dest",
-		`dest/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
-dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+		`dest/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 `,
 		map[string]string{
-			"test/world/10.txt":  "dest/test/world",
-			"test/world2/10.txt": "dest/test/world2"})
+			"test/world/10.txt":  "dest/world",
+			"test/world2/10.txt": "dest/world2"})
 }
 
 func TestUploadDestIsWindowPathFormat(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-	testUpload(t, "test/w*/10.txt", "dest\\dir",
-		`dest/dir/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
-dest/dir/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+	testUpload(t, "test/world/10.txt", "dest\\dir",
+		`dest/dir/10.txt=41e43efb30d3fbfcea93542157809ac0
 `,
-		map[string]string{
-			"test/world/10.txt":  "dest/dir/test/world",
-			"test/world2/10.txt": "dest/dir/test/world2"})
+		map[string]string{"test/world/10.txt": "dest/dir"})
+
 }
 
 func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
@@ -200,16 +198,16 @@ func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
 	assertConsoleLog(t, wd, map[string]string{
 		"src/hello/3.txt":    "dest",
 		"test/5.txt":         "[defaultRoot]",
-		"test/world/10.txt":  "dest/test/world",
-		"test/world2/10.txt": "dest/test/world2",
+		"test/world/10.txt":  "dest/world",
+		"test/world2/10.txt": "dest/world2",
 	})
 
 	uploadedChecksum, err := goServer.Checksum(buildId)
 	assert.Nil(t, err)
 	checksum := `dest/3.txt=41e43efb30d3fbfcea93542157809ac0
 5.txt=41e43efb30d3fbfcea93542157809ac0
-dest/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
-dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 `
 	assert.Equal(t, checksum, filterComments(uploadedChecksum))
 }

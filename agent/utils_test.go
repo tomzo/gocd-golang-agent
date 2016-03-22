@@ -25,11 +25,11 @@ func TestBaseDirOfPathWithWildcard(t *testing.T) {
 	assert.Equal(t, "", BaseDirOfPathWithWildcard("/*"))
 	assert.Equal(t, "", BaseDirOfPathWithWildcard("/**/*"))
 	assert.Equal(t, "", BaseDirOfPathWithWildcard("/*.go"))
-	assert.Equal(t, "", BaseDirOfPathWithWildcard("/hello/*.go"))
 
-	assert.Equal(t, "/hello", BaseDirOfPathWithWildcard("/hello/world/*.go"))
-	assert.Equal(t, "/hello", BaseDirOfPathWithWildcard("/hello/world/**/*.go"))
-	assert.Equal(t, "/hello", BaseDirOfPathWithWildcard("/hello/world/f*/*.go"))
+	assert.Equal(t, "/hello", BaseDirOfPathWithWildcard("/hello/*.go"))
+	assert.Equal(t, "/hello/world", BaseDirOfPathWithWildcard("/hello/world/*.go"))
+	assert.Equal(t, "/hello/world", BaseDirOfPathWithWildcard("/hello/world/**/*.go"))
+	assert.Equal(t, "/hello/world", BaseDirOfPathWithWildcard("/hello/world/f*/*.go"))
 }
 
 func TestJoin(t *testing.T) {

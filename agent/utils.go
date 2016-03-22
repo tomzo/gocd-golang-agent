@@ -54,12 +54,7 @@ func BaseDirOfPathWithWildcard(path string) string {
 		return ""
 	}
 	// clean up filename in the path
-	dir, _ = filepath.Split(dir)
-	if dir == "" {
-		return ""
-	}
-	// find dir's parent directory
-	base, _ := filepath.Split(dir[:len(dir)-1])
+	base, _ := filepath.Split(dir)
 	if base == "" {
 		return ""
 	}
