@@ -185,9 +185,11 @@ dest/dir/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(srcDir, destDir).Setwd(wd))
+		protocal.UploadArtifactCommand(srcDir, destDir).Setwd(wd),
+		protocal.ReportCompletedCommand())
 
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	assertConsoleLog(t, wd, src2dest)
