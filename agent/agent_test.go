@@ -235,6 +235,8 @@ func createTestProjectInPipelineDir() string {
 	createTestFile(root+"/test/world", "9.txt")
 	createTestFile(root+"/test/world", "10.txt")
 	createTestFile(root+"/test/world", "11.txt")
+	createTestFile(root+"/test/world2", "10.txt")
+	createTestFile(root+"/test/world2", "11.txt")
 	return root
 }
 

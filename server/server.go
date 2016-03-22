@@ -164,7 +164,7 @@ func (s *Server) appendToFile(filename string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0744)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0744)
 	if err != nil {
 		return err
 	}

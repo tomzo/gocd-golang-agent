@@ -58,7 +58,10 @@ func TestUploadDirectory1(t *testing.T) {
 src/2.txt=41e43efb30d3fbfcea93542157809ac0
 src/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
 src/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
-`)
+`,
+		map[string]string{
+			"src": "[defaultRoot]",
+		})
 }
 
 func TestUploadDirectory2(t *testing.T) {
@@ -67,7 +70,10 @@ func TestUploadDirectory2(t *testing.T) {
 	testUpload(t, "src/hello", "",
 		`hello/3.txt=41e43efb30d3fbfcea93542157809ac0
 hello/4.txt=41e43efb30d3fbfcea93542157809ac0
-`)
+`,
+		map[string]string{
+			"src/hello": "[defaultRoot]",
+		})
 }
 
 func TestUploadDirectory3(t *testing.T) {
@@ -76,24 +82,65 @@ func TestUploadDirectory3(t *testing.T) {
 	testUpload(t, "src/hello", "dest",
 		`dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
 dest/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
-`)
+`,
+		map[string]string{
+			"src/hello": "dest",
+		})
 }
 
 func TestUploadFile1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/hello/4.txt", "",
-		"4.txt=41e43efb30d3fbfcea93542157809ac0\n")
+		"4.txt=41e43efb30d3fbfcea93542157809ac0\n",
+		map[string]string{
+			"src/hello/4.txt": "[defaultRoot]"})
 }
 
 func TestUploadFile2(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	testUpload(t, "src/hello/4.txt", "dest/subdir",
-		"dest/subdir/4.txt=41e43efb30d3fbfcea93542157809ac0\n")
+		"dest/subdir/4.txt=41e43efb30d3fbfcea93542157809ac0\n",
+		map[string]string{
+			"src/hello/4.txt": "dest/subdir"})
 }
 
-func testUpload(t *testing.T, srcDir, destDir, checksum string) {
+func TestUploadMatchedFiles1(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/hello/*.txt", "dest",
+		`dest/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+dest/hello/4.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"src/hello/3.txt": "dest/hello",
+			"src/hello/4.txt": "dest/hello"})
+}
+
+func TestUploadMatchedFiles2(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "src/**/3.txt", "dest",
+		`dest/src/hello/3.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"src/hello/3.txt": "dest/src/hello"})
+}
+
+func TestUploadMatchedFiles3(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "test/w*/10.txt", "dest",
+		`dest/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"test/world/10.txt":  "dest/test/world",
+			"test/world2/10.txt": "dest/test/world2"})
+}
+
+func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
 		protocal.UploadArtifactCommand(srcDir, destDir).Setwd(wd))
@@ -103,8 +150,12 @@ func testUpload(t *testing.T, srcDir, destDir, checksum string) {
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := sprintf("Uploading artifacts from %v/%v to %v\n", wd, srcDir, destDescription(destDir))
-	assert.Equal(t, expected, trimTimestamp(log))
+
+	var expected bytes.Buffer
+	for src, dest := range src2dest {
+		expected.WriteString(sprintf("Uploading artifacts from %v/%v to %v\n", wd, src, dest))
+	}
+	assert.Equal(t, expected.String(), trimTimestamp(log))
 
 	uploadedChecksum, err := goServer.Checksum(buildId)
 	assert.Nil(t, err)
@@ -139,12 +190,4 @@ func filterComments(str string) string {
 		ret.WriteString("\n")
 	}
 	return ret.String()
-}
-
-func destDescription(path string) string {
-	if path == "" {
-		return "[defaultRoot]"
-	} else {
-		return path
-	}
 }

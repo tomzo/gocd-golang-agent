@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"unicode"
 )
 
@@ -133,24 +134,45 @@ func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err er
 		return
 	}
 	absSrc := filepath.Join(wd, src)
+	return s.uploadArtifacts(absSrc, destDir)
+}
 
-	srcInfo, err := os.Stat(absSrc)
+func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
+	if strings.Contains(source, "*") {
+		matches, err := filepath.Glob(source)
+		if err != nil {
+			return err
+		}
+		base := BaseDirOfPathWithWildcard(source)
+		baseLen := len(base)
+		for _, file := range matches {
+			fileDir, _ := filepath.Split(file)
+			dest := Join("/", destDir, fileDir[baseLen:len(fileDir)-1])
+			err = s.uploadArtifacts(file, dest)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	srcInfo, err := os.Stat(source)
 	if err != nil {
 		return
 	}
-	s.console.WriteLn("Uploading artifacts from %v to %v", absSrc, destDescription(destDir))
+	s.console.WriteLn("Uploading artifacts from %v to %v", source, destDescription(destDir))
 
 	var destPath string
 	if destDir != "" {
-		destPath = filepath.Join(destDir, srcInfo.Name())
+		destPath = Join("/", destDir, srcInfo.Name())
 	} else {
 		destPath = srcInfo.Name()
 	}
-	destURL, err := s.artifacts.buildDestURL(destDir, s.buildId)
+	destURL, err := s.artifacts.BuildDestURL(destDir, s.buildId)
 	if err != nil {
 		return
 	}
-	return s.artifacts.Upload(absSrc, destPath, destURL)
+	return s.artifacts.Upload(source, destPath, destURL)
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {

@@ -84,7 +84,7 @@ func (u *Uploader) Upload(source, destPath, destURL string) (err error) {
 	return
 }
 
-func (u *Uploader) buildDestURL(destDir, buildId string) (string, error) {
+func (u *Uploader) BuildDestURL(destDir, buildId string) (string, error) {
 	url, err := url.Parse(u.baseURL)
 	if err != nil {
 		return "", err
