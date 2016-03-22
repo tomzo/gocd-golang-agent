@@ -298,6 +298,6 @@ func tearDown() {
 	<-agentStopped
 	err := os.RemoveAll(pipelineDir())
 	if err != nil {
-		println(err.Error())
+		println("WARN: clean up pipeline directory failed:", err.Error())
 	}
 }
