@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var (
@@ -49,12 +50,14 @@ type AgentMessage struct {
 }
 
 type Server struct {
-	Port           string
-	CertPemFile    string
-	KeyPemFile     string
-	WorkingDir     string
-	Logger         *log.Logger
-	StateListeners []StateListener
+	Port                 string
+	CertPemFile          string
+	KeyPemFile           string
+	WorkingDir           string
+	Logger               *log.Logger
+	StateListeners       []StateListener
+	maxRequestEntitySize int64
+	fieldChangeMu        sync.Mutex
 
 	addAgent    chan *RemoteAgent
 	delAgent    chan *RemoteAgent
@@ -77,18 +80,35 @@ func New(port, certFile, keyFile, workingDir string, logger *log.Logger) *Server
 
 func (s *Server) Start() error {
 	go manageAgents(s)
-	http.HandleFunc(RegistrationPath, registorHandler(s))
 	http.Handle(WebSocketPath, websocketHandler(s))
-	http.HandleFunc(ConsoleLogPath+"/", consoleHandler(s))
-	http.HandleFunc(ArtifactsPath+"/", artifactsHandler(s))
-	http.HandleFunc(StatusPath, statusHandler())
+	s.HandleFunc(RegistrationPath, registorHandler(s))
+	s.HandleFunc(ConsoleLogPath+"/", consoleHandler(s))
+	s.HandleFunc(ArtifactsPath+"/", artifactsHandler(s))
+	s.HandleFunc(StatusPath, statusHandler())
 	s.log("listen to %v", s.Port)
 	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
+}
+
+func (s *Server) HandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {
+	http.HandleFunc(path,
+		s.LimittedRequestEntitySize(handler))
 }
 
 func (s *Server) SendBuild(agentId, buildId string, commands ...*protocal.BuildCommand) {
 	build := protocal.NewBuild(s.buildContext(buildId), commands...)
 	s.Send(agentId, protocal.CmdMessage(build))
+}
+
+func (s *Server) SetMaxRequestEntitySize(size int64) {
+	s.fieldChangeMu.Lock()
+	defer s.fieldChangeMu.Unlock()
+	s.maxRequestEntitySize = size
+}
+
+func (s *Server) MaxRequestEntitySize() int64 {
+	s.fieldChangeMu.Lock()
+	defer s.fieldChangeMu.Unlock()
+	return s.maxRequestEntitySize
 }
 
 func (s *Server) ConsoleLog(buildId string) (string, error) {

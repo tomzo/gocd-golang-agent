@@ -20,12 +20,14 @@ import (
 	"net/http"
 )
 
-func (s *Server) responseBadRequest(err error, w http.ResponseWriter) {
-	s.log("Bad request: %v", err)
-	w.WriteHeader(http.StatusBadRequest)
-}
-
-func (s *Server) responseInternalError(err error, w http.ResponseWriter) {
-	s.error("Server internal error: %v", err)
-	w.WriteHeader(http.StatusInternalServerError)
+func (s *Server) LimittedRequestEntitySize(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		limit := s.MaxRequestEntitySize()
+		if limit > 0 && req.ContentLength > limit {
+			s.log("Request content length (%v) is larger than acceptable size (%d)", req.ContentLength, limit)
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+		handler(w, req)
+	}
 }

@@ -45,6 +45,7 @@ func NewUploader(httpClient *http.Client, baseURL *url.URL) *Uploader {
 
 func (u *Uploader) Upload(source, destPath string, destURL *url.URL) (err error) {
 	zipped, checksum, err := u.zipSource(source, destPath)
+	defer os.Remove(zipped)
 	if err != nil {
 		return
 	}
@@ -63,14 +64,33 @@ func (u *Uploader) Upload(source, destPath string, destURL *url.URL) (err error)
 		return
 	}
 
-	return u.post(source, zipped, writer.FormDataContentType(), destURL, &body)
+	attempt := 1
+tryPost:
+	attemptUrl := AppendUrlParam(destURL, "attempt", strconv.Itoa(attempt))
+	statusCode, err := u.post(source, writer.FormDataContentType(), attemptUrl, &body)
+	// client side errors, no retry
+	if err != nil {
+		return
+	}
+	// success
+	if statusCode == http.StatusCreated {
+		return
+	}
+	// handle errors
+	if statusCode == http.StatusRequestEntityTooLarge {
+		info, _ := os.Stat(zipped)
+		return errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %d) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
+	}
+	// retry for other errors
+	if attempt < 3 {
+		attempt++
+		goto tryPost
+	}
+	return errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, statusCode))
 }
 
-func (u *Uploader) post(source, zipped, contentType string, destURL *url.URL, body *bytes.Buffer) (err error) {
-	attampt := 1
-tryPost:
-
-	req, err := http.NewRequest("POST", u.attamptURL(destURL, attampt), body)
+func (u *Uploader) post(source, contentType string, destURL *url.URL, body *bytes.Buffer) (statusCode int, err error) {
+	req, err := http.NewRequest("POST", destURL.String(), body)
 	if err != nil {
 		return
 	}
@@ -80,27 +100,7 @@ tryPost:
 	if err != nil {
 		return
 	}
-	if resp.StatusCode == http.StatusCreated {
-		return
-	}
-	// handle errors
-	if resp.StatusCode == http.StatusRequestEntityTooLarge {
-		info, _ := os.Stat(zipped)
-		return errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %s) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
-	}
-	if resp.StatusCode < http.StatusOK ||
-		resp.StatusCode >= http.StatusMultipleChoices {
-		return errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, resp.Status))
-	}
-	if attampt < 3 {
-		attampt++
-		goto tryPost
-	}
-	return
-}
-
-func (u *Uploader) attamptURL(destURL *url.URL, attampt int) string {
-	return AppendUrlParam(destURL, "attampt", strconv.Itoa(attampt)).String()
+	return resp.StatusCode, nil
 }
 
 func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName string) error {

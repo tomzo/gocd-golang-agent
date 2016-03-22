@@ -51,6 +51,35 @@ func TestUploadArtifactFailed(t *testing.T) {
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
+func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	goServer.SetMaxRequestEntitySize(1000)
+	defer goServer.SetMaxRequestEntitySize(0)
+
+	wd := createTestProjectInPipelineDir()
+	var buf bytes.Buffer
+	for i := 0; i < 10000; i++ {
+		buf.WriteString("large file content")
+	}
+	writeFile(wd, "large.txt", buf.String())
+	goServer.SendBuild(AgentId, buildId,
+		protocal.UploadArtifactCommand("large.txt", "").Setwd(wd),
+		protocal.ReportCompletedCommand())
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	f := `Uploading artifacts from %v/large.txt to [defaultRoot]
+Artifact upload for file %v/large.txt (Size: 609) was denied by the server. This usually happens when server runs out of disk space.
+`
+	expected := sprintf(f, wd, wd)
+	assert.Equal(t, expected, trimTimestamp(log))
+}
+
 func TestUploadDirectory1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
