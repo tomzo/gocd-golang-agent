@@ -23,9 +23,7 @@ import (
 	"strings"
 )
 
-func Join(strs ...string) string {
-	sep := strs[0]
-	parts := strs[1:]
+func Join(sep string, parts ...string) string {
 	var buf bytes.Buffer
 	for i, s := range parts {
 		if len(s) == 0 || s == sep {

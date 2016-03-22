@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 )
 
@@ -160,14 +161,7 @@ func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[str
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-
-	var expected bytes.Buffer
-	for src, dest := range src2dest {
-		expected.WriteString(sprintf("Uploading artifacts from %v/%v to %v\n", wd, src, dest))
-	}
-	assert.Equal(t, expected.String(), trimTimestamp(log))
+	assertConsoleLog(t, wd, src2dest)
 
 	uploadedChecksum, err := goServer.Checksum(buildId)
 	assert.Nil(t, err)
@@ -190,6 +184,22 @@ func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[str
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, len(split(checksum, "\n"))-1, count)
+}
+
+func assertConsoleLog(t *testing.T, wd string, src2dest map[string]string) {
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+
+	expected := make([]string, len(src2dest)+1)
+	i := 0
+	for src, dest := range src2dest {
+		expected[i] = sprintf("Uploading artifacts from %v/%v to %v", wd, src, dest)
+		i++
+	}
+	actual := split(trimTimestamp(log), "\n")
+	sort.Strings(expected)
+	sort.Strings(actual)
+	assert.Equal(t, Join("\n", expected...), Join("\n", actual...))
 }
 
 func filterComments(str string) string {
