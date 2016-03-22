@@ -140,6 +140,18 @@ dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 			"test/world2/10.txt": "dest/test/world2"})
 }
 
+func TestUploadDestIsWindowPathFormat(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	testUpload(t, "test/w*/10.txt", "dest\\dir",
+		`dest/dir/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/dir/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+`,
+		map[string]string{
+			"test/world/10.txt":  "dest/dir/test/world",
+			"test/world2/10.txt": "dest/dir/test/world2"})
+}
+
 func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,

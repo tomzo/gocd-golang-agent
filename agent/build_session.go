@@ -134,7 +134,7 @@ func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err er
 		return
 	}
 	absSrc := filepath.Join(wd, src)
-	return s.uploadArtifacts(absSrc, destDir)
+	return s.uploadArtifacts(absSrc, strings.Replace(destDir, "\\", "/", -1))
 }
 
 func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
