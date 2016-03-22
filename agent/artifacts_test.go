@@ -182,10 +182,42 @@ dest/dir/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 			"test/world2/10.txt": "dest/dir/test/world2"})
 }
 
-func testUpload(t *testing.T, srcDir, destDir, checksum string, src2dest map[string]string) {
+func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(srcDir, destDir).Setwd(wd),
+		protocal.UploadArtifactCommand("src/hello/3.txt", "dest").Setwd(wd),
+		protocal.UploadArtifactCommand("test/5.txt", "").Setwd(wd),
+		protocal.UploadArtifactCommand("test/**/10.txt", "dest").Setwd(wd),
+		protocal.ReportCompletedCommand())
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	assertConsoleLog(t, wd, map[string]string{
+		"src/hello/3.txt":    "dest",
+		"test/5.txt":         "[defaultRoot]",
+		"test/world/10.txt":  "dest/test/world",
+		"test/world2/10.txt": "dest/test/world2",
+	})
+
+	uploadedChecksum, err := goServer.Checksum(buildId)
+	assert.Nil(t, err)
+	checksum := `dest/3.txt=41e43efb30d3fbfcea93542157809ac0
+5.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world/10.txt=41e43efb30d3fbfcea93542157809ac0
+dest/test/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
+`
+	assert.Equal(t, checksum, filterComments(uploadedChecksum))
+}
+
+func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[string]string) {
+	wd := createTestProjectInPipelineDir()
+	goServer.SendBuild(AgentId, buildId,
+		protocal.UploadArtifactCommand(srcPath, destDir).Setwd(wd),
 		protocal.ReportCompletedCommand())
 
 	assert.Equal(t, "agent Building", stateLog.Next())
