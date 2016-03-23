@@ -174,11 +174,11 @@ func (s *Server) notify(class, uuid, state string) {
 }
 
 func (s *Server) appendToFile(filename string, data []byte) error {
-	err := os.MkdirAll(filepath.Dir(filename), 0744)
+	err := os.MkdirAll(filepath.Dir(filename), 0755)
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0744)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}

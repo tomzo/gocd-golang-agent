@@ -35,7 +35,7 @@ func MakeLogger(logDir, file string, debug bool) *Logger {
 	if logDir != "" {
 		fpath := filepath.Join(logDir, file)
 		var err error
-		output, err = os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		output, err = os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			panic(err)
 		}

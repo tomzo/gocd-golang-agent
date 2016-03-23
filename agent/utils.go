@@ -19,6 +19,7 @@ package agent
 import (
 	"bytes"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -73,4 +74,8 @@ func AppendUrlPath(base *url.URL, path string) *url.URL {
 	url, _ := url.Parse(base.String())
 	url.RawPath = Join("/", url.RawPath, path)
 	return url
+}
+
+func Mkdirs(path string) error {
+	return os.MkdirAll(path, 0755)
 }

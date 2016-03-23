@@ -91,7 +91,7 @@ func extractArtifactFile(file *zip.File, dest string) error {
 	}
 	defer rc.Close()
 
-	err = os.MkdirAll(filepath.Dir(dest), 0744)
+	err = os.MkdirAll(filepath.Dir(dest), 0755)
 	if err != nil {
 		return err
 	}

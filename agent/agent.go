@@ -48,7 +48,7 @@ func Initialize() {
 			logger.Error.Fatal(err)
 		}
 	}
-	if err := os.MkdirAll(config.ConfigDir, 0744); err != nil {
+	if err := Mkdirs(config.ConfigDir); err != nil {
 		logger.Error.Fatal(err)
 	}
 
@@ -62,7 +62,7 @@ func Initialize() {
 	}
 	if AgentId == "" {
 		AgentId = uuid.NewV4().String()
-		ioutil.WriteFile(config.AgentIdFile, []byte(AgentId), 0600)
+		ioutil.WriteFile(config.AgentIdFile, []byte(AgentId), 0644)
 	}
 }
 

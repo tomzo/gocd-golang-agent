@@ -135,7 +135,7 @@ func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) (err error) {
 	if err != nil {
 		return err
 	}
-	return os.MkdirAll(filepath.Join(wd, path), 0755)
+	return Mkdirs(filepath.Join(wd, path))
 }
 
 func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err error) {

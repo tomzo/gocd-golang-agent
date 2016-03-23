@@ -68,11 +68,11 @@ func TestMain(m *testing.M) {
 	serverWorkingDir := filepath.Join(workingDir, "server")
 	agentWorkingDir := filepath.Join(workingDir, "agent")
 
-	err = os.MkdirAll(serverWorkingDir, 0777)
+	err = Mkdirs(serverWorkingDir)
 	if err != nil {
 		panic(err)
 	}
-	err = os.MkdirAll(agentWorkingDir, 0777)
+	err = Mkdirs(agentWorkingDir)
 	if err != nil {
 		panic(err)
 	}
@@ -206,7 +206,7 @@ func trimTimestamp(log string) string {
 
 func createPipelineDir() string {
 	dir := pipelineDir()
-	err := os.MkdirAll(dir, 0777)
+	err := Mkdirs(dir)
 	if err != nil {
 		panic(err)
 	}
@@ -215,11 +215,11 @@ func createPipelineDir() string {
 
 func createTestProjectInPipelineDir() string {
 	root := createPipelineDir()
-	err := os.MkdirAll(root+"/src/hello", 0777)
+	err := Mkdirs(root + "/src/hello")
 	if err != nil {
 		panic(err)
 	}
-	err = os.MkdirAll(root+"/test/world", 0777)
+	err = Mkdirs(root + "/test/world")
 	if err != nil {
 		panic(err)
 	}
@@ -249,12 +249,12 @@ func createTestFile(dir, fname string) string {
 }
 
 func writeFile(dir, fname, content string) error {
-	err := os.MkdirAll(dir, 0744)
+	err := Mkdirs(dir)
 	if err != nil {
 		return err
 	}
 	fpath := filepath.Join(dir, fname)
-	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0744)
+	f, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
