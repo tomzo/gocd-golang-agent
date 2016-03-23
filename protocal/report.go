@@ -14,26 +14,11 @@
  * limitations under the License.
  */
 
-package agent_test
+package protocal
 
-import (
-	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
-	"github.com/xli/assert"
-	"testing"
-)
-
-func TestEcho(t *testing.T) {
-	setUp(t)
-	defer tearDown()
-
-	goServer.SendBuild(AgentId, buildId,
-		protocal.EchoCommand("echo hello world"),
-	)
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
-
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "echo hello world\n", trimTimestamp(log))
+type Report struct {
+	BuildId          string            `json:"buildId"`
+	Result           string            `json:"result"`
+	JobState         string            `json:"jobStatus"`
+	AgentRuntimeInfo *AgentRuntimeInfo `json:"agentRuntimeInfo"`
 }

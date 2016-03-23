@@ -21,24 +21,28 @@ import (
 	"syscall"
 )
 
-func UsableSpace() string {
+func UsableSpace() int64 {
 	_, free, err := diskSpace("/")
 	if err != nil {
 		LogInfo("Unknown diskspace, error: %v", err)
-		return "-1"
+		return -1
 	}
-	return strconv.Itoa(free)
+	return free
+}
+
+func UsableSpaceString() string {
+	return strconv.FormatInt(UsableSpace(), 10)
 }
 
 // Space returns total and free bytes available in a directory, e.g. `/`.
 // Think of it as "df" UNIX command.
-func diskSpace(path string) (total, free int, err error) {
+func diskSpace(path string) (total, free int64, err error) {
 	s := syscall.Statfs_t{}
 	err = syscall.Statfs(path, &s)
 	if err != nil {
 		return
 	}
-	total = int(s.Bsize) * int(s.Blocks)
-	free = int(s.Bsize) * int(s.Bfree)
+	total = int64(s.Bsize) * int64(s.Blocks)
+	free = int64(s.Bsize) * int64(s.Bfree)
 	return
 }

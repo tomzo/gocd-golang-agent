@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,27 +30,30 @@ import (
 )
 
 type BuildSession struct {
-	HttpClient *http.Client
-	Send       chan *protocal.Message
-
-	config      *Config
+	send        chan *protocal.Message
 	buildStatus string
 	console     *BuildConsole
 	artifacts   *Uploader
-	properties  *Uploader
+	command     *protocal.BuildCommand
 	buildId     string
 	envs        map[string]string
 	cancel      chan bool
 	done        chan bool
 }
 
-func MakeBuildSession(httpClient *http.Client, send chan *protocal.Message, config *Config) *BuildSession {
+func MakeBuildSession(buildId string, command *protocal.BuildCommand,
+	console *BuildConsole, artifacts *Uploader,
+	send chan *protocal.Message) *BuildSession {
 	return &BuildSession{
-		HttpClient: httpClient,
-		Send:       send,
-		config:     config,
-		cancel:     make(chan bool),
-		done:       make(chan bool),
+		buildId:     buildId,
+		buildStatus: "passed",
+		console:     console,
+		artifacts:   artifacts,
+		command:     command,
+		send:        send,
+		envs:        make(map[string]string),
+		cancel:      make(chan bool),
+		done:        make(chan bool),
 	}
 }
 
@@ -69,12 +71,16 @@ func (s *BuildSession) isCanceled() bool {
 	}
 }
 
-func (s *BuildSession) Process(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) Process() error {
 	defer func() {
 		s.console.Close()
 		close(s.done)
 	}()
-	err := s.process(cmd)
+
+	LogInfo("start process build command:")
+	LogInfo(s.command.String())
+
+	err := s.process(s.command)
 	if err != nil {
 		s.fail(err)
 	}
@@ -100,25 +106,21 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	}
 
 	switch cmd.Name {
-	case "start":
-		return s.processStart(cmd)
-	case "compose":
+	case protocal.CommandCompose:
 		return s.processCompose(cmd)
-	case "export":
+	case protocal.CommandExport:
 		return s.processExport(cmd)
-	case "test":
+	case protocal.CommandTest:
 		return s.processTest(cmd)
-	case "exec":
+	case protocal.CommandExec:
 		return s.processExec(cmd)
-	case "echo":
+	case protocal.CommandEcho:
 		return s.processEcho(cmd)
-	case "uploadArtifact":
+	case protocal.CommandUploadArtifact:
 		return s.processUploadArtifact(cmd)
-	case "reportCurrentStatus", "reportCompleting", "reportCompleted":
+	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
 		jobState := cmd.Args["jobState"]
-		s.Send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
-	case "end":
-		// do nothing
+		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	default:
 		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
@@ -175,9 +177,8 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
-	arg0 := cmd.Args["command"]
-	args := cmd.ExtractArgList(len(cmd.Args) - 1)
-	execCmd := exec.Command(arg0, args...)
+	args := cmd.ExtractArgList(len(cmd.Args))
+	execCmd := exec.Command(args[0], args[1:]...)
 	execCmd.Stdout = s.console
 	execCmd.Stderr = s.console
 	execCmd.Dir = cmd.WorkingDirectory
@@ -212,13 +213,13 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	return errors.New("unknown test flag")
 }
 
-func (s *BuildSession) statusReport(jobState string) map[string]interface{} {
-	ret := map[string]interface{}{
-		"agentRuntimeInfo": AgentRuntimeInfo(),
-		"buildId":          s.buildId,
-		"jobState":         jobState,
-		"result":           capitalize(s.buildStatus)}
-	return ret
+func (s *BuildSession) statusReport(jobState string) *protocal.Report {
+	return &protocal.Report{
+		AgentRuntimeInfo: GetAgentRuntimeInfo(),
+		BuildId:          s.buildId,
+		JobState:         jobState,
+		Result:           capitalize(s.buildStatus),
+	}
 }
 
 func capitalize(str string) string {
@@ -235,22 +236,24 @@ func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
 }
 
 func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
-	if len(cmd.Args) > 0 {
-		for key, value := range cmd.Args {
-			s.envs[key] = value
-		}
-	} else {
-		exports := make([]string, len(s.envs))
-		i := 0
-		for key, value := range s.envs {
-			exports[i] = fmt.Sprintf("export %v=%v", key, value)
-			i++
-		}
-		sort.Strings(exports)
-		for _, exp := range exports {
-			s.console.WriteLn(exp)
-		}
+	msg := "setting environment variable '%v' to value '%v'"
+	name := cmd.Args["name"]
+	value, ok := cmd.Args["value"]
+	if !ok {
+		s.console.WriteLn(msg, name, os.Getenv(name))
+		return nil
 	}
+	secure := cmd.Args["secure"]
+	displayValue := value
+	if secure == "true" {
+		displayValue = "********"
+	}
+	_, override := s.envs[name]
+	if override || os.Getenv(name) != "" {
+		msg = "overriding environment variable '%v' with value '%v'"
+	}
+	s.envs[name] = value
+	s.console.WriteLn(msg, name, displayValue)
 	return nil
 }
 
@@ -269,31 +272,6 @@ func (s *BuildSession) fail(err error) {
 		s.console.WriteLn(err.Error())
 		s.buildStatus = "failed"
 	}
-}
-
-func (s *BuildSession) processStart(cmd *protocal.BuildCommand) error {
-	settings := cmd.Args
-
-	SetState("buildLocator", settings["buildLocator"])
-	SetState("buildLocatorForDisplay", settings["buildLocatorForDisplay"])
-
-	curl, err := s.config.MakeFullServerURL(settings["consoleURI"])
-	if err != nil {
-		return err
-	}
-	aurl, err := s.config.MakeFullServerURL(settings["artifactUploadBaseUrl"])
-	if err != nil {
-		return err
-	}
-	purl, err := s.config.MakeFullServerURL(settings["propertyBaseUrl"])
-
-	s.console = MakeBuildConsole(s.HttpClient, curl)
-	s.artifacts = NewUploader(s.HttpClient, aurl)
-	s.properties = NewUploader(s.HttpClient, purl)
-	s.buildId = settings["buildId"]
-	s.envs = make(map[string]string)
-	s.buildStatus = "passed"
-	return nil
 }
 
 func destDescription(path string) string {

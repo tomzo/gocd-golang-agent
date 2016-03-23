@@ -72,7 +72,6 @@ loop:
 			return
 		}
 		LogInfo("--> %v", msg.Action)
-		LogDebug("message data: %v", msg.Data)
 		if connClosed {
 			logger.Error.Printf("send message failed: connection is closed")
 			goto loop
@@ -118,11 +117,9 @@ func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ac
 			return
 		}
 		LogInfo("<-- %v", msg.Action)
-		LogDebug("message data: %v", msg.Data)
 
 		if msg.Action == "ack" {
-			ackId, _ := msg.Data["data"].(string)
-			ack <- ackId
+			ack <- msg.StringData()
 		} else {
 			received <- msg
 		}

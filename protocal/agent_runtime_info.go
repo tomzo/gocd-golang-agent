@@ -16,14 +16,27 @@
 
 package protocal
 
-func AgentId(info interface{}) string {
-	m, _ := info.(map[string]interface{})
-	identifier := m["identifier"]
-	id, _ := identifier.(map[string]interface{})
-	return id["uuid"].(string)
+type AgentIdentifier struct {
+	HostName  string `json:"hostName"`
+	IpAddress string `json:"ipAddress"`
+	Uuid      string `json:"uuid"`
 }
-func AgentRuntimeStatus(info interface{}) string {
-	m, _ := info.(map[string]interface{})
-	state := m["runtimeStatus"]
-	return state.(string)
+
+type AgentBuildingInfo struct {
+	BuildingInfo string `json:"buildingInfo"`
+	BuildLocator string `json:"buildingLocator"`
+}
+
+type AgentRuntimeInfo struct {
+	Identifier                   *AgentIdentifier   `json:"identifier"`
+	BuildingInfo                 *AgentBuildingInfo `json:"buildingInfo"`
+	RuntimeStatus                string             `json:"runtimeStatus"`
+	Location                     string             `json:"location"`
+	UsableSpace                  int64              `json:"usableSpace"`
+	OperatingSystemName          string             `json:"operatingSystemName"`
+	Cookie                       string             `json:"cookie"`
+	AgentLauncherVersion         string             `json:"agentLauncherVersion"`
+	ElasticPluginId              string             `json:"elasticPluginId"`
+	ElasticAgentId               string             `json:"elasticAgentId"`
+	SupportsBuildCommandProtocol bool               `json:"supportsBuildCommandProtocol"`
 }

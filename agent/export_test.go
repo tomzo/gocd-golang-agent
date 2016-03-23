@@ -19,6 +19,7 @@ import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
+	"os"
 	"testing"
 )
 
@@ -26,23 +27,32 @@ func TestExport(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
+	os.Setenv("TEST_EXPORT", "EXPORT_VALUE")
+	defer os.Setenv("TEST_EXPORT", "")
+
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ExportCommand(map[string]string{
-			"env1": "value1",
-			"env2": "value2",
-			"env3": "value3",
-		}),
-		protocal.ExportCommand(nil),
-		protocal.EndCommand(),
+		protocal.ExportCommand("env1", "value1", "false"),
+		protocal.ExportCommand("env2", "value2", "true"),
+		protocal.ExportCommand("env1", "value4", "false"),
+		protocal.ExportCommand("env2", "value5", "true"),
+		protocal.ExportCommand("env2", "value6", "false"),
+		protocal.ExportCommand("env2", "value6", ""),
+		protocal.ExportCommand("env2", "", ""),
+		protocal.ExportCommand("TEST_EXPORT"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := `export env1=value1
-export env2=value2
-export env3=value3
+	expected := `setting environment variable 'env1' to value 'value1'
+setting environment variable 'env2' to value '********'
+overriding environment variable 'env1' with value 'value4'
+overriding environment variable 'env2' with value '********'
+overriding environment variable 'env2' with value 'value6'
+overriding environment variable 'env2' with value 'value6'
+overriding environment variable 'env2' with value ''
+setting environment variable 'TEST_EXPORT' to value 'EXPORT_VALUE'
 `
 	assert.Equal(t, expected, trimTimestamp(log))
 }

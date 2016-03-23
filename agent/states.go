@@ -17,6 +17,7 @@
 package agent
 
 import (
+	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"os"
 	"runtime"
 	"sync"
@@ -41,28 +42,29 @@ func GetState(key string) string {
 	return state[key]
 }
 
-func AgentRuntimeInfo() map[string]interface{} {
+func GetAgentRuntimeInfo() *protocal.AgentRuntimeInfo {
 	hostname, _ := os.Hostname()
 	workingDir, _ := os.Getwd()
-	data := make(map[string]interface{})
-	data["identifier"] = map[string]string{
-		"hostName":  hostname,
-		"ipAddress": "127.0.0.1",
-		"uuid":      AgentId,
+	info := protocal.AgentRuntimeInfo{
+		Identifier: &protocal.AgentIdentifier{
+			HostName:  hostname,
+			IpAddress: config.IpAddress,
+			Uuid:      AgentId,
+		},
+		BuildingInfo: &protocal.AgentBuildingInfo{
+			BuildingInfo: GetState("buildingInfo"),
+			BuildLocator: GetState("buildLocator"),
+		},
+		RuntimeStatus:                GetState("runtimeStatus"),
+		Location:                     workingDir,
+		UsableSpace:                  UsableSpace(),
+		OperatingSystemName:          runtime.GOOS,
+		ElasticPluginId:              config.AgentAutoRegisterElasticPluginId,
+		ElasticAgentId:               config.AgentAutoRegisterElasticAgentId,
+		SupportsBuildCommandProtocol: true,
 	}
-	data["runtimeStatus"] = GetState("runtimeStatus")
-	data["buildingInfo"] = map[string]string{
-		"buildingInfo": GetState("buildingInfo"),
-		"buildLocator": GetState("buildLocator")}
-	data["location"] = workingDir
-	data["usableSpace"] = UsableSpace()
-	data["operatingSystemName"] = runtime.GOOS
-	data["agentLauncherVersion"] = ""
-	data["elasticPluginId"] = config.AgentAutoRegisterElasticPluginId
-	data["elasticAgentId"] = config.AgentAutoRegisterElasticAgentId
-
 	if cookie := GetState("cookie"); cookie != "" {
-		data["cookie"] = cookie
+		info.Cookie = cookie
 	}
-	return data
+	return &info
 }

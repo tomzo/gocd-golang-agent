@@ -17,6 +17,7 @@
 package agent
 
 import (
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -26,12 +27,15 @@ import (
 
 type Config struct {
 	SendMessageTimeout time.Duration
+	ServerUrl          *url.URL
 	ServerHostAndPort  string
+	ContextPath        string
 	WebSocketPath      string
 	RegistrationPath   string
 	WorkDir            string
 	LogDir             string
 	ConfigDir          string
+	IpAddress          string
 
 	AgentAutoRegisterKey             string
 	AgentAutoRegisterResources       string
@@ -47,9 +51,15 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	serverUrl, _ := url.Parse(readEnv("GOCD_SERVER_URL", "https://localhost:8154"))
+	gocdServerURL := readEnv("GOCD_SERVER_URL", "https://localhost:8154/go")
+	serverUrl, err := url.Parse(gocdServerURL)
+	if err != nil {
+		panic(err)
+	}
+	serverUrl.Scheme = "https"
 	return &Config{
 		SendMessageTimeout:               120 * time.Second,
+		ServerUrl:                        serverUrl,
 		ServerHostAndPort:                serverUrl.Host,
 		WorkDir:                          os.Getenv("GOCD_AGENT_WORK_DIR"),
 		LogDir:                           os.Getenv("GOCD_AGENT_LOG_DIR"),
@@ -64,17 +74,36 @@ func LoadConfig() *Config {
 		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
 		AgentIdFile:                      filepath.Join("config", "agent-id"),
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
-		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/go/agent-websocket"),
-		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/go/admin/agent"),
+		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/agent-websocket"),
+		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/admin/agent"),
+		IpAddress:                        lookupIpAddress(),
 	}
 }
 
+func lookupIpAddress() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
+}
+
 func (c *Config) HttpsServerURL() string {
-	return "https://" + c.ServerHostAndPort
+	return c.ServerUrl.String()
 }
 
 func (c *Config) WssServerURL() string {
-	return "wss://" + c.ServerHostAndPort + c.WebSocketPath
+	u, _ := url.Parse(c.HttpsServerURL())
+	u.Scheme = "wss"
+	return Join("/", u.String(), c.WebSocketPath)
 }
 
 func (c *Config) RegistrationURL() (*url.URL, error) {
@@ -83,7 +112,7 @@ func (c *Config) RegistrationURL() (*url.URL, error) {
 
 func (c *Config) MakeFullServerURL(u string) (*url.URL, error) {
 	if strings.HasPrefix(u, "/") {
-		return url.Parse(c.HttpsServerURL() + u)
+		return url.Parse(Join("/", c.HttpsServerURL(), u))
 	} else {
 		return url.Parse(u)
 	}

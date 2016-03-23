@@ -18,13 +18,29 @@ package protocal
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-type CommandTest struct {
+var (
+	CommandCompose             = "compose"
+	CommandExport              = "export"
+	CommandTest                = "test"
+	CommandExec                = "exec"
+	CommandEcho                = "echo"
+	CommandUploadArtifact      = "uploadArtifact"
+	CommandReportCurrentStatus = "reportCurrentStatus"
+	CommandReportCompleting    = "reportCompleting"
+	CommandReportCompleted     = "reportCompleted"
+	// todo
+	CommandMkdirs   = "mkdirs"
+	CommandCleandir = "cleandir"
+	CommandFail     = "fail"
+	CommandSecret   = "secret"
+)
+
+type BuildCommandTest struct {
 	Command     *BuildCommand
 	Expectation bool
 }
@@ -35,7 +51,7 @@ type BuildCommand struct {
 	RunIfConfig      string
 	SubCommands      []*BuildCommand
 	WorkingDirectory string
-	Test             *CommandTest
+	Test             *BuildCommandTest
 }
 
 func NewBuildCommand(name string) *BuildCommand {
@@ -45,47 +61,52 @@ func NewBuildCommand(name string) *BuildCommand {
 	}
 }
 
-func NewBuild(context map[string]string, commands ...*BuildCommand) *BuildCommand {
-	return ComposeCommand(append([]*BuildCommand{StartCommand(context)}, commands...)...)
-}
-
-func StartCommand(args map[string]string) *BuildCommand {
-	return NewBuildCommand("start").SetArgs(args).RunIf("any")
+func NewBuild(id, locator, locatorForDisplay,
+	consoleURL, artifactUploadBaseUrl, propertyBaseUrl string,
+	commands ...*BuildCommand) *Build {
+	return &Build{
+		BuildId:                id,
+		BuildLocator:           locator,
+		BuildLocatorForDisplay: locator,
+		ConsoleURI:             consoleURL,
+		ArtifactUploadBaseUrl:  artifactUploadBaseUrl,
+		PropertyBaseUrl:        propertyBaseUrl,
+		BuildCommand:           ComposeCommand(commands...),
+	}
 }
 
 func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
-	return NewBuildCommand("compose").AddCommands(commands...)
+	return NewBuildCommand(CommandCompose).AddCommands(commands...)
 }
 
 func EchoCommand(contents ...string) *BuildCommand {
-	return NewBuildCommand("echo").SetArgs(listMap(contents...))
+	return NewBuildCommand(CommandEcho).SetArgs(listMap(contents...))
 }
 
-func EndCommand() *BuildCommand {
-	return NewBuildCommand("end").RunIf("any")
+func ExecCommand(args ...string) *BuildCommand {
+	return NewBuildCommand(CommandExec).SetArgs(listMap(args...))
 }
 
-func ExecCommand(cmd string, execArgs ...string) *BuildCommand {
-	args := listMap(execArgs...)
-	args["command"] = cmd
-	return NewBuildCommand("exec").SetArgs(args)
-}
-
-func ExportCommand(envs map[string]string) *BuildCommand {
-	return NewBuildCommand("export").SetArgs(envs)
+func ExportCommand(kvs ...string) *BuildCommand {
+	args := map[string]string{"name": kvs[0]}
+	if len(kvs) == 3 {
+		args["value"] = kvs[1]
+		args["secure"] = kvs[2]
+	}
+	return NewBuildCommand(CommandExport).SetArgs(args)
 }
 
 func ReportCurrentStatusCommand(jobState string) *BuildCommand {
 	args := map[string]string{"jobState": jobState}
-	return NewBuildCommand("reportCurrentStatus").SetArgs(args)
+	return NewBuildCommand(CommandReportCurrentStatus).SetArgs(args)
 }
 
 func ReportCompletingCommand() *BuildCommand {
-	return NewBuildCommand("reportCompleting").RunIf("any")
+	return NewBuildCommand(CommandReportCompleting).RunIf("any")
 }
 
 func ReportCompletedCommand() *BuildCommand {
-	return NewBuildCommand("reportCompleted").RunIf("any")
+	return NewBuildCommand(CommandReportCompleted).RunIf("any")
 }
 
 func TestCommand(flag, path string) *BuildCommand {
@@ -93,7 +114,7 @@ func TestCommand(flag, path string) *BuildCommand {
 		"flag": flag,
 		"path": path,
 	}
-	return NewBuildCommand("test").SetArgs(args)
+	return NewBuildCommand(CommandTest).SetArgs(args)
 }
 
 func UploadArtifactCommand(src, dest string) *BuildCommand {
@@ -101,14 +122,7 @@ func UploadArtifactCommand(src, dest string) *BuildCommand {
 		"src":  src,
 		"dest": dest,
 	}
-	return NewBuildCommand("uploadArtifact").SetArgs(args)
-}
-
-func Parse(command map[string]interface{}) *BuildCommand {
-	var cmd BuildCommand
-	str, _ := json.Marshal(command)
-	json.Unmarshal(str, &cmd)
-	return &cmd
+	return NewBuildCommand(CommandUploadArtifact).SetArgs(args)
 }
 
 func (cmd *BuildCommand) AddCommands(commands ...*BuildCommand) *BuildCommand {
@@ -122,7 +136,7 @@ func (cmd *BuildCommand) SetArgs(args map[string]string) *BuildCommand {
 }
 
 func (cmd *BuildCommand) SetTest(test *BuildCommand) *BuildCommand {
-	cmd.Test = &CommandTest{
+	cmd.Test = &BuildCommandTest{
 		Command:     test,
 		Expectation: true,
 	}
@@ -145,6 +159,10 @@ func (cmd *BuildCommand) ExtractArgList(size int) []string {
 		ret[i] = cmd.Args[strconv.Itoa(i)]
 	}
 	return ret
+}
+
+func (cmd *BuildCommand) String() string {
+	return cmd.Dump(2, 2)
 }
 
 func (cmd *BuildCommand) Dump(indent, step int) string {

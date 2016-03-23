@@ -104,49 +104,58 @@ func Start() error {
 
 func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *protocal.Message) error {
 	switch msg.Action {
-	case "setCookie":
-		str, _ := msg.Data["data"].(string)
-		SetState("cookie", str)
-	case "cancelJob":
+	case protocal.SetCookieAction:
+		SetState("cookie", msg.StringData())
+	case protocal.CancelJobAction:
 		closeBuildSession()
-	case "reregister":
+	case protocal.ReregisterAction:
 		CleanRegistration()
 		return errors.New("received reregister message")
-	case "cmd":
+	case protocal.BuildAction:
 		closeBuildSession()
-		buildSession = MakeBuildSession(httpClient, send, config)
-		go processBuildCommandMessage(msg, buildSession)
+		build := msg.Build()
+		SetState("buildLocator", build.BuildLocator)
+		SetState("buildLocatorForDisplay", build.BuildLocatorForDisplay)
+		curl, err := config.MakeFullServerURL(build.ConsoleURI)
+		if err != nil {
+			return err
+		}
+		aurl, err := config.MakeFullServerURL(build.ArtifactUploadBaseUrl)
+		if err != nil {
+			return err
+		}
+
+		buildSession = MakeBuildSession(
+			build.BuildId,
+			build.BuildCommand,
+			MakeBuildConsole(httpClient, curl),
+			NewUploader(httpClient, aurl),
+			send,
+		)
+		go processBuild(send, buildSession)
 	default:
 		logger.Error.Printf("ERROR: unknown message action %v", msg)
 	}
 	return nil
 }
 
-func processBuildCommandMessage(msg *protocal.Message, buildSession *BuildSession) {
+func processBuild(send chan *protocal.Message, buildSession *BuildSession) {
 	defer func() {
 		SetState("runtimeStatus", "Idle")
-		ping(buildSession.Send)
+		ping(send)
 		logger.Debug.Printf("! exit goroutine: process build command message")
 	}()
 	SetState("runtimeStatus", "Building")
-	ping(buildSession.Send)
-	command, _ := msg.Data["data"].(map[string]interface{})
-	buildCmd := protocal.Parse(command)
-	LogInfo("start process build command:")
-	LogInfo(buildCmd.Dump(2, 2))
-	err := buildSession.Process(buildCmd)
+	ping(send)
+	err := buildSession.Process()
 	if err != nil {
-		LogInfo("Error(%v) when processing message : %v", err, msg)
-	} else {
-		LogInfo("done")
+		LogInfo("Processing build failed: %v", err)
 	}
+	LogInfo("done")
 }
 
 func ping(send chan *protocal.Message) {
-	send <- protocal.PingMessage(
-		config.IsElasticAgent(),
-		AgentRuntimeInfo(),
-	)
+	send <- protocal.PingMessage(GetAgentRuntimeInfo())
 }
 
 func closeBuildSession() {

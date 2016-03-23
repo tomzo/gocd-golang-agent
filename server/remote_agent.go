@@ -49,24 +49,21 @@ func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) 
 		server.error("ack error: %v", err)
 	}
 	switch msg.Action {
-	case "ping":
+	case protocal.PingAction:
+		info := msg.AgentRuntimeInfo()
 		if agent.id == "" {
-			agent.id = protocal.AgentId(msg.Data["data"])
+			agent.id = info.Identifier.Uuid
 			server.add(agent)
 			agent.SetCookie()
 		}
-		agentState := protocal.AgentRuntimeStatus(msg.Data["data"])
+		agentState := info.RuntimeStatus
 		server.notifyAgent(agent.id, agentState)
 	case "reportCurrentStatus":
-		report := msg.Data["data"].(map[string]interface{})
-		buildId, _ := report["buildId"].(string)
-		jobState, _ := report["jobState"].(string)
-		server.notifyBuild(buildId, jobState)
+		report := msg.Report()
+		server.notifyBuild(report.BuildId, report.JobState)
 	case "reportCompleting", "reportCompleted":
-		report := msg.Data["data"].(map[string]interface{})
-		buildId, _ := report["buildId"].(string)
-		jobResult, _ := report["result"].(string)
-		server.notifyBuild(buildId, jobResult)
+		report := msg.Report()
+		server.notifyBuild(report.BuildId, report.Result)
 	}
 }
 

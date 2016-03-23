@@ -17,49 +17,85 @@
 package protocal
 
 import (
+	"encoding/json"
 	"github.com/satori/go.uuid"
 )
 
+var (
+	SetCookieAction           = "setCookie"
+	CancelJobAction           = "cancelJob"
+	ReregisterAction          = "reregister"
+	BuildAction               = "build"
+	PingAction                = "ping"
+	AckAction                 = "ack"
+	ReportCurrentStatusAction = "reportCurrentStatus"
+	ReportCompletingAction    = "reportCompleting"
+	ReportCompletedAction     = "reportCompleted"
+)
+
 type Message struct {
-	Action string                 `json:"action"`
-	Data   map[string]interface{} `json:"data"`
-	AckId  string                 `json:"ackId"`
+	Action string `json:"action"`
+	Data   string `json:"data"`
+	AckId  string `json:"ackId"`
 }
 
-func newMessage(action, dataType string, data interface{}) *Message {
+func (m *Message) Build() *Build {
+	var build Build
+	json.Unmarshal([]byte(m.Data), &build)
+	return &build
+}
+
+func (m *Message) StringData() string {
+	var str string
+	json.Unmarshal([]byte(m.Data), &str)
+	return str
+}
+
+func (m *Message) AgentRuntimeInfo() *AgentRuntimeInfo {
+	var info AgentRuntimeInfo
+	json.Unmarshal([]byte(m.Data), &info)
+	return &info
+}
+
+func (m *Message) Report() *Report {
+	var report Report
+	json.Unmarshal([]byte(m.Data), &report)
+	return &report
+}
+
+func newMessage(action string, data interface{}) *Message {
+	json, err := json.Marshal(data)
+	if err != nil {
+		panic(err)
+	}
+
 	return &Message{
 		Action: action,
-		Data:   map[string]interface{}{"type": dataType, "data": data},
+		Data:   string(json),
 		AckId:  uuid.NewV4().String(),
 	}
 }
 
 func SetCookieMessage(cookie string) *Message {
-	return newMessage("setCookie", "java.lang.String", cookie)
+	return newMessage(SetCookieAction, cookie)
 }
 
 func AckMessage(ackId string) *Message {
-	return newMessage("ack", "java.lang.String", ackId)
+	return newMessage(AckAction, ackId)
 }
 
-func CmdMessage(cmd *BuildCommand) *Message {
-	return newMessage("cmd", "BuildCommand", cmd)
+func BuildMessage(cmd *Build) *Message {
+	return newMessage(BuildAction, cmd)
 }
 
-func PingMessage(elasticAgent bool, data map[string]interface{}) *Message {
-	var msgType string
-	if elasticAgent {
-		msgType = "com.thoughtworks.go.server.service.AgentRuntimeInfo"
-	} else {
-		msgType = "com.thoughtworks.go.server.service.ElasticAgentRuntimeInfo"
-	}
-	return newMessage("ping", msgType, data)
+func PingMessage(data *AgentRuntimeInfo) *Message {
+	return newMessage(PingAction, data)
 }
 
-func ReportMessage(t string, report map[string]interface{}) *Message {
-	return newMessage(t, "com.thoughtworks.go.websocket.Report", report)
+func ReportMessage(t string, report *Report) *Message {
+	return newMessage(t, report)
 }
 
 func ReregisterMessage() *Message {
-	return &Message{Action: "reregister"}
+	return &Message{Action: ReregisterAction}
 }

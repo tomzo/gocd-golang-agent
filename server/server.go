@@ -95,8 +95,14 @@ func (s *Server) HandleFunc(path string, handler func(http.ResponseWriter, *http
 }
 
 func (s *Server) SendBuild(agentId, buildId string, commands ...*protocal.BuildCommand) {
-	build := protocal.NewBuild(s.buildContext(buildId), commands...)
-	s.Send(agentId, protocal.CmdMessage(build))
+
+	locator := "/builds/" + buildId
+	build := protocal.NewBuild(buildId, locator, locator,
+		ConsoleLogPath+locator,
+		ArtifactsPath+locator,
+		PropertiesPath+locator,
+		commands...)
+	s.Send(agentId, protocal.BuildMessage(build))
 }
 
 func (s *Server) SetMaxRequestEntitySize(size int64) {
@@ -135,18 +141,6 @@ func (s *Server) ConsoleLogFile(buildId string) string {
 
 func (s *Server) Send(agentId string, msg *protocal.Message) {
 	s.sendMessage <- &AgentMessage{agentId: agentId, Msg: msg}
-}
-
-func (s *Server) buildContext(id string) map[string]string {
-	locator := "/builds/" + id
-	return map[string]string{
-		"buildId":                id,
-		"buildLocator":           locator,
-		"buildLocatorForDisplay": locator,
-		"consoleURI":             ConsoleLogPath + locator,
-		"artifactUploadBaseUrl":  ArtifactsPath + locator,
-		"propertyBaseUrl":        PropertiesPath + locator,
-	}
 }
 
 func (s *Server) log(format string, v ...interface{}) {
