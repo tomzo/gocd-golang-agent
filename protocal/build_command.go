@@ -117,6 +117,11 @@ func TestCommand(flag, path string) *BuildCommand {
 	return NewBuildCommand(CommandTest).SetArgs(args)
 }
 
+func MkdirsCommand(path string) *BuildCommand {
+	args := map[string]string{"path": path}
+	return NewBuildCommand(CommandMkdirs).SetArgs(args)
+}
+
 func UploadArtifactCommand(src, dest string) *BuildCommand {
 	args := map[string]string{
 		"src":  src,

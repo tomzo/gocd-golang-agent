@@ -116,6 +116,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processExec(cmd)
 	case protocal.CommandEcho:
 		return s.processEcho(cmd)
+	case protocal.CommandMkdirs:
+		return s.processMkdirs(cmd)
 	case protocal.CommandUploadArtifact:
 		return s.processUploadArtifact(cmd)
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
@@ -125,6 +127,15 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
 	return nil
+}
+
+func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) (err error) {
+	path := cmd.Args["path"]
+	wd, err := filepath.Abs(cmd.WorkingDirectory)
+	if err != nil {
+		return err
+	}
+	return os.MkdirAll(filepath.Join(wd, path), 0755)
 }
 
 func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err error) {

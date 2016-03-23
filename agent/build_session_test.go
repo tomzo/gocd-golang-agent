@@ -20,6 +20,7 @@ import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -55,4 +56,18 @@ overriding environment variable 'env2' with value ''
 setting environment variable 'TEST_EXPORT' to value 'EXPORT_VALUE'
 `
 	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestMkdir(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	wd := pipelineDir()
+	goServer.SendBuild(AgentId, buildId,
+		protocal.MkdirsCommand("path/in/pipeline/dir").Setwd(wd),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+	_, err := os.Stat(filepath.Join(wd, "path/in/pipeline/dir"))
+	assert.Nil(t, err)
 }
