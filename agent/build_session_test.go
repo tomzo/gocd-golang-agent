@@ -143,6 +143,23 @@ func TestSecretCommand(t *testing.T) {
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
+func TestShouldMaskSecretInExecOutput(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		protocal.SecretCommand("thisissecret", "$$$$$$"),
+		protocal.ExecCommand("echo", "hello (thisissecret)"),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := Sprintf("hello ($$$$$$)\n")
+	assert.Equal(t, expected, trimTimestamp(log))
+}
+
 func TestReplaceAgentBuildVairables(t *testing.T) {
 	setUp(t)
 	defer tearDown()

@@ -293,7 +293,11 @@ func setUp(t *testing.T) {
 
 func tearDown() {
 	goServer.Send(AgentId, protocal.ReregisterMessage())
-	<-agentStopped
+	select {
+	case <-time.After(5 * time.Second):
+		panic("wait for agent stop timeout")
+	case <-agentStopped:
+	}
 	err := os.RemoveAll(pipelineDir())
 	if err != nil {
 		println("WARN: clean up pipeline directory failed:", err.Error())

@@ -127,16 +127,15 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		if err != nil {
 			return err
 		}
-		console := MakeBuildConsole(httpClient, curl)
-		console.Replace("${agent.location}", config.WorkingDir())
-		console.Replace("${agent.hostname}", config.Hostname)
 		buildSession = MakeBuildSession(
 			build.BuildId,
 			build.BuildCommand,
-			console,
+			MakeBuildConsole(httpClient, curl),
 			NewUploader(httpClient, aurl),
 			send,
 		)
+		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
+		buildSession.ReplaceEcho("${agent.hostname}", config.Hostname)
 		go processBuild(send, buildSession)
 	default:
 		logger.Error.Printf("ERROR: unknown message action %v", msg)

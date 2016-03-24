@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -33,30 +34,34 @@ var (
 )
 
 type BuildSession struct {
-	send        chan *protocal.Message
-	buildStatus string
-	console     *BuildConsole
-	artifacts   *Uploader
-	command     *protocal.BuildCommand
-	buildId     string
-	envs        map[string]string
-	cancel      chan bool
-	done        chan bool
+	send          chan *protocal.Message
+	buildStatus   string
+	console       *BuildConsole
+	artifacts     *Uploader
+	command       *protocal.BuildCommand
+	buildId       string
+	envs          map[string]string
+	cancel        chan bool
+	done          chan bool
+	echoVariables map[string]string
+	secrets       map[string]string
 }
 
 func MakeBuildSession(buildId string, command *protocal.BuildCommand,
 	console *BuildConsole, artifacts *Uploader,
 	send chan *protocal.Message) *BuildSession {
 	return &BuildSession{
-		buildId:     buildId,
-		buildStatus: "passed",
-		console:     console,
-		artifacts:   artifacts,
-		command:     command,
-		send:        send,
-		envs:        make(map[string]string),
-		cancel:      make(chan bool),
-		done:        make(chan bool),
+		buildId:       buildId,
+		buildStatus:   "passed",
+		console:       console,
+		artifacts:     artifacts,
+		command:       command,
+		send:          send,
+		envs:          make(map[string]string),
+		cancel:        make(chan bool),
+		done:          make(chan bool),
+		echoVariables: make(map[string]string),
+		secrets:       make(map[string]string),
 	}
 }
 
@@ -133,7 +138,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		jobState := cmd.Args["jobState"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	default:
-		s.console.WriteLn("TBI command: %v", cmd.Name)
+		s.ConsoleLog("TBI command: %v", cmd.Name)
 	}
 	return nil
 }
@@ -144,7 +149,7 @@ func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) (err error) {
 	if substitution == "" {
 		substitution = DefaultSecretMask
 	}
-	s.console.Replace(value, substitution)
+	s.secrets[value] = substitution
 	return nil
 }
 
@@ -207,7 +212,7 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	if err != nil {
 		return
 	}
-	s.console.WriteLn("Uploading artifacts from %v to %v", source, destDescription(destDir))
+	s.ConsoleLog("Uploading artifacts from %v to %v", source, destDescription(destDir))
 
 	var destPath string
 	if destDir != "" {
@@ -221,10 +226,11 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
+	outputFilter := &SecretOutput{session: s}
 	args := cmd.ExtractArgList(len(cmd.Args))
 	execCmd := exec.Command(args[0], args[1:]...)
-	execCmd.Stdout = s.console
-	execCmd.Stderr = s.console
+	execCmd.Stdout = outputFilter
+	execCmd.Stderr = outputFilter
 	execCmd.Dir = cmd.WorkingDirectory
 	done := make(chan error)
 	go func() {
@@ -236,7 +242,7 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 		LogDebug("received cancel signal")
 		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.console.WriteLn("kill command %v failed, error: %v", cmd.Args, err)
+			s.ConsoleLog("kill command %v failed, error: %v", cmd.Args, err)
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
@@ -272,11 +278,34 @@ func capitalize(str string) string {
 	return string(a)
 }
 
+func (s *BuildSession) ConsoleLog(format string, a ...interface{}) {
+	s.console.Write([]byte(Sprintf(format, a...)))
+}
+
+func (s *BuildSession) ReplaceEcho(name, value string) {
+	s.echoVariables[name] = value
+}
+
 func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
 	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
-		s.console.WriteLn(line)
+		s.ConsoleLog(s.maskSecrets(s.substituteVariables(line)))
 	}
 	return nil
+}
+
+func (s *BuildSession) substituteVariables(str string) string {
+	for k, v := range s.echoVariables {
+		str = strings.Replace(str, k, v, -1)
+	}
+	dateF := time.Now().Format("2006-01-02 15:04:05 PDT")
+	return strings.Replace(str, "${date}", dateF, -1)
+}
+
+func (s *BuildSession) maskSecrets(str string) string {
+	for k, v := range s.secrets {
+		str = strings.Replace(str, k, v, -1)
+	}
+	return str
 }
 
 func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
@@ -284,7 +313,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	name := cmd.Args["name"]
 	value, ok := cmd.Args["value"]
 	if !ok {
-		s.console.WriteLn(msg, name, os.Getenv(name))
+		s.ConsoleLog(msg, name, os.Getenv(name))
 		return nil
 	}
 	secure := cmd.Args["secure"]
@@ -297,7 +326,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 		msg = "overriding environment variable '%v' with value '%v'"
 	}
 	s.envs[name] = value
-	s.console.WriteLn(msg, name, displayValue)
+	s.ConsoleLog(msg, name, displayValue)
 	return nil
 }
 
@@ -313,7 +342,7 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 
 func (s *BuildSession) fail(err error) {
 	if s.buildStatus != "failed" {
-		s.console.WriteLn(err.Error())
+		s.ConsoleLog(err.Error())
 		s.buildStatus = "failed"
 	}
 }
@@ -324,4 +353,13 @@ func destDescription(path string) string {
 	} else {
 		return path
 	}
+}
+
+type SecretOutput struct {
+	session *BuildSession
+}
+
+func (o *SecretOutput) Write(out []byte) (int, error) {
+	o.session.ConsoleLog(o.session.maskSecrets(string(out)))
+	return len(out), nil
 }

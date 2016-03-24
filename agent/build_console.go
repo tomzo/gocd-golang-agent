@@ -32,9 +32,8 @@ type BuildConsole struct {
 	Buffer         *bytes.Buffer
 	stop           chan bool
 	closed         *sync.WaitGroup
-	write          chan []byte
+	write          chan string
 	writeTimestamp bool
-	replaces       chan []string
 }
 
 func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
@@ -44,24 +43,16 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 		Buffer:         bytes.NewBuffer(make([]byte, 0, 10*1024)),
 		stop:           make(chan bool),
 		closed:         &sync.WaitGroup{},
-		write:          make(chan []byte),
-		replaces:       make(chan []string),
+		write:          make(chan string),
 		writeTimestamp: true,
 	}
 	console.closed.Add(1)
 	go func() {
 		flushTick := time.NewTicker(5 * time.Second)
 		defer flushTick.Stop()
-		reps := make(map[string]string)
 		for {
 			select {
-			case data := <-console.write:
-				log := string(data)
-				for k, v := range reps {
-					log = strings.Replace(log, k, v, -1)
-				}
-				dateF := time.Now().Format("2006-01-02 15:04:05 PDT")
-				log = strings.Replace(log, "${date}", dateF, -1)
+			case log := <-console.write:
 				LogDebug("BuildConsole: %v", log)
 				console.Buffer.Write([]byte(log))
 			case <-console.stop:
@@ -71,8 +62,6 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 				return
 			case <-flushTick.C:
 				console.Flush()
-			case sub := <-console.replaces:
-				reps[sub[0]] = sub[1]
 			}
 		}
 	}()
@@ -86,19 +75,13 @@ func (console *BuildConsole) Close() {
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {
-	console.write <- []byte(time.Now().Format("15:04:05.000"))
-	console.write <- []byte(" ")
-	console.write <- data
+	for _, line := range strings.Split(string(data), "\n") {
+		console.write <- time.Now().Format("15:04:05.000")
+		console.write <- " "
+		console.write <- line
+		console.write <- "\n"
+	}
 	return len(data), nil
-}
-
-func (console *BuildConsole) Replace(args ...string) {
-	console.replaces <- args
-}
-
-func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
-	ln := Sprintf(format, a...)
-	console.Write([]byte(Sprintf("%v\n", ln)))
 }
 
 func (console *BuildConsole) Flush() {
@@ -106,6 +89,7 @@ func (console *BuildConsole) Flush() {
 	if console.Buffer.Len() == 0 {
 		return
 	}
+
 	req := http.Request{
 		Method:        http.MethodPut,
 		URL:           console.Url,
