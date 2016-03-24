@@ -38,6 +38,10 @@ func LogInfo(format string, v ...interface{}) {
 	logger.Info.Printf(format, v...)
 }
 
+func GetConfig() *Config {
+	return config
+}
+
 func Initialize() {
 	config = LoadConfig()
 	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log", config.OutputDebugLog)
@@ -123,11 +127,13 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		if err != nil {
 			return err
 		}
-
+		console := MakeBuildConsole(httpClient, curl)
+		console.Replace("${agent.location}", config.WorkingDir())
+		console.Replace("${agent.hostname}", config.Hostname)
 		buildSession = MakeBuildSession(
 			build.BuildId,
 			build.BuildCommand,
-			MakeBuildConsole(httpClient, curl),
+			console,
 			NewUploader(httpClient, aurl),
 			send,
 		)

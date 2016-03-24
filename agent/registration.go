@@ -130,19 +130,16 @@ func CleanRegistration() error {
 }
 
 func registerData() map[string]string {
-	hostname, _ := os.Hostname()
-	workingDir, _ := os.Getwd()
-
 	return map[string]string{
-		"hostname":                      hostname,
+		"hostname":                      config.Hostname,
 		"uuid":                          AgentId,
-		"location":                      workingDir,
+		"location":                      config.WorkingDir(),
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   UsableSpaceString(),
 		"agentAutoRegisterKey":          config.AgentAutoRegisterKey,
 		"agentAutoRegisterResources":    config.AgentAutoRegisterResources,
 		"agentAutoRegisterEnvironments": config.AgentAutoRegisterEnvironments,
-		"agentAutoRegisterHostname":     hostname,
+		"agentAutoRegisterHostname":     config.Hostname,
 		"elasticAgentId":                config.AgentAutoRegisterElasticAgentId,
 		"elasticPluginId":               config.AgentAutoRegisterElasticPluginId,
 	}

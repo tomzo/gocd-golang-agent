@@ -23,7 +23,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestExport(t *testing.T) {
@@ -139,4 +141,37 @@ func TestSecretCommand(t *testing.T) {
 	assert.Nil(t, err)
 	expected := Sprintf("hello ($$$$$$)\nhello (********)\n")
 	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestReplaceAgentBuildVairables(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		protocal.EchoCommand("hello ${agent.location}"),
+		protocal.EchoCommand("hello ${agent.hostname}"),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	config := GetConfig()
+	expected := Sprintf("hello %v\nhello %v\n", config.WorkingDir(), config.Hostname)
+	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestReplaceDateBuildVairables(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId, protocal.EchoCommand("${date}"))
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	log = strings.TrimSpace(trimTimestamp(log))
+	_, err = time.Parse("2006-01-02 15:04:05 PDT", log)
+	assert.Nil(t, err)
 }

@@ -60,6 +60,8 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 				for k, v := range reps {
 					log = strings.Replace(log, k, v, -1)
 				}
+				dateF := time.Now().Format("2006-01-02 15:04:05 PDT")
+				log = strings.Replace(log, "${date}", dateF, -1)
 				LogDebug("BuildConsole: %v", log)
 				console.Buffer.Write([]byte(log))
 			case <-console.stop:

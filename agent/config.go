@@ -26,6 +26,7 @@ import (
 )
 
 type Config struct {
+	Hostname           string
 	SendMessageTimeout time.Duration
 	ServerUrl          *url.URL
 	ServerHostAndPort  string
@@ -48,6 +49,8 @@ type Config struct {
 	AgentCertFile       string
 	AgentIdFile         string
 	OutputDebugLog      bool
+
+	workingDir string
 }
 
 func LoadConfig() *Config {
@@ -57,7 +60,10 @@ func LoadConfig() *Config {
 		panic(err)
 	}
 	serverUrl.Scheme = "https"
+	hostname, _ := os.Hostname()
+
 	return &Config{
+		Hostname:                         hostname,
 		SendMessageTimeout:               120 * time.Second,
 		ServerUrl:                        serverUrl,
 		ServerHostAndPort:                serverUrl.Host,
@@ -78,6 +84,13 @@ func LoadConfig() *Config {
 		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/admin/agent"),
 		IpAddress:                        lookupIpAddress(),
 	}
+}
+
+func (c *Config) WorkingDir() string {
+	if c.workingDir == "" {
+		c.workingDir, _ = os.Getwd()
+	}
+	return c.workingDir
 }
 
 func lookupIpAddress() string {

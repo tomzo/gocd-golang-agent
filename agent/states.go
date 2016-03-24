@@ -18,7 +18,6 @@ package agent
 
 import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
-	"os"
 	"runtime"
 	"sync"
 )
@@ -43,11 +42,9 @@ func GetState(key string) string {
 }
 
 func GetAgentRuntimeInfo() *protocal.AgentRuntimeInfo {
-	hostname, _ := os.Hostname()
-	workingDir, _ := os.Getwd()
 	info := protocal.AgentRuntimeInfo{
 		Identifier: &protocal.AgentIdentifier{
-			HostName:  hostname,
+			HostName:  config.Hostname,
 			IpAddress: config.IpAddress,
 			Uuid:      AgentId,
 		},
@@ -56,7 +53,7 @@ func GetAgentRuntimeInfo() *protocal.AgentRuntimeInfo {
 			BuildLocator: GetState("buildLocator"),
 		},
 		RuntimeStatus:                GetState("runtimeStatus"),
-		Location:                     workingDir,
+		Location:                     config.WorkingDir(),
 		UsableSpace:                  UsableSpace(),
 		OperatingSystemName:          runtime.GOOS,
 		ElasticPluginId:              config.AgentAutoRegisterElasticPluginId,
