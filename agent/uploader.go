@@ -20,8 +20,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -79,14 +77,14 @@ tryPost:
 	// handle errors
 	if statusCode == http.StatusRequestEntityTooLarge {
 		info, _ := os.Stat(zipped)
-		return errors.New(fmt.Sprintf("Artifact upload for file %s (Size: %d) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size()))
+		return Err("Artifact upload for file %s (Size: %d) was denied by the server. This usually happens when server runs out of disk space.", source, info.Size())
 	}
 	// retry for other errors
 	if attempt < 3 {
 		attempt++
 		goto tryPost
 	}
-	return errors.New(fmt.Sprintf("Failed to upload %v. Server response: %v", source, statusCode))
+	return Err("Failed to upload %v. Server response: %v", source, statusCode)
 }
 
 func (u *Uploader) post(source, contentType string, destURL *url.URL, body *bytes.Buffer) (statusCode int, err error) {
@@ -147,7 +145,7 @@ func (u *Uploader) zipSource(source string, dest string) (string, string, error)
 	defer w.Close()
 
 	var checksum bytes.Buffer
-	checksum.WriteString(fmt.Sprintf("#\n#%v\n", time.Now()))
+	checksum.WriteString(Sprintf("#\n#%v\n", time.Now()))
 	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -175,7 +173,7 @@ func (u *Uploader) zipSource(source string, dest string) (string, string, error)
 		if err != nil {
 			return err
 		}
-		checksum.WriteString(fmt.Sprintf("%v=%x\n", destFile, md5))
+		checksum.WriteString(Sprintf("%v=%x\n", destFile, md5))
 
 		file, err := os.Open(path)
 		if err != nil {

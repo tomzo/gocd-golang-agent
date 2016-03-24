@@ -21,7 +21,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"io/ioutil"
 	"net/http"
@@ -64,7 +63,7 @@ func GoServerRootCAs() (*x509.CertPool, error) {
 	roots := x509.NewCertPool()
 	ok := roots.AppendCertsFromPEM([]byte(caCert))
 	if !ok {
-		return nil, errors.New("failed to parse root certificate")
+		return nil, Err("failed to parse root certificate")
 	}
 	return roots, nil
 }

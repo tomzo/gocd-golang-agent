@@ -16,8 +16,12 @@
 package agent_test
 
 import (
+	"github.com/bmatcuk/doublestar"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/xli/assert"
+	"io/ioutil"
+	"path/filepath"
+	"sort"
 	"testing"
 )
 
@@ -40,4 +44,37 @@ func TestJoin(t *testing.T) {
 	assert.Equal(t, "a/b", Join("/", "a/", "/b"))
 	assert.Equal(t, "a/", Join("/", "a/", "/"))
 	assert.Equal(t, "a/b/", Join("/", "a/b", "/"))
+}
+
+func TestCleandir(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "cleandir-test")
+	assert.Nil(t, err)
+	createTestProject(tmpDir)
+
+	err = Cleandir(tmpDir, "src/hello", "test/world2")
+	assert.Nil(t, err)
+
+	matches, err := doublestar.Glob(filepath.Join(tmpDir, "**/*.txt"))
+	assert.Nil(t, err)
+	sort.Strings(matches)
+	expected := []string{
+		"src/hello/3.txt",
+		"src/hello/4.txt",
+		"test/world2/10.txt",
+		"test/world2/11.txt",
+	}
+
+	for i, f := range matches {
+		actual := f[len(tmpDir)+1:]
+		assert.Equal(t, expected[i], actual)
+	}
+}
+
+func TestShouldFailWhenCleandirAllowsContainsPathThatIsOutsideOfBaseDir(t *testing.T) {
+	tmpDir, err := ioutil.TempDir("", "cleandir-test2")
+	assert.Nil(t, err)
+	createTestProject(tmpDir)
+
+	err = Cleandir(tmpDir, "test/world2", "./../")
+	assert.NotNil(t, err)
 }

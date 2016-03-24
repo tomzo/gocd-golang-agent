@@ -18,7 +18,6 @@ package agent
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -82,8 +81,8 @@ func (console *BuildConsole) Write(data []byte) (int, error) {
 }
 
 func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
-	ln := fmt.Sprintf(format, a...)
-	console.Write([]byte(fmt.Sprintf("%v\n", ln)))
+	ln := Sprintf(format, a...)
+	console.Write([]byte(Sprintf("%v\n", ln)))
 }
 
 func (console *BuildConsole) Flush() {

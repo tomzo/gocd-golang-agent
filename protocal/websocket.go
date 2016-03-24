@@ -31,7 +31,7 @@ func messageMarshal(v interface{}) ([]byte, byte, error) {
 	}
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	_, err := w.Write([]byte(json))
+	_, err := w.Write(json)
 	w.Close()
 
 	return b.Bytes(), websocket.BinaryFrame, err

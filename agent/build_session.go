@@ -17,8 +17,7 @@
 package agent
 
 import (
-	"errors"
-	"fmt"
+	"encoding/json"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"os"
@@ -118,6 +117,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processEcho(cmd)
 	case protocal.CommandMkdirs:
 		return s.processMkdirs(cmd)
+	case protocal.CommandCleandir:
+		return s.processCleandir(cmd)
 	case protocal.CommandUploadArtifact:
 		return s.processUploadArtifact(cmd)
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
@@ -127,6 +128,20 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
 	return nil
+}
+
+func (s *BuildSession) processCleandir(cmd *protocal.BuildCommand) (err error) {
+	path := cmd.Args["path"]
+	wd, err := filepath.Abs(cmd.WorkingDirectory)
+	if err != nil {
+		return
+	}
+	var allows []string
+	err = json.Unmarshal([]byte(cmd.Args["allowed"]), &allows)
+	if err != nil {
+		return
+	}
+	return Cleandir(filepath.Join(wd, path), allows...)
 }
 
 func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) (err error) {
@@ -207,7 +222,7 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
-		return errors.New(fmt.Sprintf("%v is canceled", cmd.Args))
+		return Err("%v is canceled", cmd.Args)
 	case err := <-done:
 		return err
 	}
@@ -221,7 +236,7 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 		_, err := os.Stat(targetPath)
 		return err
 	}
-	return errors.New("unknown test flag")
+	return Err("unknown test flag")
 }
 
 func (s *BuildSession) statusReport(jobState string) *protocal.Report {

@@ -16,11 +16,13 @@
 package agent_test
 
 import (
+	"github.com/bmatcuk/doublestar"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 )
 
@@ -58,7 +60,7 @@ setting environment variable 'TEST_EXPORT' to value 'EXPORT_VALUE'
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
-func TestMkdir(t *testing.T) {
+func TestMkdirCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
@@ -70,4 +72,34 @@ func TestMkdir(t *testing.T) {
 	assert.Equal(t, "agent Idle", stateLog.Next())
 	_, err := os.Stat(filepath.Join(wd, "path/in/pipeline/dir"))
 	assert.Nil(t, err)
+}
+
+func TestCleandirCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	wd := createTestProjectInPipelineDir()
+	goServer.SendBuild(AgentId, buildId,
+		protocal.CleandirCommand("test", "world2").Setwd(wd),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	matches, err := doublestar.Glob(filepath.Join(wd, "**/*.txt"))
+	assert.Nil(t, err)
+	sort.Strings(matches)
+	expected := []string{
+		"0.txt",
+		"src/1.txt",
+		"src/2.txt",
+		"src/hello/3.txt",
+		"src/hello/4.txt",
+		"test/world2/10.txt",
+		"test/world2/11.txt",
+	}
+
+	for i, f := range matches {
+		actual := f[len(wd)+1:]
+		assert.Equal(t, expected[i], actual)
+	}
 }

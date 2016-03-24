@@ -18,6 +18,7 @@ package protocal
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,11 +34,11 @@ var (
 	CommandReportCurrentStatus = "reportCurrentStatus"
 	CommandReportCompleting    = "reportCompleting"
 	CommandReportCompleted     = "reportCompleted"
+	CommandMkdirs              = "mkdirs"
+	CommandCleandir            = "cleandir"
 	// todo
-	CommandMkdirs   = "mkdirs"
-	CommandCleandir = "cleandir"
-	CommandFail     = "fail"
-	CommandSecret   = "secret"
+	CommandFail   = "fail"
+	CommandSecret = "secret"
 )
 
 type BuildCommandTest struct {
@@ -120,6 +121,18 @@ func TestCommand(flag, path string) *BuildCommand {
 func MkdirsCommand(path string) *BuildCommand {
 	args := map[string]string{"path": path}
 	return NewBuildCommand(CommandMkdirs).SetArgs(args)
+}
+
+func CleandirCommand(path string, allows ...string) *BuildCommand {
+	bytes, err := json.Marshal(allows)
+	if err != nil {
+		panic(err)
+	}
+	args := map[string]string{
+		"path":    path,
+		"allowed": string(bytes),
+	}
+	return NewBuildCommand(CommandCleandir).SetArgs(args)
 }
 
 func UploadArtifactCommand(src, dest string) *BuildCommand {

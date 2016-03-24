@@ -18,9 +18,7 @@ package agent_test
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"flag"
-	"fmt"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
@@ -129,7 +127,7 @@ func waitForServerStarted(url string) error {
 	for {
 		select {
 		case <-timeout:
-			return errors.New("wait for server start timeout")
+			return Err("wait for server start timeout")
 		default:
 			_, err := client.Get(url)
 			if err == nil {
@@ -188,10 +186,6 @@ func startWith(s1, s2 string) bool {
 	return strings.HasPrefix(s1, s2)
 }
 
-func sprintf(f string, args ...interface{}) string {
-	return fmt.Sprintf(f, args...)
-}
-
 func trimTimestamp(log string) string {
 	lines := strings.Split(log, "\n")
 	var buf bytes.Buffer
@@ -215,6 +209,11 @@ func createPipelineDir() string {
 
 func createTestProjectInPipelineDir() string {
 	root := createPipelineDir()
+	createTestProject(root)
+	return root
+}
+
+func createTestProject(root string) {
 	err := Mkdirs(root + "/src/hello")
 	if err != nil {
 		panic(err)
@@ -237,7 +236,6 @@ func createTestProjectInPipelineDir() string {
 	createTestFile(root+"/test/world", "11.txt")
 	createTestFile(root+"/test/world2", "10.txt")
 	createTestFile(root+"/test/world2", "11.txt")
-	return root
 }
 
 func createTestFile(dir, fname string) string {

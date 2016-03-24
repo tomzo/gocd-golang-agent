@@ -18,6 +18,9 @@ package agent
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -78,4 +81,62 @@ func AppendUrlPath(base *url.URL, path string) *url.URL {
 
 func Mkdirs(path string) error {
 	return os.MkdirAll(path, 0755)
+}
+
+func Cleandir(root string, allows ...string) error {
+	root = filepath.Clean(root)
+	for i, allow := range allows {
+		allows[i] = filepath.Clean(filepath.Join(root, allow))
+		if allows[i] == root {
+			return nil
+		}
+		if strings.HasPrefix(root, allows[i]) {
+			return Err("Cannot clean directory. Folder %v is outside the base folder %v", allows[i], root)
+		}
+	}
+
+	return cleandir(root, allows...)
+}
+
+func cleandir(root string, allows ...string) error {
+	infos, err := ioutil.ReadDir(root)
+	if err != nil {
+		return err
+	}
+
+	for _, finfo := range infos {
+		fpath := filepath.Join(root, finfo.Name())
+		if finfo.IsDir() {
+			match := ""
+			for _, allow := range allows {
+				if strings.HasPrefix(allow, fpath) {
+					match = allow
+					break
+				}
+			}
+			if match == "" {
+				if err := os.RemoveAll(fpath); err != nil {
+					return err
+				}
+			} else if fpath != match {
+				if err := cleandir(fpath, allows...); err != nil {
+					return err
+				}
+			}
+		} else {
+			err := os.Remove(fpath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func Sprintf(f string, args ...interface{}) string {
+	return fmt.Sprintf(f, args...)
+}
+
+func Err(f string, args ...interface{}) error {
+	return errors.New(Sprintf(f, args...))
 }

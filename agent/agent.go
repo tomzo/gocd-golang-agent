@@ -17,7 +17,6 @@
 package agent
 
 import (
-	"errors"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
@@ -92,7 +91,7 @@ func Start() error {
 			ping(conn.Send)
 		case msg, ok := <-conn.Received:
 			if !ok {
-				return errors.New("Websocket connection is closed")
+				return Err("Websocket connection is closed")
 			}
 			err := processMessage(msg, httpClient, conn.Send)
 			if err != nil {
@@ -110,7 +109,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		closeBuildSession()
 	case protocal.ReregisterAction:
 		CleanRegistration()
-		return errors.New("received reregister message")
+		return Err("received reregister message")
 	case protocal.BuildAction:
 		closeBuildSession()
 		build := msg.Build()
