@@ -37,8 +37,7 @@ var (
 	CommandMkdirs              = "mkdirs"
 	CommandCleandir            = "cleandir"
 	CommandFail                = "fail"
-	// todo
-	CommandSecret = "secret"
+	CommandSecret              = "secret"
 )
 
 type BuildCommandTest struct {
@@ -116,6 +115,14 @@ func TestCommand(flag, path string) *BuildCommand {
 		"path": path,
 	}
 	return NewBuildCommand(CommandTest).SetArgs(args)
+}
+
+func SecretCommand(vs ...string) *BuildCommand {
+	args := map[string]string{"value": vs[0]}
+	if len(vs) == 2 {
+		args["substitution"] = vs[1]
+	}
+	return NewBuildCommand(CommandSecret).SetArgs(args)
 }
 
 func FailCommand(msg string) *BuildCommand {

@@ -28,6 +28,10 @@ import (
 	"unicode"
 )
 
+var (
+	DefaultSecretMask = "********"
+)
+
 type BuildSession struct {
 	send        chan *protocal.Message
 	buildStatus string
@@ -121,6 +125,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processCleandir(cmd)
 	case protocal.CommandUploadArtifact:
 		return s.processUploadArtifact(cmd)
+	case protocal.CommandSecret:
+		return s.processSecret(cmd)
 	case protocal.CommandFail:
 		return Err(cmd.Args["0"])
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
@@ -129,6 +135,16 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	default:
 		s.console.WriteLn("TBI command: %v", cmd.Name)
 	}
+	return nil
+}
+
+func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) (err error) {
+	value := cmd.Args["value"]
+	substitution := cmd.Args["substitution"]
+	if substitution == "" {
+		substitution = DefaultSecretMask
+	}
+	s.console.Replace(value, substitution)
 	return nil
 }
 
@@ -274,7 +290,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	secure := cmd.Args["secure"]
 	displayValue := value
 	if secure == "true" {
-		displayValue = "********"
+		displayValue = DefaultSecretMask
 	}
 	_, override := s.envs[name]
 	if override || os.Getenv(name) != "" {

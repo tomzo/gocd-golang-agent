@@ -121,3 +121,22 @@ func TestFailCommand(t *testing.T) {
 	expected := Sprintf("something is wrong, please fail\n")
 	assert.Equal(t, expected, trimTimestamp(log))
 }
+
+func TestSecretCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		protocal.SecretCommand("thisissecret", "$$$$$$"),
+		protocal.SecretCommand("replacebydefaultmask"),
+		protocal.EchoCommand("hello (thisissecret)"),
+		protocal.EchoCommand("hello (replacebydefaultmask)"),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := Sprintf("hello ($$$$$$)\nhello (********)\n")
+	assert.Equal(t, expected, trimTimestamp(log))
+}

@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,6 +34,7 @@ type BuildConsole struct {
 	closed         *sync.WaitGroup
 	write          chan []byte
 	writeTimestamp bool
+	replaces       chan []string
 }
 
 func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
@@ -43,17 +45,23 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 		stop:           make(chan bool),
 		closed:         &sync.WaitGroup{},
 		write:          make(chan []byte),
+		replaces:       make(chan []string),
 		writeTimestamp: true,
 	}
 	console.closed.Add(1)
 	go func() {
 		flushTick := time.NewTicker(5 * time.Second)
 		defer flushTick.Stop()
+		reps := make(map[string]string)
 		for {
 			select {
 			case data := <-console.write:
-				LogDebug("BuildConsole: %v", string(data))
-				console.Buffer.Write(data)
+				log := string(data)
+				for k, v := range reps {
+					log = strings.Replace(log, k, v, -1)
+				}
+				LogDebug("BuildConsole: %v", log)
+				console.Buffer.Write([]byte(log))
 			case <-console.stop:
 				console.Flush()
 				LogInfo("build console closed")
@@ -61,6 +69,8 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 				return
 			case <-flushTick.C:
 				console.Flush()
+			case sub := <-console.replaces:
+				reps[sub[0]] = sub[1]
 			}
 		}
 	}()
@@ -78,6 +88,10 @@ func (console *BuildConsole) Write(data []byte) (int, error) {
 	console.write <- []byte(" ")
 	console.write <- data
 	return len(data), nil
+}
+
+func (console *BuildConsole) Replace(args ...string) {
+	console.replaces <- args
 }
 
 func (console *BuildConsole) WriteLn(format string, a ...interface{}) {
