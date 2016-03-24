@@ -121,6 +121,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processCleandir(cmd)
 	case protocal.CommandUploadArtifact:
 		return s.processUploadArtifact(cmd)
+	case protocal.CommandFail:
+		return Err(cmd.Args["0"])
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
 		jobState := cmd.Args["jobState"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))

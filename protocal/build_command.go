@@ -36,8 +36,8 @@ var (
 	CommandReportCompleted     = "reportCompleted"
 	CommandMkdirs              = "mkdirs"
 	CommandCleandir            = "cleandir"
+	CommandFail                = "fail"
 	// todo
-	CommandFail   = "fail"
 	CommandSecret = "secret"
 )
 
@@ -116,6 +116,11 @@ func TestCommand(flag, path string) *BuildCommand {
 		"path": path,
 	}
 	return NewBuildCommand(CommandTest).SetArgs(args)
+}
+
+func FailCommand(msg string) *BuildCommand {
+	args := map[string]string{"0": msg}
+	return NewBuildCommand(CommandFail).SetArgs(args)
 }
 
 func MkdirsCommand(path string) *BuildCommand {

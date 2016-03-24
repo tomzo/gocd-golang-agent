@@ -103,3 +103,21 @@ func TestCleandirCommand(t *testing.T) {
 		assert.Equal(t, expected[i], actual)
 	}
 }
+
+func TestFailCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		protocal.FailCommand("something is wrong, please fail"),
+		protocal.ReportCompletedCommand(),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := Sprintf("something is wrong, please fail\n")
+	assert.Equal(t, expected, trimTimestamp(log))
+}
