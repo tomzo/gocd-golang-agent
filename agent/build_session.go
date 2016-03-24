@@ -17,9 +17,11 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,8 +109,13 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return nil
 	}
 	if cmd.Test != nil {
-		success := s.process(cmd.Test.Command) == nil
+		if cmd.Test.Command.Name != protocal.CommandTest {
+			panic("a BuildCommand test should be test command")
+		}
+		err := s.process(cmd.Test.Command)
+		success := err == nil
 		if success != cmd.Test.Expectation {
+			LogDebug("test failed: %v", err)
 			return nil
 		}
 	}
@@ -121,7 +128,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	case protocal.CommandTest:
 		return s.processTest(cmd)
 	case protocal.CommandExec:
-		return s.processExec(cmd)
+		return s.processExec(cmd, &SecretOutput{session: s})
 	case protocal.CommandEcho:
 		return s.processEcho(cmd)
 	case protocal.CommandMkdirs:
@@ -225,12 +232,11 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	return s.artifacts.Upload(source, destPath, destURL)
 }
 
-func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
-	outputFilter := &SecretOutput{session: s}
+func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer) error {
 	args := cmd.ExtractArgList(len(cmd.Args))
 	execCmd := exec.Command(args[0], args[1:]...)
-	execCmd.Stdout = outputFilter
-	execCmd.Stderr = outputFilter
+	execCmd.Stdout = output
+	execCmd.Stderr = output
 	execCmd.Dir = cmd.WorkingDirectory
 	done := make(chan error)
 	go func() {
@@ -254,12 +260,48 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand) error {
 
 func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	flag := cmd.Args["flag"]
-	targetPath := cmd.Args["path"]
 
-	if "-d" == flag {
-		_, err := os.Stat(targetPath)
-		return err
+	switch flag {
+	case "-d":
+		targetPath := cmd.Args["left"]
+		info, err := os.Stat(targetPath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		} else {
+			return Err("%v is not a directory", targetPath)
+		}
+	case "-f":
+		targetPath := cmd.Args["left"]
+		info, err := os.Stat(targetPath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return Err("%v is not a file", targetPath)
+		} else {
+			return nil
+		}
+	case "-eq":
+		if len(cmd.SubCommands) == 0 || cmd.SubCommands[0].Name != "exec" {
+			panic("test -eq should carry with an exec command")
+		}
+		var buf bytes.Buffer
+		exec := cmd.SubCommands[0]
+		err := s.processExec(exec, &buf)
+		if err != nil {
+			LogDebug("test -eq exec command error: %v", err)
+		}
+		expected := strings.TrimSpace(cmd.Args["left"])
+		actual := strings.TrimSpace(buf.String())
+		if expected != actual {
+			return Err("expected '%v', but was '%v'", expected, actual)
+		}
+		return nil
 	}
+
 	return Err("unknown test flag")
 }
 

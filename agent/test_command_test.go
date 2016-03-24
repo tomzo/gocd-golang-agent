@@ -20,25 +20,46 @@ import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 )
 
 func TestTestCommand(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
-
+	dir, _ := filepath.Split(file)
 	setUp(t)
 	defer tearDown()
 
-	goServer.SendBuild(AgentId, buildId,
-		protocal.EchoCommand("file exist").SetTest(protocal.TestCommand("-d", file)),
-		protocal.EchoCommand("file not exist").SetTest(protocal.TestCommand("-d", "no"+file)),
-	)
+	var tests = []struct {
+		echo     string
+		testArgs []string
+		expected string
+	}{
+		{"file exist", []string{"-f", file}, "file exist\n"},
+		{"file not exist", []string{"-f", file + "no"}, ""},
+		{"dir is not file", []string{"-f", dir}, ""},
 
-	assert.Equal(t, "agent Building", stateLog.Next())
-	assert.Equal(t, "agent Idle", stateLog.Next())
+		{"dir exist", []string{"-d", dir}, "dir exist\n"},
+		{"dir not exist", []string{"-d", dir + "no"}, ""},
+		{"file is not dir", []string{"-d", file}, ""},
 
-	log, err := goServer.ConsoleLog(buildId)
-	assert.Nil(t, err)
-	assert.Equal(t, "file exist\n", trimTimestamp(log))
+		{"equal", []string{"-eq", "hello", "echo", "hello"}, "equal\n"},
+		{"not equal", []string{"-eq", "hello", "echo", "world"}, ""},
+	}
+
+	for _, test := range tests {
+		testCmd := protocal.TestCommand(test.testArgs...)
+		goServer.SendBuild(AgentId, buildId, protocal.EchoCommand(test.echo).SetTest(testCmd))
+		assert.Equal(t, "agent Building", stateLog.Next())
+		assert.Equal(t, "agent Idle", stateLog.Next())
+		log, err := goServer.ConsoleLog(buildId)
+		assert.Nil(t, err)
+		actual := trimTimestamp(log)
+		if test.expected != actual {
+			t.Errorf("test: %+v\nbut was '%v'", test, actual)
+		}
+		os.Truncate(goServer.ConsoleLogFile(buildId), 0)
+	}
 }

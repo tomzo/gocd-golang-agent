@@ -109,12 +109,16 @@ func ReportCompletedCommand() *BuildCommand {
 	return NewBuildCommand(CommandReportCompleted).RunIf("any")
 }
 
-func TestCommand(flag, path string) *BuildCommand {
-	args := map[string]string{
-		"flag": flag,
-		"path": path,
+func TestCommand(args ...string) *BuildCommand {
+	argsMap := map[string]string{
+		"flag": args[0],
+		"left": args[1],
 	}
-	return NewBuildCommand(CommandTest).SetArgs(args)
+	cmd := NewBuildCommand(CommandTest).SetArgs(argsMap)
+	if len(args) > 2 {
+		cmd.AddCommands(ExecCommand(args[2:]...))
+	}
+	return cmd
 }
 
 func SecretCommand(vs ...string) *BuildCommand {
