@@ -25,6 +25,9 @@ import (
 )
 
 var (
+	RunIfConfigAny    = "any"
+	RunIfConfigPassed = "passed"
+
 	CommandCompose             = "compose"
 	CommandExport              = "export"
 	CommandTest                = "test"
@@ -57,7 +60,7 @@ type BuildCommand struct {
 func NewBuildCommand(name string) *BuildCommand {
 	return &BuildCommand{
 		Name:        name,
-		RunIfConfig: "passed",
+		RunIfConfig: RunIfConfigPassed,
 	}
 }
 
@@ -159,6 +162,14 @@ func UploadArtifactCommand(src, dest string) *BuildCommand {
 	return NewBuildCommand(CommandUploadArtifact).SetArgs(args)
 }
 
+func (cmd *BuildCommand) RunIfAny() bool {
+	return strings.EqualFold(RunIfConfigAny, cmd.RunIfConfig)
+}
+
+func (cmd *BuildCommand) RunIfMatch(buildStatus string) bool {
+	return strings.EqualFold(cmd.RunIfConfig, buildStatus)
+}
+
 func (cmd *BuildCommand) AddCommands(commands ...*BuildCommand) *BuildCommand {
 	cmd.SubCommands = append(cmd.SubCommands, commands...)
 	return cmd
@@ -206,7 +217,7 @@ func (cmd *BuildCommand) Dump(indent, step int) string {
 	for key, value := range cmd.Args {
 		buffer.WriteString(fmt.Sprintf(" %v='%v'", key, value))
 	}
-	if "passed" != cmd.RunIfConfig {
+	if !cmd.RunIfMatch(RunIfConfigPassed) {
 		buffer.WriteString(fmt.Sprintf(" runIf:%v", cmd.RunIfConfig))
 	}
 	for _, subCmd := range cmd.SubCommands {

@@ -107,7 +107,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	}
 
 	LogDebug("procssing build command: %v\n", cmd)
-	if cmd.RunIfConfig != "any" && !strings.EqualFold(cmd.RunIfConfig, s.buildStatus) {
+	if !cmd.RunIfAny() && !cmd.RunIfMatch(s.buildStatus) {
 		//skip, no failure
 		return nil
 	}
