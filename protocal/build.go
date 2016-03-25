@@ -16,6 +16,11 @@
 
 package protocal
 
+var (
+	BuildPassed = "Passed"
+	BuildFailed = "Failed"
+)
+
 type Build struct {
 	BuildId                string
 	BuildLocator           string

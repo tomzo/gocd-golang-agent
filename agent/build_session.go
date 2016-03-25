@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode"
 )
 
 var (
@@ -58,7 +57,7 @@ func MakeBuildSession(buildId string,
 	secrets := stream.NewSubstituteWriter(console)
 	return &BuildSession{
 		buildId:     buildId,
-		buildStatus: "passed",
+		buildStatus: protocal.BuildPassed,
 		console:     console,
 		artifacts:   artifacts,
 		command:     command,
@@ -108,7 +107,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	}
 
 	LogDebug("procssing build command: %v\n", cmd)
-	if s.buildStatus != "" && cmd.RunIfConfig != "any" && cmd.RunIfConfig != s.buildStatus {
+	if cmd.RunIfConfig != "any" && !strings.EqualFold(cmd.RunIfConfig, s.buildStatus) {
 		//skip, no failure
 		return nil
 	}
@@ -314,14 +313,8 @@ func (s *BuildSession) statusReport(jobState string) *protocal.Report {
 		AgentRuntimeInfo: GetAgentRuntimeInfo(),
 		BuildId:          s.buildId,
 		JobState:         jobState,
-		Result:           capitalize(s.buildStatus),
+		Result:           s.buildStatus,
 	}
-}
-
-func capitalize(str string) string {
-	a := []rune(str)
-	a[0] = unicode.ToUpper(a[0])
-	return string(a)
 }
 
 func (s *BuildSession) ConsoleLog(format string, a ...interface{}) {
@@ -375,10 +368,10 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 }
 
 func (s *BuildSession) fail(err error) {
-	if s.buildStatus != "failed" {
+	if s.buildStatus != protocal.BuildFailed {
 		s.ConsoleLog(err.Error())
 		s.ConsoleLog("\n")
-		s.buildStatus = "failed"
+		s.buildStatus = protocal.BuildFailed
 	}
 }
 
