@@ -136,6 +136,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		)
 		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
 		buildSession.ReplaceEcho("${agent.hostname}", config.Hostname)
+		buildSession.ReplaceEcho("${date}", func() string { return time.Now().Format("2006-01-02 15:04:05 PDT") })
 		go processBuild(send, buildSession)
 	default:
 		logger.Error.Printf("ERROR: unknown message action %v", msg)

@@ -21,13 +21,13 @@ import (
 	"encoding/json"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/stream"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -36,34 +36,38 @@ var (
 )
 
 type BuildSession struct {
-	send          chan *protocal.Message
-	buildStatus   string
-	console       *BuildConsole
-	artifacts     *Uploader
-	command       *protocal.BuildCommand
-	buildId       string
-	envs          map[string]string
-	cancel        chan bool
-	done          chan bool
-	echoVariables map[string]string
-	secrets       map[string]string
+	send        chan *protocal.Message
+	buildStatus string
+	console     *BuildConsole
+	artifacts   *Uploader
+	command     *protocal.BuildCommand
+	buildId     string
+	envs        map[string]string
+	cancel      chan bool
+	done        chan bool
+	echo        *stream.SubstituteWriter
+	secrets     *stream.SubstituteWriter
 }
 
-func MakeBuildSession(buildId string, command *protocal.BuildCommand,
-	console *BuildConsole, artifacts *Uploader,
+func MakeBuildSession(buildId string,
+	command *protocal.BuildCommand,
+	console *BuildConsole,
+	artifacts *Uploader,
 	send chan *protocal.Message) *BuildSession {
+
+	secrets := stream.NewSubstituteWriter(console)
 	return &BuildSession{
-		buildId:       buildId,
-		buildStatus:   "passed",
-		console:       console,
-		artifacts:     artifacts,
-		command:       command,
-		send:          send,
-		envs:          make(map[string]string),
-		cancel:        make(chan bool),
-		done:          make(chan bool),
-		echoVariables: make(map[string]string),
-		secrets:       make(map[string]string),
+		buildId:     buildId,
+		buildStatus: "passed",
+		console:     console,
+		artifacts:   artifacts,
+		command:     command,
+		send:        send,
+		envs:        make(map[string]string),
+		cancel:      make(chan bool),
+		done:        make(chan bool),
+		secrets:     secrets,
+		echo:        stream.NewSubstituteWriter(secrets),
 	}
 }
 
@@ -128,7 +132,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	case protocal.CommandTest:
 		return s.processTest(cmd)
 	case protocal.CommandExec:
-		return s.processExec(cmd, &SecretOutput{session: s})
+		return s.processExec(cmd, s.secrets)
 	case protocal.CommandEcho:
 		return s.processEcho(cmd)
 	case protocal.CommandMkdirs:
@@ -156,7 +160,7 @@ func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) (err error) {
 	if substitution == "" {
 		substitution = DefaultSecretMask
 	}
-	s.secrets[value] = substitution
+	s.secrets.Substitutions[value] = substitution
 	return nil
 }
 
@@ -324,31 +328,16 @@ func (s *BuildSession) ConsoleLog(format string, a ...interface{}) {
 	s.console.Write([]byte(Sprintf(format, a...)))
 }
 
-func (s *BuildSession) ReplaceEcho(name, value string) {
-	s.echoVariables[name] = value
+func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
+	s.echo.Substitutions[name] = value
 }
 
 func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
 	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
-		s.ConsoleLog(s.maskSecrets(s.substituteVariables(line)))
-		s.ConsoleLog("\n")
+		s.echo.Write([]byte(line))
+		s.echo.Write([]byte{'\n'})
 	}
 	return nil
-}
-
-func (s *BuildSession) substituteVariables(str string) string {
-	for k, v := range s.echoVariables {
-		str = strings.Replace(str, k, v, -1)
-	}
-	dateF := time.Now().Format("2006-01-02 15:04:05 PDT")
-	return strings.Replace(str, "${date}", dateF, -1)
-}
-
-func (s *BuildSession) maskSecrets(str string) string {
-	for k, v := range s.secrets {
-		str = strings.Replace(str, k, v, -1)
-	}
-	return str
 }
 
 func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
@@ -399,13 +388,4 @@ func destDescription(path string) string {
 	} else {
 		return path
 	}
-}
-
-type SecretOutput struct {
-	session *BuildSession
-}
-
-func (o *SecretOutput) Write(out []byte) (int, error) {
-	o.session.ConsoleLog(o.session.maskSecrets(string(out)))
-	return len(out), nil
 }

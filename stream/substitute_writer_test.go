@@ -19,34 +19,52 @@ import (
 	"bytes"
 	. "github.com/gocd-contrib/gocd-golang-agent/stream"
 	"github.com/xli/assert"
-	"strconv"
 	"testing"
 )
 
-func TestPrefixWriter(t *testing.T) {
+func TestSubstituteWriter(t *testing.T) {
 	var tests = []struct {
+		subs   map[string]interface{}
 		inputs []string
 		output string
 	}{
-		{[]string{"hello"}, "1 hello"},
-		{[]string{"hello", " world"}, "2 hello world"},
-		{[]string{"hello\n", "world"}, "3 hello\n4 world"},
-		{[]string{"hello\nworld", "!"}, "5 hello\n6 world!"},
-		{[]string{"hello\nworld\n", "!"}, "7 hello\n8 world\n9 !"},
-		{[]string{"\n", "hello"}, "10 \n11 hello"},
-		{[]string{"\n", "\nhello"}, "12 \n13 \n14 hello"},
-		{[]string{"...", "...", "...", "\nhello"}, "15 .........\n16 hello"},
-		{[]string{"...", "...\n", "hello\n"}, "17 ......\n18 hello\n"},
-		{[]string{"hello\n"}, "19 hello\n"},
-		{[]string{"hello", "\n", "world"}, "20 hello\n21 world"},
+		{
+			map[string]interface{}{
+				"${hello}": "world",
+			},
+			[]string{"hello ${hello}"},
+			"hello world",
+		},
+		{
+			map[string]interface{}{
+				"${hello}": "world",
+				"abcd":     "****",
+			},
+			[]string{"hello ${hello} ${abcd}", " ${hello}"},
+			"hello world ${****} world",
+		},
+		{
+			map[string]interface{}{
+				"${hello}": "world",
+				"abcd":     "****",
+			},
+			[]string{"hello ${hello} ${abcd}", " ${hello}"},
+			"hello world ${****} world",
+		},
+		{
+			map[string]interface{}{
+				"${hello}": func() string { return "world" },
+			},
+			[]string{"hello ${hello}"},
+			"hello world",
+		},
 	}
-	i := 0
 	for _, test := range tests {
 		var buf bytes.Buffer
-		w := NewPrefixWriter(&buf, func() []byte {
-			i++
-			return []byte(strconv.Itoa(i) + " ")
-		})
+		w := &SubstituteWriter{
+			Substitutions: test.subs,
+			Writer:        &buf,
+		}
 		for _, d := range test.inputs {
 			size, err := w.Write([]byte(d))
 			assert.Nil(t, err)
