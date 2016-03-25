@@ -18,43 +18,49 @@ package agent
 
 import (
 	"bytes"
+	"github.com/gocd-contrib/gocd-golang-agent/stream"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 )
 
 type BuildConsole struct {
-	Url            *url.URL
-	HttpClient     *http.Client
-	Buffer         *bytes.Buffer
-	stop           chan bool
-	closed         *sync.WaitGroup
-	write          chan string
-	writeTimestamp bool
+	Url        *url.URL
+	HttpClient *http.Client
+	buffer     *bytes.Buffer
+	stop       chan bool
+	closed     *sync.WaitGroup
+	write      chan []byte
+}
+
+func timestampPrefix() []byte {
+	ts := time.Now().Format("15:04:05.000 ")
+	return []byte(ts)
 }
 
 func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
+
 	console := BuildConsole{
-		HttpClient:     httpClient,
-		Url:            url,
-		Buffer:         bytes.NewBuffer(make([]byte, 0, 10*1024)),
-		stop:           make(chan bool),
-		closed:         &sync.WaitGroup{},
-		write:          make(chan string),
-		writeTimestamp: true,
+		HttpClient: httpClient,
+		Url:        url,
+		buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
+
+		stop:   make(chan bool),
+		closed: &sync.WaitGroup{},
+		write:  make(chan []byte),
 	}
 	console.closed.Add(1)
 	go func() {
+		tw := stream.NewPrefixWriter(console.buffer, timestampPrefix)
 		flushTick := time.NewTicker(5 * time.Second)
 		defer flushTick.Stop()
 		for {
 			select {
 			case log := <-console.write:
-				LogDebug("BuildConsole: %v", log)
-				console.Buffer.Write([]byte(log))
+				LogDebug("BuildConsole: '%v'", string(log))
+				tw.Write(log)
 			case <-console.stop:
 				console.Flush()
 				LogInfo("build console closed")
@@ -75,31 +81,26 @@ func (console *BuildConsole) Close() {
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {
-	for _, line := range strings.Split(string(data), "\n") {
-		console.write <- time.Now().Format("15:04:05.000")
-		console.write <- " "
-		console.write <- line
-		console.write <- "\n"
-	}
+	console.write <- data
 	return len(data), nil
 }
 
 func (console *BuildConsole) Flush() {
-	LogDebug("build console flush, buffer len: %v", console.Buffer.Len())
-	if console.Buffer.Len() == 0 {
+	LogDebug("build console flush, buffer len: %v", console.buffer.Len())
+	if console.buffer.Len() == 0 {
 		return
 	}
 
 	req := http.Request{
 		Method:        http.MethodPut,
 		URL:           console.Url,
-		Body:          ioutil.NopCloser(console.Buffer),
-		ContentLength: int64(console.Buffer.Len()),
+		Body:          ioutil.NopCloser(console.buffer),
+		ContentLength: int64(console.buffer.Len()),
 		Close:         true,
 	}
 	_, err := console.HttpClient.Do(&req)
 	if err != nil {
 		logger.Error.Printf("build console flush failed: %v", err)
 	}
-	console.Buffer.Reset()
+	console.buffer.Reset()
 }

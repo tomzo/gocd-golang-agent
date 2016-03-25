@@ -145,7 +145,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		jobState := cmd.Args["jobState"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	default:
-		s.ConsoleLog("TBI command: %v", cmd.Name)
+		s.ConsoleLog("TBI command: %v\n", cmd.Name)
 	}
 	return nil
 }
@@ -219,7 +219,7 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	if err != nil {
 		return
 	}
-	s.ConsoleLog("Uploading artifacts from %v to %v", source, destDescription(destDir))
+	s.ConsoleLog("Uploading artifacts from %v to %v\n", source, destDescription(destDir))
 
 	var destPath string
 	if destDir != "" {
@@ -248,7 +248,7 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 		LogDebug("received cancel signal")
 		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.ConsoleLog("kill command %v failed, error: %v", cmd.Args, err)
+			s.ConsoleLog("kill command %v failed, error: %v\n", cmd.Args, err)
 		} else {
 			LogInfo("Process %v is killed", execCmd.Process)
 		}
@@ -331,6 +331,7 @@ func (s *BuildSession) ReplaceEcho(name, value string) {
 func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
 	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
 		s.ConsoleLog(s.maskSecrets(s.substituteVariables(line)))
+		s.ConsoleLog("\n")
 	}
 	return nil
 }
@@ -356,6 +357,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	value, ok := cmd.Args["value"]
 	if !ok {
 		s.ConsoleLog(msg, name, os.Getenv(name))
+		s.ConsoleLog("\n")
 		return nil
 	}
 	secure := cmd.Args["secure"]
@@ -369,6 +371,7 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	}
 	s.envs[name] = value
 	s.ConsoleLog(msg, name, displayValue)
+	s.ConsoleLog("\n")
 	return nil
 }
 
@@ -385,6 +388,7 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 func (s *BuildSession) fail(err error) {
 	if s.buildStatus != "failed" {
 		s.ConsoleLog(err.Error())
+		s.ConsoleLog("\n")
 		s.buildStatus = "failed"
 	}
 }
