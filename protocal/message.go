@@ -23,7 +23,7 @@ import (
 
 var (
 	SetCookieAction           = "setCookie"
-	CancelJobAction           = "cancelJob"
+	CancelBuildAction         = "cancelBuild"
 	ReregisterAction          = "reregister"
 	BuildAction               = "build"
 	PingAction                = "ping"
@@ -102,4 +102,8 @@ func CompletedMessage(report *Report) *Message {
 
 func ReregisterMessage() *Message {
 	return &Message{Action: ReregisterAction}
+}
+
+func CancelMessage(buildId string) *Message {
+	return newMessage(CancelBuildAction, buildId)
 }

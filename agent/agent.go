@@ -109,7 +109,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 	switch msg.Action {
 	case protocal.SetCookieAction:
 		SetState("cookie", msg.StringData())
-	case protocal.CancelJobAction:
+	case protocal.CancelBuildAction:
 		closeBuildSession()
 	case protocal.ReregisterAction:
 		CleanRegistration()
@@ -127,35 +127,35 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		if err != nil {
 			return err
 		}
+		console := MakeBuildConsole(httpClient, curl)
 		buildSession = MakeBuildSession(
 			build.BuildId,
 			build.BuildCommand,
-			MakeBuildConsole(httpClient, curl),
+			console,
 			NewUploader(httpClient, aurl),
 			send,
 		)
 		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
 		buildSession.ReplaceEcho("${agent.hostname}", config.Hostname)
 		buildSession.ReplaceEcho("${date}", func() string { return time.Now().Format("2006-01-02 15:04:05 PDT") })
-		go processBuild(send, buildSession)
+		go processBuild(send, buildSession, console)
 	default:
 		logger.Error.Printf("ERROR: unknown message action %v", msg)
 	}
 	return nil
 }
 
-func processBuild(send chan *protocal.Message, buildSession *BuildSession) {
+func processBuild(send chan *protocal.Message, buildSession *BuildSession, console *BuildConsole) {
 	defer func() {
+		console.Close()
 		SetState("runtimeStatus", "Idle")
 		ping(send)
 		logger.Debug.Printf("! exit goroutine: process build command message")
 	}()
 	SetState("runtimeStatus", "Building")
 	ping(send)
-	err := buildSession.Process()
-	if err != nil {
-		LogInfo("Processing build failed: %v", err)
-	}
+	report := buildSession.Process()
+	send <- protocal.CompletedMessage(report)
 	LogInfo("done")
 }
 

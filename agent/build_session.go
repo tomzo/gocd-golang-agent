@@ -35,17 +35,18 @@ var (
 )
 
 type BuildSession struct {
-	send        chan *protocal.Message
-	buildStatus string
-	console     *BuildConsole
-	artifacts   *Uploader
-	command     *protocal.BuildCommand
+	send      chan *protocal.Message
+	console   *BuildConsole
+	artifacts *Uploader
+	command   *protocal.BuildCommand
+	envs      map[string]string
+	cancel    chan bool
+	done      chan bool
+	echo      *stream.SubstituteWriter
+	secrets   *stream.SubstituteWriter
+
 	buildId     string
-	envs        map[string]string
-	cancel      chan bool
-	done        chan bool
-	echo        *stream.SubstituteWriter
-	secrets     *stream.SubstituteWriter
+	buildStatus string
 }
 
 func MakeBuildSession(buildId string,
@@ -84,24 +85,20 @@ func (s *BuildSession) isCanceled() bool {
 	}
 }
 
-func (s *BuildSession) Process() error {
+func (s *BuildSession) Process() *protocal.Report {
 	defer func() {
-		s.send <- protocal.CompletedMessage(s.statusReport(""))
-		s.console.Close()
 		close(s.done)
 	}()
 
 	LogInfo("start process build command:")
 	LogInfo(s.command.String())
-
-	err := s.process(s.command)
-	if err != nil {
-		s.fail(err)
-	}
-	return err
+	s.process(s.command)
+	return s.Report("")
 }
 
-func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
+	defer s.onCancel(cmd)
+
 	if s.isCanceled() {
 		LogDebug("Ignored command %v, because build is canceled", cmd.Name)
 		return nil
@@ -127,41 +124,58 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 	switch cmd.Name {
 	case protocal.CommandCompose:
 		return s.processCompose(cmd)
-	case protocal.CommandExport:
-		return s.processExport(cmd)
 	case protocal.CommandTest:
 		return s.processTest(cmd)
-	case protocal.CommandExec:
-		return s.processExec(cmd, s.secrets)
+	case protocal.CommandExport:
+		s.processExport(cmd)
 	case protocal.CommandEcho:
-		return s.processEcho(cmd)
-	case protocal.CommandMkdirs:
-		return s.processMkdirs(cmd)
-	case protocal.CommandCleandir:
-		return s.processCleandir(cmd)
-	case protocal.CommandUploadArtifact:
-		return s.processUploadArtifact(cmd)
+		s.processEcho(cmd)
 	case protocal.CommandSecret:
-		return s.processSecret(cmd)
-	case protocal.CommandFail:
-		return Err(cmd.Args["0"])
+		s.processSecret(cmd)
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting:
 		jobState := cmd.Args["jobState"]
-		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
+		s.send <- protocal.ReportMessage(cmd.Name, s.Report(jobState))
+	case protocal.CommandExec:
+		err = s.processExec(cmd, s.secrets)
+	case protocal.CommandMkdirs:
+		err = s.processMkdirs(cmd)
+	case protocal.CommandCleandir:
+		err = s.processCleandir(cmd)
+	case protocal.CommandUploadArtifact:
+		err = s.processUploadArtifact(cmd)
+	case protocal.CommandFail:
+		err = Err(cmd.Args["0"])
 	default:
 		s.ConsoleLog("TBI command: %v\n", cmd.Name)
 	}
-	return nil
+
+	if s.isCanceled() {
+		LogInfo("Build canceled")
+		s.buildStatus = protocal.BuildCanceled
+	} else if err != nil {
+		LogInfo("Build failed: %v", err)
+		s.buildStatus = protocal.BuildFailed
+		s.ConsoleLog(err.Error())
+		s.ConsoleLog("\n")
+	}
+
+	return
 }
 
-func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) (err error) {
+func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
+	if cmd.OnCancel == nil || !s.isCanceled() {
+		return
+	}
+	MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send).Process()
+}
+
+func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) {
 	value := cmd.Args["value"]
 	substitution := cmd.Args["substitution"]
 	if substitution == "" {
 		substitution = DefaultSecretMask
 	}
 	s.secrets.Substitutions[value] = substitution
-	return nil
 }
 
 func (s *BuildSession) processCleandir(cmd *protocal.BuildCommand) (err error) {
@@ -178,7 +192,7 @@ func (s *BuildSession) processCleandir(cmd *protocal.BuildCommand) (err error) {
 	return Cleandir(filepath.Join(wd, path), allows...)
 }
 
-func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) (err error) {
+func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) error {
 	path := cmd.Args["path"]
 	wd, err := filepath.Abs(cmd.WorkingDirectory)
 	if err != nil {
@@ -187,13 +201,13 @@ func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) (err error) {
 	return Mkdirs(filepath.Join(wd, path))
 }
 
-func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) (err error) {
+func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) error {
 	src := cmd.Args["src"]
 	destDir := cmd.Args["dest"]
 
 	wd, err := filepath.Abs(cmd.WorkingDirectory)
 	if err != nil {
-		return
+		return err
 	}
 	absSrc := filepath.Join(wd, src)
 	return s.uploadArtifacts(absSrc, strings.Replace(destDir, "\\", "/", -1))
@@ -309,7 +323,7 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	return Err("unknown test flag")
 }
 
-func (s *BuildSession) statusReport(jobState string) *protocal.Report {
+func (s *BuildSession) Report(jobState string) *protocal.Report {
 	return &protocal.Report{
 		AgentRuntimeInfo: GetAgentRuntimeInfo(),
 		BuildId:          s.buildId,
@@ -326,22 +340,21 @@ func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
 	s.echo.Substitutions[name] = value
 }
 
-func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) {
 	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
 		s.echo.Write([]byte(line))
 		s.echo.Write([]byte{'\n'})
 	}
-	return nil
 }
 
-func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) processExport(cmd *protocal.BuildCommand) {
 	msg := "setting environment variable '%v' to value '%v'"
 	name := cmd.Args["name"]
 	value, ok := cmd.Args["value"]
 	if !ok {
 		s.ConsoleLog(msg, name, os.Getenv(name))
 		s.ConsoleLog("\n")
-		return nil
+		return
 	}
 	secure := cmd.Args["secure"]
 	displayValue := value
@@ -355,25 +368,18 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) error {
 	s.envs[name] = value
 	s.ConsoleLog(msg, name, displayValue)
 	s.ConsoleLog("\n")
-	return nil
 }
 
 func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 	var err error
 	for _, sub := range cmd.SubCommands {
-		if err = s.process(sub); err != nil {
-			s.fail(err)
+		if err != nil {
+			s.process(sub)
+		} else {
+			err = s.process(sub)
 		}
 	}
 	return err
-}
-
-func (s *BuildSession) fail(err error) {
-	if s.buildStatus != protocal.BuildFailed {
-		s.ConsoleLog(err.Error())
-		s.ConsoleLog("\n")
-		s.buildStatus = protocal.BuildFailed
-	}
 }
 
 func destDescription(path string) string {

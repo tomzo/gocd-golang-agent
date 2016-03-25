@@ -17,8 +17,9 @@
 package protocal
 
 var (
-	BuildPassed = "Passed"
-	BuildFailed = "Failed"
+	BuildPassed   = "Passed"
+	BuildFailed   = "Failed"
+	BuildCanceled = "Cancelled"
 )
 
 type Build struct {

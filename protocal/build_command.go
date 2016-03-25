@@ -54,6 +54,7 @@ type BuildCommand struct {
 	SubCommands      []*BuildCommand
 	WorkingDirectory string
 	Test             *BuildCommandTest
+	OnCancel         *BuildCommand
 }
 
 func NewBuildCommand(name string) *BuildCommand {
@@ -190,6 +191,11 @@ func (cmd *BuildCommand) Setwd(wd string) *BuildCommand {
 
 func (cmd *BuildCommand) RunIf(c string) *BuildCommand {
 	cmd.RunIfConfig = c
+	return cmd
+}
+
+func (cmd *BuildCommand) SetOnCancel(c *BuildCommand) *BuildCommand {
+	cmd.OnCancel = c
 	return cmd
 }
 
