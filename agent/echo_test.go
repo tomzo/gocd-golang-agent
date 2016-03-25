@@ -31,6 +31,7 @@ func TestEcho(t *testing.T) {
 		protocal.EchoCommand("echo hello world"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)

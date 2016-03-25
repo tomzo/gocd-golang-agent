@@ -52,6 +52,7 @@ func TestSetCookieAfterConnected(t *testing.T) {
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.NotEqual(t, "", GetState("cookie"))
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 }
 

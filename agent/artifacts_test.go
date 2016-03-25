@@ -37,7 +37,6 @@ func TestUploadArtifactFailed(t *testing.T) {
 
 	goServer.SendBuild(AgentId, buildId,
 		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd),
-		protocal.ReportCompletedCommand(),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -63,9 +62,7 @@ func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
 		buf.WriteString("large file content")
 	}
 	writeFile(wd, "large.txt", buf.String())
-	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand("large.txt", "").Setwd(wd),
-		protocal.ReportCompletedCommand())
+	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("large.txt", "").Setwd(wd))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
@@ -272,7 +269,7 @@ func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
 		protocal.UploadArtifactCommand("src/hello/3.txt", "dest").Setwd(wd),
 		protocal.UploadArtifactCommand("test/5.txt", "").Setwd(wd),
 		protocal.UploadArtifactCommand("test/**/10.txt", "dest").Setwd(wd),
-		protocal.ReportCompletedCommand())
+	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -297,9 +294,7 @@ dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 
 func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
-	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(srcPath, destDir).Setwd(wd),
-		protocal.ReportCompletedCommand())
+	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand(srcPath, destDir).Setwd(wd))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())

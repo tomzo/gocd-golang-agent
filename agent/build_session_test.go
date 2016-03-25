@@ -46,6 +46,7 @@ func TestExport(t *testing.T) {
 		protocal.ExportCommand("TEST_EXPORT"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -71,6 +72,7 @@ func TestMkdirCommand(t *testing.T) {
 		protocal.MkdirsCommand("path/in/pipeline/dir").Setwd(wd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 	_, err := os.Stat(filepath.Join(wd, "path/in/pipeline/dir"))
 	assert.Nil(t, err)
@@ -85,6 +87,7 @@ func TestCleandirCommand(t *testing.T) {
 		protocal.CleandirCommand("test", "world2").Setwd(wd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	matches, err := doublestar.Glob(filepath.Join(wd, "**/*.txt"))
@@ -110,10 +113,7 @@ func TestFailCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	goServer.SendBuild(AgentId, buildId,
-		protocal.FailCommand("something is wrong, please fail"),
-		protocal.ReportCompletedCommand(),
-	)
+	goServer.SendBuild(AgentId, buildId, protocal.FailCommand("something is wrong, please fail"))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -135,6 +135,7 @@ func TestSecretCommand(t *testing.T) {
 		protocal.EchoCommand("hello (replacebydefaultmask)"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -152,6 +153,7 @@ func TestShouldMaskSecretInExecOutput(t *testing.T) {
 		protocal.ExecCommand("echo", "hello (thisissecret)"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -169,6 +171,7 @@ func TestReplaceAgentBuildVairables(t *testing.T) {
 		protocal.EchoCommand("hello ${agent.hostname}"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -184,6 +187,7 @@ func TestReplaceDateBuildVairables(t *testing.T) {
 
 	goServer.SendBuild(AgentId, buildId, protocal.EchoCommand("${date}"))
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)

@@ -53,6 +53,7 @@ func TestTestCommand(t *testing.T) {
 		testCmd := protocal.TestCommand(test.testArgs...)
 		goServer.SendBuild(AgentId, buildId, protocal.EchoCommand(test.echo).SetTest(testCmd))
 		assert.Equal(t, "agent Building", stateLog.Next())
+		assert.Equal(t, "build Passed", stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
 		assert.Nil(t, err)

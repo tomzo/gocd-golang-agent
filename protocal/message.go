@@ -96,6 +96,10 @@ func ReportMessage(t string, report *Report) *Message {
 	return newMessage(t, report)
 }
 
+func CompletedMessage(report *Report) *Message {
+	return ReportMessage(ReportCompletedAction, report)
+}
+
 func ReregisterMessage() *Message {
 	return &Message{Action: ReregisterAction}
 }

@@ -86,6 +86,7 @@ func (s *BuildSession) isCanceled() bool {
 
 func (s *BuildSession) Process() error {
 	defer func() {
+		s.send <- protocal.CompletedMessage(s.statusReport(""))
 		s.console.Close()
 		close(s.done)
 	}()
@@ -144,7 +145,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) error {
 		return s.processSecret(cmd)
 	case protocal.CommandFail:
 		return Err(cmd.Args["0"])
-	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting, protocal.CommandReportCompleted:
+	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting:
 		jobState := cmd.Args["jobState"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.statusReport(jobState))
 	default:

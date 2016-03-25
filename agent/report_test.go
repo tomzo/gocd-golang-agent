@@ -31,7 +31,6 @@ func TestReportStatusAndCompleting(t *testing.T) {
 		protocal.ReportCurrentStatusCommand("Preparing"),
 		protocal.ReportCurrentStatusCommand("Building"),
 		protocal.ReportCompletingCommand(),
-		protocal.ReportCompletedCommand(),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())

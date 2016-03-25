@@ -36,7 +36,6 @@ var (
 	CommandUploadArtifact      = "uploadArtifact"
 	CommandReportCurrentStatus = "reportCurrentStatus"
 	CommandReportCompleting    = "reportCompleting"
-	CommandReportCompleted     = "reportCompleted"
 	CommandMkdirs              = "mkdirs"
 	CommandCleandir            = "cleandir"
 	CommandFail                = "fail"
@@ -106,10 +105,6 @@ func ReportCurrentStatusCommand(jobState string) *BuildCommand {
 
 func ReportCompletingCommand() *BuildCommand {
 	return NewBuildCommand(CommandReportCompleting).RunIf("any")
-}
-
-func ReportCompletedCommand() *BuildCommand {
-	return NewBuildCommand(CommandReportCompleted).RunIf("any")
 }
 
 func TestCommand(args ...string) *BuildCommand {

@@ -37,6 +37,7 @@ func TestRunIfConfig(t *testing.T) {
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
@@ -73,6 +74,7 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	log, err := goServer.ConsoleLog(buildId)
