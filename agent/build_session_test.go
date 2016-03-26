@@ -196,3 +196,20 @@ func TestReplaceDateBuildVairables(t *testing.T) {
 	_, err = time.Parse("2006-01-02 15:04:05 PDT", log)
 	assert.Nil(t, err)
 }
+
+func TestShowWarningInfoWhenThereIsUnsupportedBuildCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	cmd := protocal.NewBuildCommand("fancy")
+	goServer.SendBuild(AgentId, buildId, cmd)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+
+	expected := Sprintf("WARN: Golang Agent does not support build comamnd 'fancy'")
+	assert.True(t, strings.HasPrefix(trimTimestamp(log), expected), "console log must start with: %v", expected)
+}

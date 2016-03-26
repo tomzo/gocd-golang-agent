@@ -160,7 +160,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandFail:
 		err = Err(cmd.Args["0"])
 	default:
-		panic(Sprintf("Unknown command name: %+v", cmd))
+		s.warn("Golang Agent does not support build comamnd '%v', which means, related GoCD feature will not be supported.", cmd.Name)
 	}
 
 	if s.isCanceled() {
@@ -169,8 +169,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	} else if err != nil {
 		LogInfo("Build failed: %v", err)
 		s.buildStatus = protocal.BuildFailed
-		s.ConsoleLog(err.Error())
-		s.ConsoleLog("\n")
+		s.ConsoleLog(Sprintf("%v\n", err))
 	}
 
 	return
@@ -187,7 +186,7 @@ func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
 	select {
 	case <-cancel.done:
 	case <-time.After(CancelCommandTimeout):
-		s.ConsoleLog("WARN: Kill cancel task because it did not finish in %v.\n", CancelCommandTimeout)
+		s.warn("Kill cancel task because it did not finish in %v.", CancelCommandTimeout)
 		cancel.Close()
 	}
 }
@@ -360,6 +359,10 @@ func (s *BuildSession) Report(jobState string) *protocal.Report {
 
 func (s *BuildSession) ConsoleLog(format string, a ...interface{}) {
 	s.console.Write([]byte(Sprintf(format, a...)))
+}
+
+func (s *BuildSession) warn(format string, a ...interface{}) {
+	s.ConsoleLog(Sprintf("WARN: %v\n", format), a...)
 }
 
 func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
