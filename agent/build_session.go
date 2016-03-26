@@ -40,7 +40,7 @@ var (
 
 type BuildSession struct {
 	send      chan *protocal.Message
-	console   *BuildConsole
+	console   io.Writer
 	artifacts *Uploader
 	command   *protocal.BuildCommand
 	envs      map[string]string
@@ -55,7 +55,7 @@ type BuildSession struct {
 
 func MakeBuildSession(buildId string,
 	command *protocal.BuildCommand,
-	console *BuildConsole,
+	console io.Writer,
 	artifacts *Uploader,
 	send chan *protocal.Message) *BuildSession {
 
@@ -93,15 +93,21 @@ func (s *BuildSession) isCanceled() bool {
 	}
 }
 
-func (s *BuildSession) Process() *protocal.Report {
+func (s *BuildSession) Run() error {
+	defer func() {
+		s.send <- protocal.CompletedMessage(s.Report(""))
+	}()
+	return s.ProcessCommand()
+}
+
+func (s *BuildSession) ProcessCommand() error {
 	defer func() {
 		close(s.done)
 	}()
 
 	LogInfo("start process build command:")
 	LogInfo(s.command.String())
-	s.process(s.command)
-	return s.Report("")
+	return s.process(s.command)
 }
 
 func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
@@ -121,7 +127,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 		if cmd.Test.Command.Name != protocal.CommandTest {
 			panic("a BuildCommand test should be test command")
 		}
-		err := s.process(cmd.Test.Command)
+		_, err := s.processTestCommand(cmd.Test.Command)
 		success := err == nil
 		if success != cmd.Test.Expectation {
 			LogDebug("test failed: %v", err)
@@ -132,8 +138,6 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	switch cmd.Name {
 	case protocal.CommandCompose:
 		return s.processCompose(cmd)
-	case protocal.CommandTest:
-		return s.processTest(cmd)
 	case protocal.CommandExport:
 		s.processExport(cmd)
 	case protocal.CommandEcho:
@@ -143,6 +147,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting:
 		jobState := cmd.Args["jobState"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.Report(jobState))
+	case protocal.CommandTest:
+		err = s.processTest(cmd)
 	case protocal.CommandExec:
 		err = s.processExec(cmd, s.secrets)
 	case protocal.CommandMkdirs:
@@ -174,15 +180,15 @@ func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
 	if cmd.OnCancel == nil || !s.isCanceled() {
 		return
 	}
-	cancelSession := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send)
+	cancel := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send)
 	go func() {
-		cancelSession.Process()
+		cancel.ProcessCommand()
 	}()
 	select {
-	case <-cancelSession.done:
+	case <-cancel.done:
 	case <-time.After(CancelCommandTimeout):
 		s.ConsoleLog("WARN: Kill cancel task because it did not finish in %v.\n", CancelCommandTimeout)
-		cancelSession.Close()
+		cancel.Close()
 	}
 }
 
@@ -293,6 +299,14 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 	}
 }
 
+func (s *BuildSession) processTestCommand(cmd *protocal.BuildCommand) (bytes.Buffer, error) {
+	var output bytes.Buffer
+	session := MakeBuildSession(s.buildId, cmd, &output, s.artifacts, s.send)
+	session.cancel = s.cancel
+	err := session.ProcessCommand()
+	return output, err
+}
+
 func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	flag := cmd.Args["flag"]
 
@@ -320,17 +334,12 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 			return nil
 		}
 	case "-eq":
-		if len(cmd.SubCommands) == 0 || cmd.SubCommands[0].Name != "exec" {
-			panic("test -eq should carry with an exec command")
-		}
-		var buf bytes.Buffer
-		exec := cmd.SubCommands[0]
-		err := s.processExec(exec, &buf)
+		output, err := s.processTestCommand(cmd.SubCommands[0])
 		if err != nil {
 			LogDebug("test -eq exec command error: %v", err)
 		}
 		expected := strings.TrimSpace(cmd.Args["left"])
-		actual := strings.TrimSpace(buf.String())
+		actual := strings.TrimSpace(output.String())
 		if expected != actual {
 			return Err("expected '%v', but was '%v'", expected, actual)
 		}

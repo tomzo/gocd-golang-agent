@@ -154,8 +154,7 @@ func processBuild(send chan *protocal.Message, buildSession *BuildSession, conso
 	}()
 	SetState("runtimeStatus", "Building")
 	ping(send)
-	report := buildSession.Process()
-	send <- protocal.CompletedMessage(report)
+	buildSession.Run()
 	LogInfo("done")
 }
 
