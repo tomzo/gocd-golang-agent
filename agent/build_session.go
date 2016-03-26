@@ -154,7 +154,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandFail:
 		err = Err(cmd.Args["0"])
 	default:
-		s.ConsoleLog("TBI command: %v\n", cmd.Name)
+		panic(Sprintf("Unknown command name: %+v", cmd))
 	}
 
 	if s.isCanceled() {

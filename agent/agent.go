@@ -140,7 +140,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		buildSession.ReplaceEcho("${date}", func() string { return time.Now().Format("2006-01-02 15:04:05 PDT") })
 		go processBuild(send, buildSession, console)
 	default:
-		logger.Error.Printf("ERROR: unknown message action %v", msg)
+		panic(Sprintf("Unknown message action: %+v", msg))
 	}
 	return nil
 }
