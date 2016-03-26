@@ -377,12 +377,11 @@ func (s *BuildSession) processEcho(cmd *protocal.BuildCommand) {
 }
 
 func (s *BuildSession) processExport(cmd *protocal.BuildCommand) {
-	msg := "setting environment variable '%v' to value '%v'"
+	msg := "setting environment variable '%v' to value '%v'\n"
 	name := cmd.Args["name"]
 	value, ok := cmd.Args["value"]
 	if !ok {
 		s.ConsoleLog(msg, name, os.Getenv(name))
-		s.ConsoleLog("\n")
 		return
 	}
 	secure := cmd.Args["secure"]
@@ -392,11 +391,10 @@ func (s *BuildSession) processExport(cmd *protocal.BuildCommand) {
 	}
 	_, override := s.envs[name]
 	if override || os.Getenv(name) != "" {
-		msg = "overriding environment variable '%v' with value '%v'"
+		msg = "overriding environment variable '%v' with value '%v'\n"
 	}
 	s.envs[name] = value
 	s.ConsoleLog(msg, name, displayValue)
-	s.ConsoleLog("\n")
 }
 
 func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
