@@ -28,10 +28,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 var (
-	DefaultSecretMask = "********"
+	DefaultSecretMask           = "********"
+	DefaultCancelCommandTimeout = 25 * time.Second
+	CancelCommandTimeout        = DefaultCancelCommandTimeout
+	CancelBuildTimeout          = 30 * time.Second
 )
 
 type BuildSession struct {
@@ -73,7 +77,11 @@ func MakeBuildSession(buildId string,
 
 func (s *BuildSession) Close() {
 	close(s.cancel)
-	<-s.done
+	select {
+	case <-s.done:
+	case <-time.After(CancelBuildTimeout):
+		logger.Error.Printf("cancel build timeout(%v)", CancelBuildTimeout)
+	}
 }
 
 func (s *BuildSession) isCanceled() bool {
@@ -166,7 +174,16 @@ func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
 	if cmd.OnCancel == nil || !s.isCanceled() {
 		return
 	}
-	MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send).Process()
+	cancelSession := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send)
+	go func() {
+		cancelSession.Process()
+	}()
+	select {
+	case <-cancelSession.done:
+	case <-time.After(CancelCommandTimeout):
+		s.ConsoleLog("WARN: Kill cancel task because it did not finish in %v.\n", CancelCommandTimeout)
+		cancelSession.Close()
+	}
 }
 
 func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) {

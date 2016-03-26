@@ -39,13 +39,13 @@ type Message struct {
 	AckId  string `json:"ackId"`
 }
 
-func (m *Message) Build() *Build {
+func (m *Message) DataBuild() *Build {
 	var build Build
 	json.Unmarshal([]byte(m.Data), &build)
 	return &build
 }
 
-func (m *Message) StringData() string {
+func (m *Message) DataString() string {
 	var str string
 	json.Unmarshal([]byte(m.Data), &str)
 	return str
@@ -104,6 +104,6 @@ func ReregisterMessage() *Message {
 	return &Message{Action: ReregisterAction}
 }
 
-func CancelMessage(buildId string) *Message {
-	return newMessage(CancelBuildAction, buildId)
+func CancelMessage() *Message {
+	return &Message{Action: CancelBuildAction}
 }

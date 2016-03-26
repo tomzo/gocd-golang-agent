@@ -108,7 +108,7 @@ func Start() error {
 func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *protocal.Message) error {
 	switch msg.Action {
 	case protocal.SetCookieAction:
-		SetState("cookie", msg.StringData())
+		SetState("cookie", msg.DataString())
 	case protocal.CancelBuildAction:
 		closeBuildSession()
 	case protocal.ReregisterAction:
@@ -116,7 +116,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		return Err("received reregister message")
 	case protocal.BuildAction:
 		closeBuildSession()
-		build := msg.Build()
+		build := msg.DataBuild()
 		SetState("buildLocator", build.BuildLocator)
 		SetState("buildLocatorForDisplay", build.BuildLocatorForDisplay)
 		curl, err := config.MakeFullServerURL(build.ConsoleURI)

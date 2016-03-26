@@ -119,7 +119,7 @@ func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ac
 		LogInfo("<-- %v", msg.Action)
 
 		if msg.Action == "ack" {
-			ack <- msg.StringData()
+			ack <- msg.DataString()
 		} else {
 			received <- msg
 		}

@@ -20,9 +20,10 @@ import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
 	"testing"
+	"time"
 )
 
-func TestOnCancel(t *testing.T) {
+func TestOnCancel1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	goServer.SendBuild(AgentId, buildId,
@@ -30,13 +31,13 @@ func TestOnCancel(t *testing.T) {
 			echo("echo before sleep"),
 			protocal.ExecCommand("sleep", "5").SetOnCancel(echo("read on cancel")),
 			echo("should not process this echo").RunIf("any"),
-		).SetOnCancel(echo("compose on cancel")),
+		).SetOnCancel(protocal.ExecCommand("echo", "compose on cancel")),
 		echo("should not process this echo"),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 
-	goServer.Send(AgentId, protocal.CancelMessage(buildId))
+	goServer.Send(AgentId, protocal.CancelMessage())
 
 	assert.Equal(t, "build Cancelled", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -47,6 +48,34 @@ func TestOnCancel(t *testing.T) {
 	expected := `echo before sleep
 read on cancel
 compose on cancel
+`
+	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestOnCancel2(t *testing.T) {
+	CancelCommandTimeout = 10 * time.Millisecond
+	defer func() {
+		CancelCommandTimeout = DefaultCancelCommandTimeout
+	}()
+
+	setUp(t)
+	defer tearDown()
+	cancel := protocal.ExecCommand("sleep", "60")
+	goServer.SendBuild(AgentId, buildId,
+		protocal.ExecCommand("sleep", "5").SetOnCancel(cancel),
+	)
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+
+	goServer.Send(AgentId, protocal.CancelMessage())
+
+	assert.Equal(t, "build Cancelled", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+
+	expected := `WARN: Kill cancel task because it did not finish in 10ms.
 `
 	assert.Equal(t, expected, trimTimestamp(log))
 }
