@@ -160,7 +160,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandFail:
 		err = Err(cmd.Args["0"])
 	default:
-		s.warn("Golang Agent does not support build comamnd '%v', which means, related GoCD feature will not be supported.", cmd.Name)
+		s.warn("Golang Agent does not support build comamnd '%v' yet, related GoCD feature will not be supported. More details: https://github.com/gocd-contrib/gocd-golang-agent", cmd.Name)
 	}
 
 	if s.isCanceled() {
