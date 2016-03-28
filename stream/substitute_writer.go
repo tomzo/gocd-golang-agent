@@ -22,15 +22,12 @@ import (
 )
 
 type SubstituteWriter struct {
+	io.Writer
 	Substitutions map[string]interface{}
-	Writer        io.Writer
 }
 
 func NewSubstituteWriter(writer io.Writer) *SubstituteWriter {
-	return &SubstituteWriter{
-		Substitutions: make(map[string]interface{}),
-		Writer:        writer,
-	}
+	return &SubstituteWriter{writer, make(map[string]interface{})}
 }
 
 func (w *SubstituteWriter) Write(out []byte) (int, error) {

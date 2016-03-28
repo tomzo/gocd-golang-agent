@@ -22,17 +22,13 @@ import (
 )
 
 type PrefixWriter struct {
+	io.Writer
 	Prefix func() []byte
-	Writer io.Writer
 	ap     bool
 }
 
 func NewPrefixWriter(writer io.Writer, prefix func() []byte) *PrefixWriter {
-	return &PrefixWriter{
-		Prefix: prefix,
-		Writer: writer,
-		ap:     true,
-	}
+	return &PrefixWriter{writer, prefix, true}
 }
 
 func (w *PrefixWriter) Write(out []byte) (int, error) {
