@@ -40,7 +40,7 @@ var (
 
 type BuildSession struct {
 	send      chan *protocal.Message
-	console   io.Writer
+	console   io.WriteCloser
 	artifacts *Uploader
 	command   *protocal.BuildCommand
 	envs      map[string]string
@@ -55,7 +55,7 @@ type BuildSession struct {
 
 func MakeBuildSession(buildId string,
 	command *protocal.BuildCommand,
-	console io.Writer,
+	console io.WriteCloser,
 	artifacts *Uploader,
 	send chan *protocal.Message) *BuildSession {
 
@@ -75,13 +75,8 @@ func MakeBuildSession(buildId string,
 	}
 }
 
-func (s *BuildSession) Close() {
-	close(s.cancel)
-	select {
-	case <-s.done:
-	case <-time.After(CancelBuildTimeout):
-		logger.Error.Printf("cancel build timeout(%v)", CancelBuildTimeout)
-	}
+func (s *BuildSession) Close() error {
+	return closeAndWait(s.cancel, s.done, CancelBuildTimeout)
 }
 
 func (s *BuildSession) isCanceled() bool {
@@ -95,6 +90,7 @@ func (s *BuildSession) isCanceled() bool {
 
 func (s *BuildSession) Run() error {
 	defer func() {
+		s.console.Close()
 		s.send <- protocal.CompletedMessage(s.Report(""))
 	}()
 	return s.ProcessCommand()
@@ -300,7 +296,7 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 
 func (s *BuildSession) processTestCommand(cmd *protocal.BuildCommand) (bytes.Buffer, error) {
 	var output bytes.Buffer
-	session := MakeBuildSession(s.buildId, cmd, &output, s.artifacts, s.send)
+	session := MakeBuildSession(s.buildId, cmd, stream.NopCloser(&output), s.artifacts, s.send)
 	session.cancel = s.cancel
 	err := session.ProcessCommand()
 	return output, err

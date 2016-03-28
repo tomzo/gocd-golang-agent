@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -31,7 +30,7 @@ type BuildConsole struct {
 	HttpClient *http.Client
 	buffer     *bytes.Buffer
 	stop       chan bool
-	closed     *sync.WaitGroup
+	closed     chan bool
 	write      chan []byte
 }
 
@@ -41,18 +40,20 @@ func timestampPrefix() []byte {
 }
 
 func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
-
 	console := BuildConsole{
 		HttpClient: httpClient,
 		Url:        url,
 		buffer:     bytes.NewBuffer(make([]byte, 0, 10*1024)),
 
 		stop:   make(chan bool),
-		closed: &sync.WaitGroup{},
+		closed: make(chan bool),
 		write:  make(chan []byte),
 	}
-	console.closed.Add(1)
 	go func() {
+		defer func() {
+			close(console.closed)
+			LogInfo("build console closed")
+		}()
 		tw := stream.NewPrefixWriter(console.buffer, timestampPrefix)
 		flushTick := time.NewTicker(5 * time.Second)
 		defer flushTick.Stop()
@@ -63,8 +64,6 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 				tw.Write(log)
 			case <-console.stop:
 				console.Flush()
-				LogInfo("build console closed")
-				console.closed.Done()
 				return
 			case <-flushTick.C:
 				console.Flush()
@@ -75,9 +74,8 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 	return &console
 }
 
-func (console *BuildConsole) Close() {
-	console.stop <- true
-	console.closed.Wait()
+func (console *BuildConsole) Close() error {
+	return closeAndWait(console.stop, console.closed, CancelCommandTimeout)
 }
 
 func (console *BuildConsole) Write(data []byte) (int, error) {

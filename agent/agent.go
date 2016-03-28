@@ -127,27 +127,25 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		if err != nil {
 			return err
 		}
-		console := MakeBuildConsole(httpClient, curl)
 		buildSession = MakeBuildSession(
 			build.BuildId,
 			build.BuildCommand,
-			console,
+			MakeBuildConsole(httpClient, curl),
 			NewUploader(httpClient, aurl),
 			send,
 		)
 		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
 		buildSession.ReplaceEcho("${agent.hostname}", config.Hostname)
 		buildSession.ReplaceEcho("${date}", func() string { return time.Now().Format("2006-01-02 15:04:05 PDT") })
-		go processBuild(send, buildSession, console)
+		go processBuild(send, buildSession)
 	default:
 		panic(Sprintf("Unknown message action: %+v", msg))
 	}
 	return nil
 }
 
-func processBuild(send chan *protocal.Message, buildSession *BuildSession, console *BuildConsole) {
+func processBuild(send chan *protocal.Message, buildSession *BuildSession) {
 	defer func() {
-		console.Close()
 		SetState("runtimeStatus", "Idle")
 		ping(send)
 		logger.Debug.Printf("! exit goroutine: process build command message")

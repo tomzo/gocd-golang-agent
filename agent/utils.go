@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func Join(sep string, parts ...string) string {
@@ -139,4 +140,23 @@ func Sprintf(f string, args ...interface{}) string {
 
 func Err(f string, args ...interface{}) error {
 	return errors.New(Sprintf(f, args...))
+}
+
+func closeAndWait(stop, closed chan bool, timeout time.Duration) error {
+	select {
+	case _, ok := <-stop:
+		if !ok {
+			return nil
+		}
+	default:
+	}
+
+	close(stop)
+
+	select {
+	case <-closed:
+		return nil
+	case <-time.After(timeout):
+		return Err("Wait for closed timeout")
+	}
 }
