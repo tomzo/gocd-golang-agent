@@ -32,16 +32,11 @@ import (
 	"time"
 )
 
-type Uploader struct {
-	BaseURL    *url.URL
+type Artifacts struct {
 	httpClient *http.Client
 }
 
-func NewUploader(httpClient *http.Client, baseURL *url.URL) *Uploader {
-	return &Uploader{BaseURL: baseURL, httpClient: httpClient}
-}
-
-func (u *Uploader) Upload(source, destPath string, destURL *url.URL) (err error) {
+func (u *Artifacts) Upload(source, destPath string, destURL *url.URL) (err error) {
 	zipped, checksum, err := u.zipSource(source, destPath)
 	defer os.Remove(zipped)
 	if err != nil {
@@ -87,7 +82,7 @@ tryPost:
 	return Err("Failed to upload %v. Server response: %v", source, statusCode)
 }
 
-func (u *Uploader) post(source, contentType string, destURL *url.URL, body *bytes.Buffer) (statusCode int, err error) {
+func (u *Artifacts) post(source, contentType string, destURL *url.URL, body *bytes.Buffer) (statusCode int, err error) {
 	req, err := http.NewRequest("POST", destURL.String(), body)
 	if err != nil {
 		return
@@ -101,7 +96,7 @@ func (u *Uploader) post(source, contentType string, destURL *url.URL, body *byte
 	return resp.StatusCode, nil
 }
 
-func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName string) error {
+func (u *Artifacts) writeFilePart(writer *multipart.Writer, path, paramName string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -110,7 +105,7 @@ func (u *Uploader) writeFilePart(writer *multipart.Writer, path, paramName strin
 	return u.writePart(writer, file, paramName, filepath.Base(path))
 }
 
-func (u *Uploader) writePart(writer *multipart.Writer, src io.Reader, fieldname, filename string) error {
+func (u *Artifacts) writePart(writer *multipart.Writer, src io.Reader, fieldname, filename string) error {
 	part, err := writer.CreateFormFile(fieldname, filename)
 	if err != nil {
 		return err
@@ -119,7 +114,7 @@ func (u *Uploader) writePart(writer *multipart.Writer, src io.Reader, fieldname,
 	return err
 }
 
-func (u *Uploader) computeMd5(filePath string) ([]byte, error) {
+func (u *Artifacts) computeMd5(filePath string) ([]byte, error) {
 	var result []byte
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -135,7 +130,7 @@ func (u *Uploader) computeMd5(filePath string) ([]byte, error) {
 	return hash.Sum(result), nil
 }
 
-func (u *Uploader) zipSource(source string, dest string) (string, string, error) {
+func (u *Artifacts) zipSource(source string, dest string) (string, string, error) {
 	zipfile, err := ioutil.TempFile("", "tmp.zip")
 	if err != nil {
 		return "", "", err

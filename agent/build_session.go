@@ -23,6 +23,7 @@ import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/gocd-contrib/gocd-golang-agent/stream"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,15 +40,17 @@ var (
 )
 
 type BuildSession struct {
-	send      chan *protocal.Message
-	console   io.WriteCloser
-	artifacts *Uploader
-	command   *protocal.BuildCommand
-	envs      map[string]string
-	cancel    chan bool
-	done      chan bool
-	echo      *stream.SubstituteWriter
-	secrets   *stream.SubstituteWriter
+	send                  chan *protocal.Message
+	console               io.WriteCloser
+	artifacts             *Artifacts
+	command               *protocal.BuildCommand
+	artifactUploadBaseURL *url.URL
+
+	envs    map[string]string
+	cancel  chan bool
+	done    chan bool
+	echo    *stream.SubstituteWriter
+	secrets *stream.SubstituteWriter
 
 	buildId     string
 	buildStatus string
@@ -56,22 +59,24 @@ type BuildSession struct {
 func MakeBuildSession(buildId string,
 	command *protocal.BuildCommand,
 	console io.WriteCloser,
-	artifacts *Uploader,
+	artifacts *Artifacts,
+	artifactUploadBaseURL *url.URL,
 	send chan *protocal.Message) *BuildSession {
 
 	secrets := stream.NewSubstituteWriter(console)
 	return &BuildSession{
-		buildId:     buildId,
-		buildStatus: protocal.BuildPassed,
-		console:     console,
-		artifacts:   artifacts,
-		command:     command,
-		send:        send,
-		envs:        make(map[string]string),
-		cancel:      make(chan bool),
-		done:        make(chan bool),
-		secrets:     secrets,
-		echo:        stream.NewSubstituteWriter(secrets),
+		buildId:               buildId,
+		buildStatus:           protocal.BuildPassed,
+		console:               console,
+		artifacts:             artifacts,
+		artifactUploadBaseURL: artifactUploadBaseURL,
+		command:               command,
+		send:                  send,
+		envs:                  make(map[string]string),
+		cancel:                make(chan bool),
+		done:                  make(chan bool),
+		secrets:               secrets,
+		echo:                  stream.NewSubstituteWriter(secrets),
 	}
 }
 
@@ -175,7 +180,7 @@ func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
 	if cmd.OnCancel == nil || !s.isCanceled() {
 		return
 	}
-	cancel := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.send)
+	cancel := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.artifactUploadBaseURL, s.send)
 	go func() {
 		cancel.ProcessCommand()
 	}()
@@ -263,7 +268,7 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	} else {
 		destPath = srcInfo.Name()
 	}
-	destURL := AppendUrlParam(AppendUrlPath(s.artifacts.BaseURL, destDir),
+	destURL := AppendUrlParam(AppendUrlPath(s.artifactUploadBaseURL, destDir),
 		"buildId", s.buildId)
 	return s.artifacts.Upload(source, destPath, destURL)
 }
@@ -296,7 +301,7 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 
 func (s *BuildSession) processTestCommand(cmd *protocal.BuildCommand) (bytes.Buffer, error) {
 	var output bytes.Buffer
-	session := MakeBuildSession(s.buildId, cmd, stream.NopCloser(&output), s.artifacts, s.send)
+	session := MakeBuildSession(s.buildId, cmd, stream.NopCloser(&output), s.artifacts, s.artifactUploadBaseURL, s.send)
 	session.cancel = s.cancel
 	err := session.ProcessCommand()
 	return output, err

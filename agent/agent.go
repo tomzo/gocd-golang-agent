@@ -131,7 +131,8 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 			build.BuildId,
 			build.BuildCommand,
 			MakeBuildConsole(httpClient, curl),
-			NewUploader(httpClient, aurl),
+			&Artifacts{httpClient: httpClient},
+			aurl,
 			send,
 		)
 		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
