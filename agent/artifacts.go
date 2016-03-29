@@ -36,6 +36,26 @@ type Artifacts struct {
 	httpClient *http.Client
 }
 
+func (u *Artifacts) Download(source *url.URL, destPath string) (err error) {
+	out, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return
+	}
+	defer out.Close()
+
+	resp, err := u.httpClient.Get(source.String())
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (u *Artifacts) Upload(source, destPath string, destURL *url.URL) (err error) {
 	zipped, checksum, err := u.zipSource(source, destPath)
 	defer os.Remove(zipped)

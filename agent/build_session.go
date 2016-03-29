@@ -158,6 +158,8 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 		err = s.processCleandir(cmd)
 	case protocal.CommandUploadArtifact:
 		err = s.processUploadArtifact(cmd)
+	case protocal.CommandDownloadFile:
+		err = s.processDownloadFile(cmd)
 	case protocal.CommandFail:
 		err = Err(cmd.Args["0"])
 	default:
@@ -271,6 +273,28 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	destURL := AppendUrlParam(AppendUrlPath(s.artifactUploadBaseURL, destDir),
 		"buildId", s.buildId)
 	return s.artifacts.Upload(source, destPath, destURL)
+}
+
+func (s *BuildSession) processDownloadFile(cmd *protocal.BuildCommand) error {
+	src := cmd.Args["src"]
+	uri := cmd.Args["uri"]
+	destDir := cmd.Args["dest"]
+
+	wd, err := filepath.Abs(cmd.WorkingDirectory)
+	if err != nil {
+		return err
+	}
+	absDestDir := filepath.Join(wd, destDir)
+	err = Mkdirs(absDestDir)
+	if err != nil {
+		return err
+	}
+	srcURL, err := config.MakeFullServerURL(uri)
+	if err != nil {
+		return err
+	}
+	_, fname := filepath.Split(src)
+	return s.artifacts.Download(srcURL, filepath.Join(absDestDir, fname))
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer) error {

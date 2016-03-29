@@ -131,6 +131,10 @@ func (s *Server) ArtifactFile(buildId, file string) string {
 	return filepath.Join(s.WorkingDir, buildId, "artifacts", file)
 }
 
+func (s *Server) ArtifactURI(buildId, file string) string {
+	return ArtifactsPath + "/builds/" + buildId + "?file=" + file
+}
+
 func (s *Server) ChecksumFile(buildId string) string {
 	return filepath.Join(s.WorkingDir, buildId, "md5.checksum")
 }

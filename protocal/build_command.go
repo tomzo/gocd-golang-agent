@@ -40,6 +40,7 @@ var (
 	CommandCleandir            = "cleandir"
 	CommandFail                = "fail"
 	CommandSecret              = "secret"
+	CommandDownloadFile        = "downloadFile"
 )
 
 type BuildCommandTest struct {
@@ -156,6 +157,15 @@ func UploadArtifactCommand(src, dest string) *BuildCommand {
 		"dest": dest,
 	}
 	return NewBuildCommand(CommandUploadArtifact).SetArgs(args)
+}
+
+func DownloadFileCommand(src, uri, dest string) *BuildCommand {
+	args := map[string]string{
+		"src":  src,
+		"uri":  uri,
+		"dest": dest,
+	}
+	return NewBuildCommand(CommandDownloadFile).SetArgs(args)
 }
 
 func (cmd *BuildCommand) RunIfAny() bool {

@@ -29,39 +29,67 @@ import (
 
 func artifactsHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
-		buildId := parseBuildId(req.URL.Path)
-		form, err := req.MultipartReader()
-		if err != nil {
-			s.responseBadRequest(err, w)
-			return
+		switch req.Method {
+		case http.MethodPost:
+			handleArtifactsUpload(s, w, req)
+		case http.MethodGet:
+			handleArtifactDownload(s, w, req)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-		for {
-			part, err := form.NextPart()
-			if err == io.EOF {
-				break
-			}
-			switch part.FormName() {
-			case "zipfile":
-				err = extractToArtifactDir(s, buildId, part)
-				if err != nil {
-					s.responseInternalError(err, w)
-					return
-				}
-			case "file_checksum":
-				bytes, err := ioutil.ReadAll(part)
-				if err != nil {
-					s.responseInternalError(err, w)
-					return
-				}
-				err = s.appendToFile(s.ChecksumFile(buildId), bytes)
-				if err != nil {
-					s.responseInternalError(err, w)
-					return
-				}
-			}
-		}
-		w.WriteHeader(http.StatusCreated)
 	}
+}
+
+func handleArtifactDownload(s *Server, w http.ResponseWriter, req *http.Request) {
+	buildId := parseBuildId(req.URL.Path)
+	file := req.URL.Query()["file"]
+	if len(file) == 0 {
+		w.WriteHeader(http.StatusNotAcceptable)
+		return
+	}
+	fullPath := s.ArtifactFile(buildId, file[0])
+	f, err := os.Open(fullPath)
+	defer f.Close()
+	if err != nil {
+		s.responseBadRequest(err, w)
+	} else {
+		io.Copy(w, f)
+	}
+}
+
+func handleArtifactsUpload(s *Server, w http.ResponseWriter, req *http.Request) {
+	buildId := parseBuildId(req.URL.Path)
+	form, err := req.MultipartReader()
+	if err != nil {
+		s.responseBadRequest(err, w)
+		return
+	}
+	for {
+		part, err := form.NextPart()
+		if err == io.EOF {
+			break
+		}
+		switch part.FormName() {
+		case "zipfile":
+			err = extractToArtifactDir(s, buildId, part)
+			if err != nil {
+				s.responseInternalError(err, w)
+				return
+			}
+		case "file_checksum":
+			bytes, err := ioutil.ReadAll(part)
+			if err != nil {
+				s.responseInternalError(err, w)
+				return
+			}
+			err = s.appendToFile(s.ChecksumFile(buildId), bytes)
+			if err != nil {
+				s.responseInternalError(err, w)
+				return
+			}
+		}
+	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 func extractToArtifactDir(s *Server, buildId string, part *multipart.Part) error {
