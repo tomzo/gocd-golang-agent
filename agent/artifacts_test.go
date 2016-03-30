@@ -341,10 +341,10 @@ func testDownload(t *testing.T, srcPath, destDir, checksum string, destFiles []s
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	srcURI := goServer.ArtifactURI(buildId, srcPath)
+	srcUrl := goServer.ArtifactUrl(buildId, srcPath)
 	checksumUrl := goServer.ChecksumUrl(buildId)
 	checksumPath := Sprintf("build-%v.md5", buildId)
-	goServer.SendBuild(AgentId, buildId, protocal.DownloadFileCommand(srcPath, srcURI, destDir, checksumUrl, checksumPath).Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocal.DownloadFileCommand(srcPath, srcUrl, destDir, checksumUrl, checksumPath).Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())

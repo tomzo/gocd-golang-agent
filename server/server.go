@@ -135,7 +135,7 @@ func (s *Server) ArtifactFile(buildId, file string) string {
 	return filepath.Join(s.WorkingDir, buildId, "artifacts", file)
 }
 
-func (s *Server) ArtifactURI(buildId, file string) string {
+func (s *Server) ArtifactUrl(buildId, file string) string {
 	return ArtifactsPath + "/builds/" + buildId + "?file=" + file
 }
 
