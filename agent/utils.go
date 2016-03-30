@@ -18,8 +18,10 @@ package agent
 
 import (
 	"bytes"
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -173,4 +175,20 @@ func ParseChecksum(checksum string) map[string]string {
 		}
 	}
 	return ret
+}
+
+func ComputeMd5(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	var result []byte
+	return Sprintf("%x", hash.Sum(result)), nil
 }

@@ -19,7 +19,6 @@ package agent
 import (
 	"archive/zip"
 	"bytes"
-	"crypto/md5"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -54,7 +53,7 @@ func (u *Artifacts) DownloadFile(source *url.URL, destPath string) (err error) {
 }
 
 func (u *Artifacts) VerifyChecksum(srcFname, fname, checksumFname string) error {
-	md5, err := u.computeMd5(fname)
+	md5, err := ComputeMd5(fname)
 	if err != nil {
 		return err
 	}
@@ -62,11 +61,10 @@ func (u *Artifacts) VerifyChecksum(srcFname, fname, checksumFname string) error 
 	if err != nil {
 		return err
 	}
-	md5Str := Sprintf("%x", md5)
 	properties := ParseChecksum(string(checksum))
 	if properties[srcFname] == "" {
 		return Err("[WARN] The md5checksum value of the artifact [%v] was not found on the server. Hence, Go could not verify the integrity of its contents.", srcFname)
-	} else if properties[srcFname] != md5Str {
+	} else if properties[srcFname] != md5 {
 		return Err("[ERROR] Verification of the integrity of the artifact [%v] failed. The artifact file on the server may have changed since its original upload.", srcFname)
 	} else {
 		return nil
@@ -151,22 +149,6 @@ func (u *Artifacts) writePart(writer *multipart.Writer, src io.Reader, fieldname
 	return err
 }
 
-func (u *Artifacts) computeMd5(filePath string) ([]byte, error) {
-	var result []byte
-	file, err := os.Open(filePath)
-	if err != nil {
-		return result, err
-	}
-	defer file.Close()
-
-	hash := md5.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return result, err
-	}
-
-	return hash.Sum(result), nil
-}
-
 func (u *Artifacts) zipSource(source string, dest string) (string, string, error) {
 	zipfile, err := ioutil.TempFile("", "tmp.zip")
 	if err != nil {
@@ -201,11 +183,11 @@ func (u *Artifacts) zipSource(source string, dest string) (string, string, error
 			}
 		}
 
-		md5, err := u.computeMd5(path)
+		md5, err := ComputeMd5(path)
 		if err != nil {
 			return err
 		}
-		checksum.WriteString(Sprintf("%v=%x\n", destFile, md5))
+		checksum.WriteString(Sprintf("%v=%v\n", destFile, md5))
 
 		file, err := os.Open(path)
 		if err != nil {

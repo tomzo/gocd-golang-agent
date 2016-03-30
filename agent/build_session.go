@@ -303,6 +303,13 @@ func (s *BuildSession) processDownloadFile(cmd *protocal.BuildCommand) error {
 	}
 	_, fname := filepath.Split(src)
 	absDestPath := filepath.Join(absDestDir, fname)
+
+	err = s.artifacts.VerifyChecksum(src, absDestPath, absChecksumFile)
+	if err == nil {
+		s.ConsoleLog("File [%v] exists and matches checksum.\n", src)
+		return nil
+	}
+
 	err = s.artifacts.DownloadFile(srcURL, absDestPath)
 	if err != nil {
 		return err

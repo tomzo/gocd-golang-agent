@@ -328,11 +328,41 @@ func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[st
 func TestDownloadArtifactFile(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-	testDownload(t, "artifacts/src/hello/4.txt", "dest", []string{"dest/4.txt"})
+	wd := createTestProjectInPipelineDir()
+	testDownload(t, wd, "artifacts/src/hello/4.txt", "dest", []string{"dest/4.txt"})
+
 }
 
-func testDownload(t *testing.T, srcPath, destDir string, destFiles []string) {
+func TestShouldNotDownloadIfDestFileExistedAndMatchedChecksum(t *testing.T) {
+	setUp(t)
+	defer tearDown()
 	wd := createTestProjectInPipelineDir()
+	content, err := ioutil.ReadFile(filepath.Join(wd, "src/1.txt"))
+	assert.Nil(t, err)
+
+	err = Mkdirs(filepath.Join(wd, "dest"))
+	assert.Nil(t, err)
+	err = ioutil.WriteFile(filepath.Join(wd, "dest/1.txt"), content, 0400)
+	assert.Nil(t, err)
+	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"})
+	info, err := os.Stat(filepath.Join(wd, "dest/1.txt"))
+	assert.Nil(t, err)
+	assert.Equal(t, os.FileMode(0400), info.Mode())
+}
+
+func TestShouldDownloadIfDestFileExistedButMismatchedChecksum(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+
+	err := Mkdirs(filepath.Join(wd, "dest"))
+	assert.Nil(t, err)
+	err = ioutil.WriteFile(filepath.Join(wd, "dest/1.txt"), []byte("hello"), 0777)
+	assert.Nil(t, err)
+	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"})
+}
+
+func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string) {
 	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "artifacts").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -347,8 +377,10 @@ func testDownload(t *testing.T, srcPath, destDir string, destFiles []string) {
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	for _, f := range destFiles {
-		_, err := os.Stat(filepath.Join(wd, f))
+		path := filepath.Join(wd, f)
+		md5, err := ComputeMd5(path)
 		assert.Nil(t, err)
+		assert.Equal(t, "41e43efb30d3fbfcea93542157809ac0", md5)
 	}
 
 	content, err := ioutil.ReadFile(filepath.Join(wd, checksumPath))
