@@ -160,3 +160,17 @@ func closeAndWait(stop, closed chan bool, timeout time.Duration) error {
 		return Err("Wait for closed timeout")
 	}
 }
+
+func ParseChecksum(checksum string) map[string]string {
+	ret := make(map[string]string)
+	for _, l := range strings.Split(checksum, "\n") {
+		if strings.HasPrefix(l, "#") {
+			continue
+		}
+		i := strings.Index(l, "=")
+		if i > -1 {
+			ret[l[:i]] = l[i+1:]
+		}
+	}
+	return ret
+}

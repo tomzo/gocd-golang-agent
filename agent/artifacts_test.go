@@ -328,12 +328,12 @@ func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[st
 func TestDownloadArtifactFile(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-	testDownload(t, "src/hello/4.txt", "dest", []string{"dest/4.txt"})
+	testDownload(t, "artifacts/src/hello/4.txt", "dest", []string{"dest/4.txt"})
 }
 
 func testDownload(t *testing.T, srcPath, destDir string, destFiles []string) {
 	wd := createTestProjectInPipelineDir()
-	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "").Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "artifacts").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())

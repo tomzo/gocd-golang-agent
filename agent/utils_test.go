@@ -78,3 +78,17 @@ func TestShouldFailWhenCleandirAllowsContainsPathThatIsOutsideOfBaseDir(t *testi
 	err = Cleandir(tmpDir, "test/world2", "./../")
 	assert.NotNil(t, err)
 }
+
+func TestParseChecksum(t *testing.T) {
+	checksum := `dest/3.txt=md5-3.txt
+5.txt=md5-5.txt
+dest/world/10.txt=md5-10.txt
+dest/world2/10.txt=md5-10.2.txt
+dest/world=md5-world
+`
+	ret := ParseChecksum(checksum)
+	assert.Equal(t, 5, len(ret))
+	assert.Equal(t, "md5-10.txt", ret["dest/world/10.txt"])
+	assert.Equal(t, "md5-5.txt", ret["5.txt"])
+	assert.Equal(t, "md5-world", ret["dest/world"])
+}
