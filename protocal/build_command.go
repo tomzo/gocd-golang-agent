@@ -159,11 +159,13 @@ func UploadArtifactCommand(src, dest string) *BuildCommand {
 	return NewBuildCommand(CommandUploadArtifact).SetArgs(args)
 }
 
-func DownloadFileCommand(src, uri, dest string) *BuildCommand {
+func DownloadFileCommand(src, url, dest, checksumUrl, checksumPath string) *BuildCommand {
 	args := map[string]string{
-		"src":  src,
-		"uri":  uri,
-		"dest": dest,
+		"src":          src,
+		"url":          url,
+		"dest":         dest,
+		"checksumUrl":  checksumUrl,
+		"checksumFile": checksumPath,
 	}
 	return NewBuildCommand(CommandDownloadFile).SetArgs(args)
 }

@@ -36,12 +36,12 @@ type Artifacts struct {
 	httpClient *http.Client
 }
 
-func (u *Artifacts) Download(source *url.URL, destPath string) (err error) {
-	out, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE, 0644)
+func (u *Artifacts) DownloadFile(source *url.URL, destPath string) (err error) {
+	destFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return
 	}
-	defer out.Close()
+	defer destFile.Close()
 
 	resp, err := u.httpClient.Get(source.String())
 	if err != nil {
@@ -49,10 +49,7 @@ func (u *Artifacts) Download(source *url.URL, destPath string) (err error) {
 	}
 	defer resp.Body.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return
-	}
+	_, err = io.Copy(destFile, resp.Body)
 	return
 }
 
@@ -132,6 +129,31 @@ func (u *Artifacts) writePart(writer *multipart.Writer, src io.Reader, fieldname
 	}
 	_, err = io.Copy(part, src)
 	return err
+}
+
+func (u *Artifacts) VerifyChecksum(srcFname, fname, checksumFname string) error {
+	md5, err := u.computeMd5(fname)
+	if err != nil {
+		return err
+	}
+	checksum, err := ioutil.ReadFile(checksumFname)
+	if err != nil {
+		return err
+	}
+	md5Str := Sprintf("%x", md5)
+	for _, l := range strings.Split(string(checksum), "\n") {
+		if strings.HasPrefix(l, "#") {
+			continue
+		}
+		if strings.HasPrefix(l, srcFname) {
+			if md5Str == l[len(srcFname)+1:] {
+				return nil
+			} else {
+				return Err("[ERROR] Verification of the integrity of the artifact [%v] failed. The artifact file on the server may have changed since its original upload.", srcFname)
+			}
+		}
+	}
+	return Err("[WARN] The md5checksum value of the artifact [%v] was not found on the server. Hence, Go could not verify the integrity of its contents.", srcFname)
 }
 
 func (u *Artifacts) computeMd5(filePath string) ([]byte, error) {

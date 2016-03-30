@@ -276,25 +276,38 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 }
 
 func (s *BuildSession) processDownloadFile(cmd *protocal.BuildCommand) error {
-	src := cmd.Args["src"]
-	uri := cmd.Args["uri"]
-	destDir := cmd.Args["dest"]
-
 	wd, err := filepath.Abs(cmd.WorkingDirectory)
 	if err != nil {
 		return err
 	}
-	absDestDir := filepath.Join(wd, destDir)
+
+	checksumURL, err := config.MakeFullServerURL(cmd.Args["checksumUrl"])
+	if err != nil {
+		return err
+	}
+	absChecksumFile := filepath.Join(wd, cmd.Args["checksumFile"])
+	err = s.artifacts.DownloadFile(checksumURL, absChecksumFile)
+	if err != nil {
+		return err
+	}
+
+	srcURL, err := config.MakeFullServerURL(cmd.Args["url"])
+	if err != nil {
+		return err
+	}
+	src := cmd.Args["src"]
+	absDestDir := filepath.Join(wd, cmd.Args["dest"])
 	err = Mkdirs(absDestDir)
 	if err != nil {
 		return err
 	}
-	srcURL, err := config.MakeFullServerURL(uri)
+	_, fname := filepath.Split(src)
+	absDestPath := filepath.Join(absDestDir, fname)
+	err = s.artifacts.DownloadFile(srcURL, absDestPath)
 	if err != nil {
 		return err
 	}
-	_, fname := filepath.Split(src)
-	return s.artifacts.Download(srcURL, filepath.Join(absDestDir, fname))
+	return s.artifacts.VerifyChecksum(src, absDestPath, absChecksumFile)
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer) error {

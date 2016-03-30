@@ -127,6 +127,10 @@ func (s *Server) Checksum(buildId string) (string, error) {
 	return string(bytes), err
 }
 
+func (s *Server) ChecksumUrl(buildId string) string {
+	return ArtifactsPath + "/builds/" + buildId
+}
+
 func (s *Server) ArtifactFile(buildId, file string) string {
 	return filepath.Join(s.WorkingDir, buildId, "artifacts", file)
 }

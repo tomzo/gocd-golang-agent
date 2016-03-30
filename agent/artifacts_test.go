@@ -329,20 +329,22 @@ func TestDownloadArtifactFile(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	testDownload(t, "/src/hello/4.txt", "dest",
+	testDownload(t, "src/hello/4.txt", "dest",
 		"src/hello/4.txt=41e43efb30d3fbfcea93542157809ac0\n",
 		[]string{"dest/4.txt"})
 }
 
 func testDownload(t *testing.T, srcPath, destDir, checksum string, destFiles []string) {
 	wd := createTestProjectInPipelineDir()
-	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "src").Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
 	srcURI := goServer.ArtifactURI(buildId, srcPath)
-	goServer.SendBuild(AgentId, buildId, protocal.DownloadFileCommand(srcPath, srcURI, destDir).Setwd(wd))
+	checksumUrl := goServer.ChecksumUrl(buildId)
+	checksumPath := Sprintf("build-%v.md5", buildId)
+	goServer.SendBuild(AgentId, buildId, protocal.DownloadFileCommand(srcPath, srcURI, destDir, checksumUrl, checksumPath).Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())

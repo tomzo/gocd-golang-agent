@@ -43,14 +43,17 @@ func artifactsHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 func handleArtifactDownload(s *Server, w http.ResponseWriter, req *http.Request) {
 	buildId := parseBuildId(req.URL.Path)
 	file := req.URL.Query()["file"]
-	if len(file) == 0 {
-		w.WriteHeader(http.StatusNotAcceptable)
-		return
+	var fullPath string
+	if len(file) == 1 {
+		fullPath = s.ArtifactFile(buildId, file[0])
+	} else {
+		fullPath = s.ChecksumFile(buildId)
 	}
-	fullPath := s.ArtifactFile(buildId, file[0])
+	s.log("Downloading %v", fullPath)
 	f, err := os.Open(fullPath)
 	defer f.Close()
 	if err != nil {
+		s.log("Error: %v", err)
 		s.responseBadRequest(err, w)
 	} else {
 		io.Copy(w, f)
