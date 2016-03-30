@@ -328,13 +328,10 @@ func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[st
 func TestDownloadArtifactFile(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-
-	testDownload(t, "src/hello/4.txt", "dest",
-		"src/hello/4.txt=41e43efb30d3fbfcea93542157809ac0\n",
-		[]string{"dest/4.txt"})
+	testDownload(t, "src/hello/4.txt", "dest", []string{"dest/4.txt"})
 }
 
-func testDownload(t *testing.T, srcPath, destDir, checksum string, destFiles []string) {
+func testDownload(t *testing.T, srcPath, destDir string, destFiles []string) {
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -353,6 +350,11 @@ func testDownload(t *testing.T, srcPath, destDir, checksum string, destFiles []s
 		_, err := os.Stat(filepath.Join(wd, f))
 		assert.Nil(t, err)
 	}
+
+	content, err := ioutil.ReadFile(filepath.Join(wd, checksumPath))
+	assert.Nil(t, err)
+	buildChecksum, _ := goServer.Checksum(buildId)
+	assert.Equal(t, buildChecksum, string(content))
 }
 
 func assertConsoleLog(t *testing.T, wd string, src2dest map[string]string) {
