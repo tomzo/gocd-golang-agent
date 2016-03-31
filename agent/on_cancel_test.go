@@ -79,3 +79,26 @@ func TestOnCancel2(t *testing.T) {
 `
 	assert.Equal(t, expected, trimTimestamp(log))
 }
+
+func TestOnCancelShouldContinueMaskEchos(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	goServer.SendBuild(AgentId, buildId,
+		protocal.SecretCommand("secret", "$$$"),
+		protocal.ExecCommand("sleep", "5").SetOnCancel(echo("secret on cancel: ${agent.location}")),
+	)
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+
+	goServer.Send(AgentId, protocal.CancelMessage())
+
+	assert.Equal(t, "build Cancelled", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+
+	config := GetConfig()
+	expected := Sprintf("$$$ on cancel: %v\n", config.WorkingDir())
+	assert.Equal(t, expected, trimTimestamp(log))
+}

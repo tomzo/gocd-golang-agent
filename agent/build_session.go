@@ -188,7 +188,20 @@ func (s *BuildSession) onCancel(cmd *protocal.BuildCommand) {
 	if cmd.OnCancel == nil || !s.isCanceled() {
 		return
 	}
-	cancel := MakeBuildSession(s.buildId, cmd.OnCancel, s.console, s.artifacts, s.artifactUploadBaseURL, s.send)
+	cancel := &BuildSession{
+		buildId:               s.buildId,
+		console:               s.console,
+		artifacts:             s.artifacts,
+		artifactUploadBaseURL: s.artifactUploadBaseURL,
+		send:        s.send,
+		envs:        s.envs,
+		secrets:     s.secrets,
+		echo:        s.echo,
+		command:     cmd.OnCancel,
+		buildStatus: protocal.BuildPassed,
+		cancel:      make(chan bool),
+		done:        make(chan bool),
+	}
 	go func() {
 		cancel.ProcessCommand()
 	}()
