@@ -146,7 +146,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandSecret:
 		s.processSecret(cmd)
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting:
-		jobState := cmd.Args["jobState"]
+		jobState := cmd.Args["status"]
 		s.send <- protocal.ReportMessage(cmd.Name, s.Report(jobState))
 	case protocal.CommandTest:
 		err = s.processTest(cmd)

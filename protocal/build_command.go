@@ -101,7 +101,7 @@ func ExportCommand(kvs ...string) *BuildCommand {
 }
 
 func ReportCurrentStatusCommand(jobState string) *BuildCommand {
-	args := map[string]string{"jobState": jobState}
+	args := map[string]string{"status": jobState}
 	return NewBuildCommand(CommandReportCurrentStatus).SetArgs(args)
 }
 

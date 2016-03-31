@@ -19,6 +19,6 @@ package protocal
 type Report struct {
 	BuildId          string            `json:"buildId"`
 	Result           string            `json:"result"`
-	JobState         string            `json:"jobStatus"`
+	JobState         string            `json:"jobState"`
 	AgentRuntimeInfo *AgentRuntimeInfo `json:"agentRuntimeInfo"`
 }
