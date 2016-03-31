@@ -45,7 +45,7 @@ func TestUploadArtifactFailed(t *testing.T) {
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := Sprintf("stat %v/%v: no such file or directory\n",
+	expected := Sprintf("ERROR: stat %v/%v: no such file or directory\n",
 		artifactWd, fname)
 	assert.Equal(t, expected, trimTimestamp(log))
 }
@@ -71,7 +71,7 @@ func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	f := `Uploading artifacts from %v/large.txt to [defaultRoot]
-Artifact upload for file %v/large.txt (Size: 609) was denied by the server. This usually happens when server runs out of disk space.
+ERROR: Artifact upload for file %v/large.txt (Size: 609) was denied by the server. This usually happens when server runs out of disk space.
 `
 	expected := Sprintf(f, wd, wd)
 	assert.Equal(t, expected, trimTimestamp(log))

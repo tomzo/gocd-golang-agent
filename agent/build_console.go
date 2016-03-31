@@ -60,7 +60,6 @@ func MakeBuildConsole(httpClient *http.Client, url *url.URL) *BuildConsole {
 		for {
 			select {
 			case log := <-console.write:
-				LogDebug("BuildConsole: '%v'", string(log))
 				tw.Write(log)
 			case <-console.stop:
 				console.Flush()
@@ -84,10 +83,10 @@ func (console *BuildConsole) Write(data []byte) (int, error) {
 }
 
 func (console *BuildConsole) Flush() {
-	LogDebug("build console flush, buffer len: %v", console.buffer.Len())
 	if console.buffer.Len() == 0 {
 		return
 	}
+	LogDebug("ConsoleLog: \n%v", console.buffer.String())
 
 	req := http.Request{
 		Method:        http.MethodPut,

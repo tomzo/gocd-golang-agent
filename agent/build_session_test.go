@@ -120,7 +120,7 @@ func TestFailCommand(t *testing.T) {
 
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
-	expected := Sprintf("something is wrong, please fail\n")
+	expected := Sprintf("ERROR: something is wrong, please fail\n")
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 

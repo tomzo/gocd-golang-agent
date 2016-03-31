@@ -45,7 +45,7 @@ func TestRunIfConfig(t *testing.T) {
 
 	expected := `should echo if any when passed
 should echo if passed when passed
-exec: "cmdnotexist": executable file not found in $PATH
+ERROR: exec: "cmdnotexist": executable file not found in $PATH
 should echo if failed when failed
 should echo if any when failed
 `

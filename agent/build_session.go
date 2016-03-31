@@ -37,6 +37,7 @@ var (
 	DefaultCancelCommandTimeout = 25 * time.Second
 	CancelCommandTimeout        = DefaultCancelCommandTimeout
 	CancelBuildTimeout          = 30 * time.Second
+	BuildDebugToConsoleLog      = true
 )
 
 type BuildSession struct {
@@ -97,8 +98,9 @@ func (s *BuildSession) Run() error {
 	defer func() {
 		s.console.Close()
 		s.send <- protocal.CompletedMessage(s.Report(""))
+		LogInfo("Build completed")
 	}()
-	LogInfo("Run build command")
+	LogInfo("Build started")
 	return s.ProcessCommand()
 }
 
@@ -114,23 +116,25 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	defer s.onCancel(cmd)
 
 	if s.isCanceled() {
-		LogDebug("Ignored command %v, because build is canceled", cmd.Name)
+		s.debugLog("build canceled, ignore %v", cmd.Name)
 		return nil
 	}
 
 	if !cmd.RunIfAny() && !cmd.RunIfMatch(s.buildStatus) {
+		s.debugLog("ignore %v: build[%v] != runIf[%v]", cmd.Name, s.buildStatus, cmd.RunIfConfig)
 		//skip, no failure
 		return nil
 	}
+	s.debugLog("process: %v", cmd.Name)
 	if cmd.Test != nil {
-		if cmd.Test.Command.Name != protocal.CommandTest {
-			panic("a BuildCommand test should be test command")
-		}
+		s.debugLog("test: %+v", cmd.Test)
 		_, err := s.processTestCommand(cmd.Test.Command)
 		success := err == nil
 		if success != cmd.Test.Expectation {
-			LogDebug("test failed: %v", err)
+			s.debugLog("test failed: %v, ignore command", err)
 			return nil
+		} else {
+			s.debugLog("test matches expectation, continue")
 		}
 	}
 
@@ -145,6 +149,7 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 		s.processSecret(cmd)
 	case protocal.CommandReportCurrentStatus, protocal.CommandReportCompleting:
 		jobState := cmd.Args["status"]
+		s.debugLog("report %v", jobState)
 		s.send <- protocal.ReportMessage(cmd.Name, s.Report(jobState))
 	case protocal.CommandTest:
 		err = s.processTest(cmd)
@@ -167,12 +172,11 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	}
 
 	if s.isCanceled() {
-		LogInfo("Build canceled")
+		LogInfo("build canceled")
 		s.buildStatus = protocal.BuildCanceled
 	} else if err != nil {
-		LogInfo("Build failed: %v", err)
 		s.buildStatus = protocal.BuildFailed
-		s.ConsoleLog(Sprintf("%v\n", err))
+		s.ConsoleLog(Sprintf("ERROR: %v\n", err))
 	}
 
 	return
@@ -200,6 +204,7 @@ func (s *BuildSession) processSecret(cmd *protocal.BuildCommand) {
 	if substitution == "" {
 		substitution = DefaultSecretMask
 	}
+	s.debugLog("%v => %v", value, substitution)
 	s.secrets.Substitutions[value] = substitution
 }
 
@@ -214,7 +219,9 @@ func (s *BuildSession) processCleandir(cmd *protocal.BuildCommand) (err error) {
 	if err != nil {
 		return
 	}
-	return Cleandir(filepath.Join(wd, path), allows...)
+	fullPath := filepath.Join(wd, path)
+	s.debugLog("cleandir %v, excludes: %+v", fullPath, allows)
+	return Cleandir(fullPath, allows...)
 }
 
 func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) error {
@@ -223,7 +230,9 @@ func (s *BuildSession) processMkdirs(cmd *protocal.BuildCommand) error {
 	if err != nil {
 		return err
 	}
-	return Mkdirs(filepath.Join(wd, path))
+	fullPath := filepath.Join(wd, path)
+	s.debugLog("mkdirs %v", fullPath)
+	return Mkdirs(fullPath)
 }
 
 func (s *BuildSession) processUploadArtifact(cmd *protocal.BuildCommand) error {
@@ -306,6 +315,7 @@ func (s *BuildSession) processDownload(cmd *protocal.BuildCommand) error {
 		s.ConsoleLog("[%v] exists and matches checksum, does not need dowload it from server.\n", srcPath)
 		return nil
 	}
+	s.debugLog("download %v to %v", srcURL, absDestPath)
 	if cmd.Name == protocal.CommandDownloadDir {
 		err = s.artifacts.DownloadDir(srcURL, absDestPath)
 	} else {
@@ -330,12 +340,12 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 
 	select {
 	case <-s.cancel:
-		LogDebug("received cancel signal")
-		LogInfo("killing process(%v) %v", execCmd.Process, cmd.Args)
+		s.debugLog("received cancel signal")
+		LogInfo("kill process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.ConsoleLog("kill command %v failed, error: %v\n", cmd.Args, err)
+			s.ConsoleLog("Kill command %v failed, error: %v\n", cmd.Args, err)
 		} else {
-			LogInfo("Process %v is killed", execCmd.Process)
+			LogInfo("process %v is killed", execCmd.Process)
 		}
 		return Err("%v is canceled", cmd.Args)
 	case err := <-done:
@@ -384,7 +394,7 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	case "-eq":
 		output, err := s.processTestCommand(cmd.SubCommands[0])
 		if err != nil {
-			LogDebug("test -eq exec command error: %v", err)
+			s.debugLog("test -eq exec command error: %v", err)
 		}
 		expected := strings.TrimSpace(cmd.Args["left"])
 		actual := strings.TrimSpace(output.String())
@@ -456,6 +466,10 @@ func (s *BuildSession) processCompose(cmd *protocal.BuildCommand) error {
 		}
 	}
 	return err
+}
+
+func (s *BuildSession) debugLog(format string, a ...interface{}) {
+	LogDebug(Sprintf("%v\n", format), a...)
 }
 
 func destDescription(path string) string {

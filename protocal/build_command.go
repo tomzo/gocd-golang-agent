@@ -229,10 +229,10 @@ func (cmd *BuildCommand) ExtractArgList(size int) []string {
 }
 
 func (cmd *BuildCommand) String() string {
-	return cmd.Dump(2, 2)
+	return cmd.Dump(2, 2, false)
 }
 
-func (cmd *BuildCommand) Dump(indent, step int) string {
+func (cmd *BuildCommand) Dump(indent, step int, includeSubCmds bool) string {
 	var buffer bytes.Buffer
 	buffer.WriteString(strings.Repeat(" ", indent))
 	buffer.WriteString(cmd.Name)
@@ -242,9 +242,14 @@ func (cmd *BuildCommand) Dump(indent, step int) string {
 	if !cmd.RunIfMatch(RunIfConfigPassed) {
 		buffer.WriteString(fmt.Sprintf(" runIf:%v", cmd.RunIfConfig))
 	}
-	for _, subCmd := range cmd.SubCommands {
-		buffer.WriteString("\n")
-		buffer.WriteString(subCmd.Dump(indent+step, step))
+	if cmd.Test != nil {
+		buffer.WriteString(fmt.Sprintf(" test:%+v", cmd.Test))
+	}
+	if includeSubCmds {
+		for _, subCmd := range cmd.SubCommands {
+			buffer.WriteString("\n")
+			buffer.WriteString(subCmd.Dump(indent+step, step, true))
+		}
 	}
 	return buffer.String()
 }

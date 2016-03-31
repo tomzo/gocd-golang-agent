@@ -63,19 +63,23 @@ func (u *Artifacts) DownloadDir(source *url.URL, destPath string) error {
 	if err != nil {
 		return err
 	}
+	LogDebug("unzip to %v", destPath)
 	defer zipReader.Close()
 	destDir := filepath.Dir(destPath)
 	for _, file := range zipReader.File {
 		dest := filepath.Join(destDir, file.FileHeader.Name)
 		if file.FileHeader.FileInfo().IsDir() {
+			LogDebug("mkdirs %v", dest)
 			err = Mkdirs(dest)
 		} else {
+			LogDebug("extract file %v => %v", file.FileHeader.Name, dest)
 			err = u.extractFile(file, dest)
 		}
 		if err != nil {
 			return err
 		}
 	}
+	LogDebug("unzip finished")
 	return nil
 }
 
@@ -85,6 +89,7 @@ func (u *Artifacts) downloadFile(source *url.URL, destFile *os.File) (err error)
 	if err != nil {
 		return
 	}
+	LogDebug("response: %v", resp.Status)
 	defer resp.Body.Close()
 
 	_, err = io.Copy(destFile, resp.Body)

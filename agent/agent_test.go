@@ -77,6 +77,7 @@ func TestMain(m *testing.M) {
 	}
 
 	startServer(serverWorkingDir)
+	BuildDebugToConsoleLog = false
 	os.Setenv("DEBUG", "t")
 	os.Setenv("GOCD_SERVER_URL", goServerUrl)
 	os.Setenv("GOCD_SERVER_WEB_SOCKET_PATH", server.WebSocketPath)
