@@ -176,7 +176,9 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 		s.buildStatus = protocal.BuildCanceled
 	} else if err != nil {
 		s.buildStatus = protocal.BuildFailed
-		s.ConsoleLog(Sprintf("ERROR: %v\n", err))
+		errMsg := Sprintf("ERROR: %v\n", err)
+		LogInfo(errMsg)
+		s.ConsoleLog(errMsg)
 	}
 
 	return

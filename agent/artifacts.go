@@ -53,11 +53,12 @@ func (u *Artifacts) DownloadDir(source *url.URL, destPath string) error {
 	if err != nil {
 		return err
 	}
+	defer os.Remove(zipfile.Name())
+	LogDebug("tmp file created for download zipped dir")
 	err = u.downloadFile(source, zipfile)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(zipfile.Name())
 
 	zipReader, err := zip.OpenReader(zipfile.Name())
 	if err != nil {
@@ -85,13 +86,30 @@ func (u *Artifacts) DownloadDir(source *url.URL, destPath string) error {
 
 func (u *Artifacts) downloadFile(source *url.URL, destFile *os.File) (err error) {
 	defer destFile.Close()
+	LogDebug("download file %v => %v", source, destFile.Name())
+	retry := 0
+startDownload:
 	resp, err := u.httpClient.Get(source.String())
 	if err != nil {
 		return
 	}
 	LogDebug("response: %v", resp.Status)
+	if resp.StatusCode == http.StatusAccepted {
+		LogDebug("sleep 1 sec and start download again")
+		time.Sleep(1 * time.Second)
+		goto startDownload
+	}
+	if resp.StatusCode != http.StatusOK {
+		if retry < 3 {
+			retry++
+			LogDebug("sleep %v sec and start download again", retry)
+			time.Sleep(time.Duration(retry) * time.Second)
+			goto startDownload
+		} else {
+			return Err("tried %v times to download [%v] and all failed.", retry, source)
+		}
+	}
 	defer resp.Body.Close()
-
 	_, err = io.Copy(destFile, resp.Body)
 	return
 }
