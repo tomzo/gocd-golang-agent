@@ -55,6 +55,7 @@ type Config struct {
 
 func LoadConfig() *Config {
 	gocdServerURL := readEnv("GOCD_SERVER_URL", "https://localhost:8154/go")
+	os.Setenv("GO_SERVER_URL", gocdServerURL)
 	serverUrl, err := url.Parse(gocdServerURL)
 	if err != nil {
 		panic(err)
