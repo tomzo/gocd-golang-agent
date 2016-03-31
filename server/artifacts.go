@@ -49,13 +49,33 @@ func handleArtifactDownload(s *Server, w http.ResponseWriter, req *http.Request)
 	} else {
 		fullPath = s.ChecksumFile(buildId)
 	}
-	s.log("Downloading %v", fullPath)
-	f, err := os.Open(fullPath)
-	defer f.Close()
+	info, err := os.Stat(fullPath)
 	if err != nil {
-		s.log("Error: %v", err)
 		s.responseBadRequest(err, w)
+		return
+	}
+	if info.IsDir() {
+		s.log("Downloading directory %v", fullPath)
+		zipfile, err := zipDirecotry(fullPath)
+		if err != nil {
+			s.responseBadRequest(err, w)
+			return
+		}
+		f, err := os.Open(zipfile)
+		if err != nil {
+			s.responseBadRequest(err, w)
+			return
+		}
+		defer f.Close()
+		io.Copy(w, f)
 	} else {
+		s.log("Downloading %v", fullPath)
+		f, err := os.Open(fullPath)
+		if err != nil {
+			s.responseBadRequest(err, w)
+			return
+		}
+		defer f.Close()
 		io.Copy(w, f)
 	}
 }
@@ -133,4 +153,39 @@ func extractArtifactFile(file *zip.File, dest string) error {
 	defer destFile.Close()
 	_, err = io.Copy(destFile, rc)
 	return err
+}
+
+func zipDirecotry(source string) (string, error) {
+	zipfile, err := ioutil.TempFile("", "tmp.zip")
+	if err != nil {
+		return "", err
+	}
+	defer zipfile.Close()
+	w := zip.NewWriter(zipfile)
+	defer w.Close()
+	_, dirName := filepath.Split(source)
+	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		destFile := dirName + path[len(source):]
+		writer, err := w.Create(destFile)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.Copy(writer, file)
+		return err
+	})
+	return zipfile.Name(), err
+
 }

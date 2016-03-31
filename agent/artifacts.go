@@ -36,12 +36,51 @@ type Artifacts struct {
 }
 
 func (u *Artifacts) DownloadFile(source *url.URL, destPath string) (err error) {
+	dir, _ := filepath.Split(destPath)
+	err = Mkdirs(dir)
+	if err != nil {
+		return err
+	}
 	destFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return
 	}
-	defer destFile.Close()
+	return u.downloadFile(source, destFile)
+}
 
+func (u *Artifacts) DownloadDir(source *url.URL, destPath string) error {
+	zipfile, err := ioutil.TempFile("", "tmp.zip")
+	if err != nil {
+		return err
+	}
+	err = u.downloadFile(source, zipfile)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(zipfile.Name())
+
+	zipReader, err := zip.OpenReader(zipfile.Name())
+	if err != nil {
+		return err
+	}
+	defer zipReader.Close()
+	destDir := filepath.Dir(destPath)
+	for _, file := range zipReader.File {
+		dest := filepath.Join(destDir, file.FileHeader.Name)
+		if file.FileHeader.FileInfo().IsDir() {
+			err = Mkdirs(dest)
+		} else {
+			err = u.extractFile(file, dest)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (u *Artifacts) downloadFile(source *url.URL, destFile *os.File) (err error) {
+	defer destFile.Close()
 	resp, err := u.httpClient.Get(source.String())
 	if err != nil {
 		return
@@ -52,7 +91,28 @@ func (u *Artifacts) DownloadFile(source *url.URL, destPath string) (err error) {
 	return
 }
 
-func (u *Artifacts) VerifyChecksum(srcFname, fname, checksumFname string) error {
+func (u *Artifacts) VerifyChecksum(srcPath, destPath, checksumFname string) error {
+	destInfo, err := os.Stat(destPath)
+	if err != nil {
+		return err
+	}
+	if destInfo.IsDir() {
+		return filepath.Walk(destPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			srcFname := Join("/", srcPath, path[len(destPath)+1:])
+			return u.VerifyChecksumFile(srcFname, path, checksumFname)
+		})
+	} else {
+		return u.VerifyChecksumFile(srcPath, destPath, checksumFname)
+	}
+}
+
+func (u *Artifacts) VerifyChecksumFile(srcFname, fname, checksumFname string) error {
 	md5, err := ComputeMd5(fname)
 	if err != nil {
 		return err
@@ -203,4 +263,24 @@ func (u *Artifacts) zipSource(source string, dest string) (string, string, error
 		return err
 	})
 	return zipfile.Name(), checksum.String(), err
+}
+
+func (u *Artifacts) extractFile(file *zip.File, dest string) error {
+	rc, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	err = os.MkdirAll(filepath.Dir(dest), 0755)
+	if err != nil {
+		return err
+	}
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+	_, err = io.Copy(destFile, rc)
+	return err
 }

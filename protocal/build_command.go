@@ -41,6 +41,7 @@ var (
 	CommandFail                = "fail"
 	CommandSecret              = "secret"
 	CommandDownloadFile        = "downloadFile"
+	CommandDownloadDir         = "downloadDir"
 )
 
 type BuildCommandTest struct {
@@ -160,6 +161,14 @@ func UploadArtifactCommand(src, dest string) *BuildCommand {
 }
 
 func DownloadFileCommand(src, url, dest, checksumUrl, checksumPath string) *BuildCommand {
+	return DownloadCommand(CommandDownloadFile, src, url, dest, checksumUrl, checksumPath)
+}
+
+func DownloadDirCommand(src, url, dest, checksumUrl, checksumPath string) *BuildCommand {
+	return DownloadCommand(CommandDownloadDir, src, url, dest, checksumUrl, checksumPath)
+}
+
+func DownloadCommand(file_or_dir, src, url, dest, checksumUrl, checksumPath string) *BuildCommand {
 	args := map[string]string{
 		"src":          src,
 		"url":          url,
@@ -167,7 +176,7 @@ func DownloadFileCommand(src, url, dest, checksumUrl, checksumPath string) *Buil
 		"checksumUrl":  checksumUrl,
 		"checksumFile": checksumPath,
 	}
-	return NewBuildCommand(CommandDownloadFile).SetArgs(args)
+	return NewBuildCommand(file_or_dir).SetArgs(args)
 }
 
 func (cmd *BuildCommand) RunIfAny() bool {

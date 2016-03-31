@@ -157,7 +157,9 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	case protocal.CommandUploadArtifact:
 		err = s.processUploadArtifact(cmd)
 	case protocal.CommandDownloadFile:
-		err = s.processDownloadFile(cmd)
+		err = s.processDownload(cmd)
+	case protocal.CommandDownloadDir:
+		err = s.processDownload(cmd)
 	case protocal.CommandFail:
 		err = Err(cmd.Args["0"])
 	default:
@@ -273,7 +275,7 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 	return s.artifacts.Upload(source, destPath, destURL)
 }
 
-func (s *BuildSession) processDownloadFile(cmd *protocal.BuildCommand) error {
+func (s *BuildSession) processDownload(cmd *protocal.BuildCommand) error {
 	wd, err := filepath.Abs(cmd.WorkingDirectory)
 	if err != nil {
 		return err
@@ -293,26 +295,26 @@ func (s *BuildSession) processDownloadFile(cmd *protocal.BuildCommand) error {
 	if err != nil {
 		return err
 	}
-	src := cmd.Args["src"]
-	absDestDir := filepath.Join(wd, cmd.Args["dest"])
-	err = Mkdirs(absDestDir)
-	if err != nil {
-		return err
+	srcPath := cmd.Args["src"]
+	absDestPath := filepath.Join(wd, cmd.Args["dest"])
+	if cmd.Name == protocal.CommandDownloadDir {
+		_, fname := filepath.Split(srcPath)
+		absDestPath = filepath.Join(wd, cmd.Args["dest"], fname)
 	}
-	_, fname := filepath.Split(src)
-	absDestPath := filepath.Join(absDestDir, fname)
-
-	err = s.artifacts.VerifyChecksum(src, absDestPath, absChecksumFile)
+	err = s.artifacts.VerifyChecksum(srcPath, absDestPath, absChecksumFile)
 	if err == nil {
-		s.ConsoleLog("File [%v] exists and matches checksum.\n", src)
+		s.ConsoleLog("[%v] exists and matches checksum, does not need dowload it from server.\n", srcPath)
 		return nil
 	}
-
-	err = s.artifacts.DownloadFile(srcURL, absDestPath)
+	if cmd.Name == protocal.CommandDownloadDir {
+		err = s.artifacts.DownloadDir(srcURL, absDestPath)
+	} else {
+		err = s.artifacts.DownloadFile(srcURL, absDestPath)
+	}
 	if err != nil {
 		return err
 	}
-	return s.artifacts.VerifyChecksum(src, absDestPath, absChecksumFile)
+	return s.artifacts.VerifyChecksum(srcPath, absDestPath, absChecksumFile)
 }
 
 func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer) error {

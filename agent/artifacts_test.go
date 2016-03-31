@@ -329,8 +329,7 @@ func TestDownloadArtifactFile(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	wd := createTestProjectInPipelineDir()
-	testDownload(t, wd, "artifacts/src/hello/4.txt", "dest", []string{"dest/4.txt"})
-
+	testDownload(t, wd, "artifacts/src/hello/4.txt", "dest", []string{"dest/4.txt"}, false)
 }
 
 func TestShouldNotDownloadIfDestFileExistedAndMatchedChecksum(t *testing.T) {
@@ -344,7 +343,7 @@ func TestShouldNotDownloadIfDestFileExistedAndMatchedChecksum(t *testing.T) {
 	assert.Nil(t, err)
 	err = ioutil.WriteFile(filepath.Join(wd, "dest/1.txt"), content, 0400)
 	assert.Nil(t, err)
-	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"})
+	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"}, false)
 	info, err := os.Stat(filepath.Join(wd, "dest/1.txt"))
 	assert.Nil(t, err)
 	assert.Equal(t, os.FileMode(0400), info.Mode())
@@ -359,10 +358,17 @@ func TestShouldDownloadIfDestFileExistedButMismatchedChecksum(t *testing.T) {
 	assert.Nil(t, err)
 	err = ioutil.WriteFile(filepath.Join(wd, "dest/1.txt"), []byte("hello"), 0777)
 	assert.Nil(t, err)
-	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"})
+	testDownload(t, wd, "artifacts/src/1.txt", "dest", []string{"dest/1.txt"}, false)
 }
 
-func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string) {
+func TestDownloadArtifactDir(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+	testDownload(t, wd, "artifacts/src/hello", "dest", []string{"dest/hello/3.txt", "dest/hello/4.txt"}, true)
+}
+
+func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string, sourceIsDir bool) {
 	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "artifacts").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -371,7 +377,17 @@ func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string)
 	srcUrl := goServer.ArtifactUrl(buildId, srcPath)
 	checksumUrl := goServer.ChecksumUrl(buildId)
 	checksumPath := Sprintf("build-%v.md5", buildId)
-	goServer.SendBuild(AgentId, buildId, protocal.DownloadFileCommand(srcPath, srcUrl, destDir, checksumUrl, checksumPath).Setwd(wd))
+
+	var cmd *protocal.BuildCommand
+	if sourceIsDir {
+		cmd = protocal.DownloadDirCommand(srcPath, srcUrl, destDir, checksumUrl, checksumPath)
+	} else {
+		_, fname := filepath.Split(srcPath)
+		destPath := Join("/", destDir, fname)
+		cmd = protocal.DownloadFileCommand(srcPath, srcUrl, destPath, checksumUrl, checksumPath)
+	}
+	goServer.SendBuild(AgentId, buildId, cmd.Setwd(wd))
+
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
