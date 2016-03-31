@@ -98,6 +98,7 @@ func (s *BuildSession) Run() error {
 		s.console.Close()
 		s.send <- protocal.CompletedMessage(s.Report(""))
 	}()
+	LogInfo("Run build command")
 	return s.ProcessCommand()
 }
 
@@ -106,8 +107,6 @@ func (s *BuildSession) ProcessCommand() error {
 		close(s.done)
 	}()
 
-	LogInfo("start process build command:")
-	LogInfo(s.command.String())
 	return s.process(s.command)
 }
 
@@ -119,7 +118,6 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 		return nil
 	}
 
-	LogDebug("procssing build command: %v\n", cmd)
 	if !cmd.RunIfAny() && !cmd.RunIfMatch(s.buildStatus) {
 		//skip, no failure
 		return nil
