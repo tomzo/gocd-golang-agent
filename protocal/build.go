@@ -26,7 +26,7 @@ type Build struct {
 	BuildId                string
 	BuildLocator           string
 	BuildLocatorForDisplay string
-	ConsoleURI             string
+	ConsoleUrl             string
 	ArtifactUploadBaseUrl  string
 	PropertyBaseUrl        string
 	BuildCommand           *BuildCommand

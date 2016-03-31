@@ -119,7 +119,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 		build := msg.DataBuild()
 		SetState("buildLocator", build.BuildLocator)
 		SetState("buildLocatorForDisplay", build.BuildLocatorForDisplay)
-		curl, err := config.MakeFullServerURL(build.ConsoleURI)
+		curl, err := config.MakeFullServerURL(build.ConsoleUrl)
 		if err != nil {
 			return err
 		}

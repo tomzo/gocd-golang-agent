@@ -66,13 +66,13 @@ func NewBuildCommand(name string) *BuildCommand {
 }
 
 func NewBuild(id, locator, locatorForDisplay,
-	consoleURL, artifactUploadBaseUrl, propertyBaseUrl string,
+	consoleUrl, artifactUploadBaseUrl, propertyBaseUrl string,
 	commands ...*BuildCommand) *Build {
 	return &Build{
 		BuildId:                id,
 		BuildLocator:           locator,
 		BuildLocatorForDisplay: locator,
-		ConsoleURI:             consoleURL,
+		ConsoleUrl:             consoleUrl,
 		ArtifactUploadBaseUrl:  artifactUploadBaseUrl,
 		PropertyBaseUrl:        propertyBaseUrl,
 		BuildCommand:           ComposeCommand(commands...),
