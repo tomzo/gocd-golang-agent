@@ -21,16 +21,16 @@ import (
 	"github.com/gocd-contrib/gocd-golang-agent/protocal"
 	"github.com/xli/assert"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 )
 
 func TestTestCommand(t *testing.T) {
-	_, file, _, _ := runtime.Caller(0)
-	dir, _ := filepath.Split(file)
 	setUp(t)
 	defer tearDown()
+
+	wd := createTestProjectInPipelineDir()
+	file := "src/hello/3.txt"
+	dir := "src/hello"
 
 	var tests = []struct {
 		echo     string
@@ -50,7 +50,7 @@ func TestTestCommand(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		testCmd := protocal.TestCommand(test.testArgs...)
+		testCmd := protocal.TestCommand(test.testArgs...).Setwd(wd)
 		goServer.SendBuild(AgentId, buildId, protocal.EchoCommand(test.echo).SetTest(testCmd))
 		assert.Equal(t, "agent Building", stateLog.Next())
 		assert.Equal(t, "build Passed", stateLog.Next())

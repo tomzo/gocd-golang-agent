@@ -351,10 +351,14 @@ func (s *BuildSession) processTestCommand(cmd *protocal.BuildCommand) (bytes.Buf
 
 func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 	flag := cmd.Args["flag"]
+	wd, err := filepath.Abs(cmd.WorkingDirectory)
+	if err != nil {
+		return err
+	}
 
 	switch flag {
 	case "-d":
-		targetPath := cmd.Args["left"]
+		targetPath := filepath.Join(wd, cmd.Args["left"])
 		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err
@@ -365,7 +369,7 @@ func (s *BuildSession) processTest(cmd *protocal.BuildCommand) error {
 			return Err("%v is not a directory", targetPath)
 		}
 	case "-f":
-		targetPath := cmd.Args["left"]
+		targetPath := filepath.Join(wd, cmd.Args["left"])
 		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err
