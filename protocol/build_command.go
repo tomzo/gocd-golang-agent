@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-var (
+const (
 	RunIfConfigAny    = "any"
 	RunIfConfigPassed = "passed"
 

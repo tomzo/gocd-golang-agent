@@ -25,10 +25,12 @@ import (
 	"time"
 )
 
-var buildSession *BuildSession
-var logger *Logger
-var config *Config
-var AgentId string
+var (
+	buildSession *BuildSession
+	logger       *Logger
+	config       *Config
+	AgentId      string
+)
 
 func LogDebug(format string, v ...interface{}) {
 	logger.Debug.Printf(format, v...)

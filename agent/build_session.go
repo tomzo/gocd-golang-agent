@@ -28,12 +28,15 @@ import (
 	"time"
 )
 
-var (
+const (
 	DefaultSecretMask           = "********"
 	DefaultCancelCommandTimeout = 25 * time.Second
-	CancelCommandTimeout        = DefaultCancelCommandTimeout
-	CancelBuildTimeout          = 30 * time.Second
-	BuildDebugToConsoleLog      = true
+)
+
+var (
+	CancelCommandTimeout   = DefaultCancelCommandTimeout
+	CancelBuildTimeout     = 30 * time.Second
+	BuildDebugToConsoleLog = true
 )
 
 type Executor func(session *BuildSession, cmd *protocol.BuildCommand) error

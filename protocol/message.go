@@ -21,7 +21,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var (
+const (
 	SetCookieAction           = "setCookie"
 	CancelBuildAction         = "cancelBuild"
 	ReregisterAction          = "reregister"

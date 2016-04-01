@@ -16,7 +16,7 @@
 
 package protocol
 
-var (
+const (
 	BuildPassed   = "Passed"
 	BuildFailed   = "Failed"
 	BuildCanceled = "Cancelled"

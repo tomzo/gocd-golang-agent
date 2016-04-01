@@ -30,7 +30,7 @@ import (
 	"sync"
 )
 
-var (
+const (
 	WebSocketPath    = "/agent-websocket"
 	RegistrationPath = "/agent-register"
 	StatusPath       = "/status"
