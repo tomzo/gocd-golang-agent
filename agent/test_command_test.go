@@ -40,23 +40,33 @@ func TestTestCommand(t *testing.T) {
 		{"file exist", []string{"-f", file}, "file exist\n"},
 		{"file not exist", []string{"-f", file + "no"}, ""},
 		{"dir is not file", []string{"-f", dir}, ""},
+		{"file exist", []string{"-nf", file}, ""},
+		{"file not exist", []string{"-nf", file + "no"}, "file not exist\n"},
+		{"dir is not file", []string{"-nf", dir}, "dir is not file\n"},
 
 		{"dir exist", []string{"-d", dir}, "dir exist\n"},
+		{"dir exist", []string{"-nd", dir}, ""},
 		{"dir not exist", []string{"-d", dir + "no"}, ""},
+		{"dir not exist", []string{"-nd", dir + "no"}, "dir not exist\n"},
 		{"file is not dir", []string{"-d", file}, ""},
+		{"file is not dir", []string{"-nd", file}, "file is not dir\n"},
 
 		{"equal", []string{"-eq", "hello", "echo", "hello"}, "equal\n"},
 		{"not equal", []string{"-eq", "hello", "echo", "world"}, ""},
+		{"equal", []string{"-neq", "hello", "echo", "hello"}, ""},
+		{"not equal", []string{"-neq", "hello", "echo", "world"}, "not equal\n"},
 	}
 
 	for _, test := range tests {
-		testCmd := protocol.TestCommand(test.testArgs...).Setwd(wd)
-		goServer.SendBuild(AgentId, buildId, protocol.EchoCommand(test.echo).SetTest(testCmd))
+		testCmd := protocol.TestCommand(test.testArgs...).Setwd(relativePath(wd))
+		goServer.SendBuild(AgentId, buildId, echo(test.echo).SetTest(testCmd))
 		assert.Equal(t, "agent Building", stateLog.Next())
 		assert.Equal(t, "build Passed", stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
-		assert.Nil(t, err)
+		if err != nil {
+			t.Errorf("Can't find console log when test: %+v", test)
+		}
 		actual := trimTimestamp(log)
 		if test.expected != actual {
 			t.Errorf("test: %+v\nbut was '%v'", test, actual)

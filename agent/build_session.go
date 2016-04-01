@@ -235,6 +235,7 @@ func (s *BuildSession) onCancel(cmd *protocol.BuildCommand) {
 		envs:        s.envs,
 		secrets:     s.secrets,
 		echo:        s.echo,
+		rootDir:     s.rootDir,
 		command:     cmd.OnCancel,
 		buildStatus: protocol.BuildPassed,
 		cancel:      make(chan bool),
@@ -399,6 +400,7 @@ func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buf
 		envs:        s.envs,
 		secrets:     s.secrets.Filter(&output),
 		echo:        s.echo.Filter(&output),
+		rootDir:     s.rootDir,
 		console:     stream.NopCloser(&output),
 		command:     cmd,
 		buildStatus: protocol.BuildPassed,
@@ -425,6 +427,19 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 		} else {
 			return Err("%v is not a directory", targetPath)
 		}
+	case "-nd":
+		targetPath := filepath.Join(s.wd, cmd.Args["left"])
+		info, err := os.Stat(targetPath)
+		if err != nil && os.IsNotExist(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return Err("%v is a directory", targetPath)
+		} else {
+			return nil
+		}
 	case "-f":
 		targetPath := filepath.Join(s.wd, cmd.Args["left"])
 		info, err := os.Stat(targetPath)
@@ -435,6 +450,19 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return Err("%v is not a file", targetPath)
 		} else {
 			return nil
+		}
+	case "-nf":
+		targetPath := filepath.Join(s.wd, cmd.Args["left"])
+		info, err := os.Stat(targetPath)
+		if err != nil && os.IsNotExist(err) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		} else {
+			return Err("%v is a file", targetPath)
 		}
 	case "-eq":
 		output, err := s.processTestCommand(cmd.SubCommands[0])
@@ -447,9 +475,20 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return Err("expected '%v', but was '%v'", expected, actual)
 		}
 		return nil
+	case "-neq":
+		output, err := s.processTestCommand(cmd.SubCommands[0])
+		if err != nil {
+			s.debugLog("test -neq exec command error: %v", err)
+		}
+		expected := strings.TrimSpace(cmd.Args["left"])
+		actual := strings.TrimSpace(output.String())
+		if expected == actual {
+			return Err("expected different with '%v'", expected)
+		}
+		return nil
 	}
 
-	return Err("unknown test flag")
+	return Err("unknown test flag: %v", flag)
 }
 
 func (s *BuildSession) Report(jobState string) *protocol.Report {
