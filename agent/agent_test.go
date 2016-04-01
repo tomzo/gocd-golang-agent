@@ -151,13 +151,20 @@ func (log *StateLog) Notify(class, id, state string) {
 	switch class {
 	case "agent":
 		if id == log.agentId {
-			log.states <- "agent " + state
+			log.notify("agent " + state)
 		}
 	case "build":
 		if id == log.buildId {
-			log.states <- "build " + state
+			log.notify("build " + state)
 		}
 	}
+}
+
+func (log *StateLog) notify(state string) {
+	defer func() {
+		_ = recover()
+	}()
+	log.states <- state
 }
 
 func (log *StateLog) Next() string {
@@ -167,6 +174,11 @@ func (log *StateLog) Next() string {
 	case <-time.After(5 * time.Second):
 		return "timeout"
 	}
+}
+
+func (log *StateLog) Close() {
+	close(log.states)
+	log.states = make(chan string)
 }
 
 func (log *StateLog) Reset(buildId, agentId string) {
@@ -308,6 +320,9 @@ func tearDown() {
 		panic("wait for agent stop timeout")
 	case <-agentStopped:
 	}
+
+	stateLog.Close()
+
 	err := os.RemoveAll(pipelineDir())
 	if err != nil {
 		println("WARN: clean up pipeline directory failed:", err.Error())

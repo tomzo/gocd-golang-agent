@@ -159,6 +159,15 @@ func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) (err error) {
 	if !strings.HasPrefix(s.wd, s.rootDir) {
 		return Err("Working directory[%v] is outside the agent sandbox.", s.wd)
 	}
+	_, err = os.Stat(s.wd)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return Err("Working directory \"%v\" is not a directory", s.wd)
+		} else {
+			return err
+		}
+	}
+
 	switch cmd.Name {
 	case protocol.CommandExport:
 		s.processExport(cmd)

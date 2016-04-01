@@ -69,6 +69,7 @@ func TestMkdirCommand(t *testing.T) {
 
 	wd := pipelineDir()
 	goServer.SendBuild(AgentId, buildId,
+		protocol.MkdirsCommand(relativePath(wd)),
 		protocol.MkdirsCommand("path/in/pipeline/dir").Setwd(relativePath(wd)),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -224,4 +225,23 @@ func TestShouldFailBuildIfWorkingDirIsSetToOutsideOfAgentWorkingDir(t *testing.T
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
+}
+
+func TestShouldFailBuildIfWorkingDirDoesNotExist(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		echo("echo hello world").Setwd("notexist/subdir"),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+
+	config := GetConfig()
+	expected := Sprintf("ERROR: Working directory \"%v/%v\" is not a directory\n", config.WorkingDir, "notexist/subdir")
+	assert.Equal(t, expected, trimTimestamp(log))
 }
