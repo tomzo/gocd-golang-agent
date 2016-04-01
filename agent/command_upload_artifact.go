@@ -36,10 +36,10 @@ func CommandUploadArtifact(s *BuildSession, cmd *protocol.BuildCommand) error {
 func uploadArtifacts(s *BuildSession, source, destDir string) (err error) {
 	if strings.Contains(source, "*") {
 		matches, err := doublestar.Glob(source)
-		sort.Strings(matches)
 		if err != nil {
 			return err
 		}
+		sort.Strings(matches)
 		base := BaseDirOfPathWithWildcard(source)
 		baseLen := len(base)
 		for _, file := range matches {
