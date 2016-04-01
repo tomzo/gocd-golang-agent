@@ -33,7 +33,7 @@ type Config struct {
 	ContextPath        string
 	WebSocketPath      string
 	RegistrationPath   string
-	WorkDir            string
+	WorkingDir         string
 	LogDir             string
 	ConfigDir          string
 	IpAddress          string
@@ -49,8 +49,6 @@ type Config struct {
 	AgentCertFile       string
 	AgentIdFile         string
 	OutputDebugLog      bool
-
-	workingDir string
 }
 
 func LoadConfig() *Config {
@@ -62,36 +60,34 @@ func LoadConfig() *Config {
 	}
 	serverUrl.Scheme = "https"
 	hostname, _ := os.Hostname()
-
+	wd, err := filepath.Abs(os.Getenv("GOCD_AGENT_WORKING_DIR"))
+	if err != nil {
+		panic(Sprintf("GOCD_AGENT_WORKING_DIR is invalid: %v", err))
+	}
+	wd = filepath.Clean(wd)
+	configDir := filepath.Join(wd, readEnv("GOCD_AGENT_CONFIG_DIR", "config"))
 	return &Config{
 		Hostname:                         hostname,
 		SendMessageTimeout:               120 * time.Second,
 		ServerUrl:                        serverUrl,
 		ServerHostAndPort:                serverUrl.Host,
-		WorkDir:                          os.Getenv("GOCD_AGENT_WORK_DIR"),
+		WorkingDir:                       wd,
 		LogDir:                           os.Getenv("GOCD_AGENT_LOG_DIR"),
-		ConfigDir:                        readEnv("GOCD_AGENT_CONFIG_DIR", "config"),
+		ConfigDir:                        configDir,
+		GoServerCAFile:                   filepath.Join(configDir, "go-server-ca.pem"),
+		AgentPrivateKeyFile:              filepath.Join(configDir, "agent-private-key.pem"),
+		AgentCertFile:                    filepath.Join(configDir, "agent-cert.pem"),
+		AgentIdFile:                      filepath.Join(configDir, "agent-id"),
 		AgentAutoRegisterKey:             os.Getenv("GOCD_AGENT_AUTO_REGISTER_KEY"),
 		AgentAutoRegisterResources:       os.Getenv("GOCD_AGENT_AUTO_REGISTER_RESOURCES"),
 		AgentAutoRegisterEnvironments:    os.Getenv("GOCD_AGENT_AUTO_REGISTER_ENVIRONMENTS"),
 		AgentAutoRegisterElasticAgentId:  os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_AGENT_ID"),
 		AgentAutoRegisterElasticPluginId: os.Getenv("GOCD_AGENT_AUTO_REGISTER_ELASTIC_PLUGIN_ID"),
-		GoServerCAFile:                   filepath.Join("config", "go-server-ca.pem"),
-		AgentPrivateKeyFile:              filepath.Join("config", "agent-private-key.pem"),
-		AgentCertFile:                    filepath.Join("config", "agent-cert.pem"),
-		AgentIdFile:                      filepath.Join("config", "agent-id"),
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
 		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/agent-websocket"),
 		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/admin/agent"),
 		IpAddress:                        lookupIpAddress(),
 	}
-}
-
-func (c *Config) WorkingDir() string {
-	if c.workingDir == "" {
-		c.workingDir, _ = os.Getwd()
-	}
-	return c.workingDir
 }
 
 func lookupIpAddress() string {

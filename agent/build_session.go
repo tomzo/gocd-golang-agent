@@ -55,6 +55,9 @@ type BuildSession struct {
 
 	buildId     string
 	buildStatus string
+
+	rootDir string
+	wd      string
 }
 
 func MakeBuildSession(buildId string,
@@ -62,7 +65,8 @@ func MakeBuildSession(buildId string,
 	console io.WriteCloser,
 	artifacts *Artifacts,
 	artifactUploadBaseURL *url.URL,
-	send chan *protocol.Message) *BuildSession {
+	send chan *protocol.Message,
+	rootDir string) *BuildSession {
 
 	secrets := stream.NewSubstituteWriter(console)
 	return &BuildSession{
@@ -78,6 +82,7 @@ func MakeBuildSession(buildId string,
 		done:                  make(chan bool),
 		secrets:               secrets,
 		echo:                  stream.NewSubstituteWriter(secrets),
+		rootDir:               rootDir,
 	}
 }
 
@@ -103,7 +108,7 @@ func (s *BuildSession) Run() error {
 		s.send <- protocol.CompletedMessage(s.Report(""))
 		LogInfo("Build completed")
 	}()
-	LogInfo("Build started")
+	LogInfo("Build started, root directory: %v", s.rootDir)
 	return s.ProcessCommand()
 }
 
@@ -133,9 +138,28 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 		return nil
 	}
 
+	err = s.doProcess(cmd)
+	if s.isCanceled() {
+		LogInfo("build canceled")
+		s.buildStatus = protocol.BuildCanceled
+	} else if err != nil && s.buildStatus != protocol.BuildFailed {
+		s.buildStatus = protocol.BuildFailed
+		errMsg := Sprintf("ERROR: %v\n", err)
+		LogInfo(errMsg)
+		s.ConsoleLog(errMsg)
+	}
+
+	return
+}
+
+func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) (err error) {
+	s.wd = filepath.Clean(filepath.Join(s.rootDir, cmd.WorkingDirectory))
+	s.debugLog("set wd to %v", s.wd)
+
+	if !strings.HasPrefix(s.wd, s.rootDir) {
+		return Err("Working directory[%v] is outside the agent sandbox.", s.wd)
+	}
 	switch cmd.Name {
-	case protocol.CommandCompose:
-		return s.processCompose(cmd)
 	case protocol.CommandExport:
 		s.processExport(cmd)
 	case protocol.CommandEcho:
@@ -146,6 +170,8 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 		jobState := cmd.Args["status"]
 		s.debugLog("report %v", jobState)
 		s.send <- protocol.ReportMessage(cmd.Name, s.Report(jobState))
+	case protocol.CommandCompose:
+		err = s.processCompose(cmd)
 	case protocol.CommandTest:
 		err = s.processTest(cmd)
 	case protocol.CommandExec:
@@ -165,17 +191,6 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 	default:
 		s.warn("Golang Agent does not support build comamnd '%v' yet, related GoCD feature will not be supported. More details: https://github.com/gocd-contrib/gocd-golang-agent", cmd.Name)
 	}
-
-	if s.isCanceled() {
-		LogInfo("build canceled")
-		s.buildStatus = protocol.BuildCanceled
-	} else if err != nil {
-		s.buildStatus = protocol.BuildFailed
-		errMsg := Sprintf("ERROR: %v\n", err)
-		LogInfo(errMsg)
-		s.ConsoleLog(errMsg)
-	}
-
 	return
 }
 
@@ -240,27 +255,19 @@ func (s *BuildSession) processSecret(cmd *protocol.BuildCommand) {
 
 func (s *BuildSession) processCleandir(cmd *protocol.BuildCommand) (err error) {
 	path := cmd.Args["path"]
-	wd, err := filepath.Abs(cmd.WorkingDirectory)
-	if err != nil {
-		return
-	}
 	var allows []string
 	err = json.Unmarshal([]byte(cmd.Args["allowed"]), &allows)
 	if err != nil {
 		return
 	}
-	fullPath := filepath.Join(wd, path)
+	fullPath := filepath.Join(s.wd, path)
 	s.debugLog("cleandir %v, excludes: %+v", fullPath, allows)
 	return Cleandir(fullPath, allows...)
 }
 
 func (s *BuildSession) processMkdirs(cmd *protocol.BuildCommand) error {
 	path := cmd.Args["path"]
-	wd, err := filepath.Abs(cmd.WorkingDirectory)
-	if err != nil {
-		return err
-	}
-	fullPath := filepath.Join(wd, path)
+	fullPath := filepath.Join(s.wd, path)
 	s.debugLog("mkdirs %v", fullPath)
 	return Mkdirs(fullPath)
 }
@@ -269,11 +276,7 @@ func (s *BuildSession) processUploadArtifact(cmd *protocol.BuildCommand) error {
 	src := cmd.Args["src"]
 	destDir := cmd.Args["dest"]
 
-	wd, err := filepath.Abs(cmd.WorkingDirectory)
-	if err != nil {
-		return err
-	}
-	absSrc := filepath.Join(wd, src)
+	absSrc := filepath.Join(s.wd, src)
 	return s.uploadArtifacts(absSrc, strings.Replace(destDir, "\\", "/", -1))
 }
 
@@ -315,16 +318,11 @@ func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
 }
 
 func (s *BuildSession) processDownload(cmd *protocol.BuildCommand) error {
-	wd, err := filepath.Abs(cmd.WorkingDirectory)
-	if err != nil {
-		return err
-	}
-
 	checksumURL, err := config.MakeFullServerURL(cmd.Args["checksumUrl"])
 	if err != nil {
 		return err
 	}
-	absChecksumFile := filepath.Join(wd, cmd.Args["checksumFile"])
+	absChecksumFile := filepath.Join(s.wd, cmd.Args["checksumFile"])
 	err = s.artifacts.DownloadFile(checksumURL, absChecksumFile)
 	if err != nil {
 		return err
@@ -335,10 +333,10 @@ func (s *BuildSession) processDownload(cmd *protocol.BuildCommand) error {
 		return err
 	}
 	srcPath := cmd.Args["src"]
-	absDestPath := filepath.Join(wd, cmd.Args["dest"])
+	absDestPath := filepath.Join(s.wd, cmd.Args["dest"])
 	if cmd.Name == protocol.CommandDownloadDir {
 		_, fname := filepath.Split(srcPath)
-		absDestPath = filepath.Join(wd, cmd.Args["dest"], fname)
+		absDestPath = filepath.Join(s.wd, cmd.Args["dest"], fname)
 	}
 	err = s.artifacts.VerifyChecksum(srcPath, absDestPath, absChecksumFile)
 	if err == nil {
@@ -362,7 +360,7 @@ func (s *BuildSession) processExec(cmd *protocol.BuildCommand, output io.Writer)
 	execCmd := exec.Command(args[0], args[1:]...)
 	execCmd.Stdout = output
 	execCmd.Stderr = output
-	execCmd.Dir = cmd.WorkingDirectory
+	execCmd.Dir = s.wd
 	done := make(chan error)
 	go func() {
 		done <- execCmd.Run()
@@ -406,14 +404,10 @@ func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buf
 
 func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 	flag := cmd.Args["flag"]
-	wd, err := filepath.Abs(cmd.WorkingDirectory)
-	if err != nil {
-		return err
-	}
 
 	switch flag {
 	case "-d":
-		targetPath := filepath.Join(wd, cmd.Args["left"])
+		targetPath := filepath.Join(s.wd, cmd.Args["left"])
 		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err
@@ -424,7 +418,7 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return Err("%v is not a directory", targetPath)
 		}
 	case "-f":
-		targetPath := filepath.Join(wd, cmd.Args["left"])
+		targetPath := filepath.Join(s.wd, cmd.Args["left"])
 		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err

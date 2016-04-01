@@ -46,11 +46,11 @@ func Initialize() {
 	config = LoadConfig()
 	logger = MakeLogger(config.LogDir, "gocd-golang-agent.log", config.OutputDebugLog)
 	LogInfo(">>>>>>> go >>>>>>>")
-	if config.WorkDir != "" {
-		if err := os.Chdir(config.WorkDir); err != nil {
-			logger.Error.Fatal(err)
-		}
+	LogInfo("working directory: %v", config.WorkingDir)
+	if _, err := os.Stat(config.WorkingDir); err != nil {
+		logger.Error.Fatal(err)
 	}
+
 	if err := Mkdirs(config.ConfigDir); err != nil {
 		logger.Error.Fatal(err)
 	}
@@ -134,8 +134,9 @@ func processMessage(msg *protocol.Message, httpClient *http.Client, send chan *p
 			&Artifacts{httpClient: httpClient},
 			aurl,
 			send,
+			config.WorkingDir,
 		)
-		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir())
+		buildSession.ReplaceEcho("${agent.location}", config.WorkingDir)
 		buildSession.ReplaceEcho("${agent.hostname}", config.Hostname)
 		buildSession.ReplaceEcho("${date}", func() string { return time.Now().Format("2006-01-02 15:04:05 PDT") })
 		go processBuild(send, buildSession)

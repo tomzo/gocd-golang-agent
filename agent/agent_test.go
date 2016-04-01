@@ -82,7 +82,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("GOCD_SERVER_URL", goServerUrl)
 	os.Setenv("GOCD_SERVER_WEB_SOCKET_PATH", server.WebSocketPath)
 	os.Setenv("GOCD_SERVER_REGISTRATION_PATH", server.RegistrationPath)
-	os.Setenv("GOCD_AGENT_WORK_DIR", agentWorkingDir)
+	os.Setenv("GOCD_AGENT_WORKING_DIR", agentWorkingDir)
 	os.Setenv("GOCD_AGENT_LOG_DIR", agentWorkingDir)
 
 	Initialize()
@@ -267,7 +267,15 @@ func writeFile(dir, fname, content string) error {
 }
 
 func pipelineDir() string {
-	return os.Getenv("GOCD_AGENT_WORK_DIR") + "/pipelines/" + buildId
+	return Join("/", os.Getenv("GOCD_AGENT_WORKING_DIR"), pipelineDirRelativePath())
+}
+
+func pipelineDirRelativePath() string {
+	return Join("/", "pipelines", buildId)
+}
+
+func relativePath(wd string) string {
+	return wd[len(os.Getenv("GOCD_AGENT_WORKING_DIR"))+1:]
 }
 
 func startAgent(t *testing.T) chan bool {

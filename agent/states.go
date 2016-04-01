@@ -53,7 +53,7 @@ func GetAgentRuntimeInfo() *protocol.AgentRuntimeInfo {
 			BuildLocator: GetState("buildLocator"),
 		},
 		RuntimeStatus:                GetState("runtimeStatus"),
-		Location:                     config.WorkingDir(),
+		Location:                     config.WorkingDir,
 		UsableSpace:                  UsableSpace(),
 		OperatingSystemName:          runtime.GOOS,
 		ElasticPluginId:              config.AgentAutoRegisterElasticPluginId,

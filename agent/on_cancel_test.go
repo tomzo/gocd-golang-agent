@@ -99,7 +99,7 @@ func TestOnCancelShouldContinueMaskEchos(t *testing.T) {
 	assert.Nil(t, err)
 
 	config := GetConfig()
-	expected := Sprintf("$$$ on cancel: %v\n", config.WorkingDir())
+	expected := Sprintf("$$$ on cancel: %v\n", config.WorkingDir)
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 

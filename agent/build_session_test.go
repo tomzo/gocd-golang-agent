@@ -69,7 +69,7 @@ func TestMkdirCommand(t *testing.T) {
 
 	wd := pipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocol.MkdirsCommand("path/in/pipeline/dir").Setwd(wd),
+		protocol.MkdirsCommand("path/in/pipeline/dir").Setwd(relativePath(wd)),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -84,7 +84,7 @@ func TestCleandirCommand(t *testing.T) {
 
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocol.CleandirCommand("test", "world2").Setwd(wd),
+		protocol.CleandirCommand("test", "world2").Setwd(relativePath(wd)),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -177,7 +177,7 @@ func TestReplaceAgentBuildVairables(t *testing.T) {
 	log, err := goServer.ConsoleLog(buildId)
 	assert.Nil(t, err)
 	config := GetConfig()
-	expected := Sprintf("hello %v\nhello %v\n", config.WorkingDir(), config.Hostname)
+	expected := Sprintf("hello %v\nhello %v\n", config.WorkingDir, config.Hostname)
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
@@ -212,4 +212,16 @@ func TestShowWarningInfoWhenThereIsUnsupportedBuildCommand(t *testing.T) {
 
 	expected := Sprintf("WARN: Golang Agent does not support build comamnd 'fancy'")
 	assert.True(t, strings.HasPrefix(trimTimestamp(log), expected), "console log must start with: %v", expected)
+}
+
+func TestShouldFailBuildIfWorkingDirIsSetToOutsideOfAgentWorkingDir(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	goServer.SendBuild(AgentId, buildId,
+		echo("echo hello world").Setwd("../../../"),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Failed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 }

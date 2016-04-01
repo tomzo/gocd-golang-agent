@@ -133,7 +133,7 @@ func registerData() map[string]string {
 	return map[string]string{
 		"hostname":                      config.Hostname,
 		"uuid":                          AgentId,
-		"location":                      config.WorkingDir(),
+		"location":                      config.WorkingDir,
 		"operatingSystem":               runtime.GOOS,
 		"usablespace":                   UsableSpaceString(),
 		"agentAutoRegisterKey":          config.AgentAutoRegisterKey,
