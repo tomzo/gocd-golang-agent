@@ -18,16 +18,12 @@ package agent
 
 import (
 	"bytes"
-	"encoding/json"
-	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/gocd-contrib/gocd-golang-agent/stream"
 	"io"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -39,6 +35,29 @@ var (
 	CancelBuildTimeout          = 30 * time.Second
 	BuildDebugToConsoleLog      = true
 )
+
+type Executor func(session *BuildSession, cmd *protocol.BuildCommand) error
+
+func Executors() map[string]Executor {
+	return map[string]Executor{
+		protocol.CommandExport:              CommandExport,
+		protocol.CommandEcho:                CommandEcho,
+		protocol.CommandSecret:              CommandSecret,
+		protocol.CommandReportCurrentStatus: CommandReport,
+		protocol.CommandReportCompleting:    CommandReport,
+		protocol.CommandCompose:             CommandCompose,
+		protocol.CommandTest:                CommandTest,
+		protocol.CommandExec:                CommandExec,
+		protocol.CommandMkdirs:              CommandMkdirs,
+		protocol.CommandCleandir:            CommandCleandir,
+		protocol.CommandUploadArtifact:      CommandUploadArtifact,
+		protocol.CommandDownloadFile:        CommandDownloadArtifact,
+		protocol.CommandDownloadDir:         CommandDownloadArtifact,
+		protocol.CommandFail:                CommandFail,
+		protocol.CommandGenerateTestReport:  NotImplemented,
+		protocol.CommandGenerateProperty:    NotImplemented,
+	}
+}
 
 type BuildSession struct {
 	send                  chan *protocol.Message
@@ -58,6 +77,8 @@ type BuildSession struct {
 
 	rootDir string
 	wd      string
+
+	executors map[string]Executor
 }
 
 func MakeBuildSession(buildId string,
@@ -83,6 +104,7 @@ func MakeBuildSession(buildId string,
 		secrets:               secrets,
 		echo:                  stream.NewSubstituteWriter(secrets),
 		rootDir:               rootDir,
+		executors:             Executors(),
 	}
 }
 
@@ -152,14 +174,14 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 	return
 }
 
-func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) (err error) {
+func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) error {
 	s.wd = filepath.Clean(filepath.Join(s.rootDir, cmd.WorkingDirectory))
 	s.debugLog("set wd to %v", s.wd)
 
 	if !strings.HasPrefix(s.wd, s.rootDir) {
 		return Err("Working directory[%v] is outside the agent sandbox.", s.wd)
 	}
-	_, err = os.Stat(s.wd)
+	_, err := os.Stat(s.wd)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Err("Working directory \"%v\" is not a directory", s.wd)
@@ -168,39 +190,12 @@ func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) (err error) {
 		}
 	}
 
-	switch cmd.Name {
-	case protocol.CommandExport:
-		s.processExport(cmd)
-	case protocol.CommandEcho:
-		s.processEcho(cmd)
-	case protocol.CommandSecret:
-		s.processSecret(cmd)
-	case protocol.CommandReportCurrentStatus, protocol.CommandReportCompleting:
-		jobState := cmd.Args["status"]
-		s.debugLog("report %v", jobState)
-		s.send <- protocol.ReportMessage(cmd.Name, s.Report(jobState))
-	case protocol.CommandCompose:
-		err = s.processCompose(cmd)
-	case protocol.CommandTest:
-		err = s.processTest(cmd)
-	case protocol.CommandExec:
-		err = s.processExec(cmd, s.secrets)
-	case protocol.CommandMkdirs:
-		err = s.processMkdirs(cmd)
-	case protocol.CommandCleandir:
-		err = s.processCleandir(cmd)
-	case protocol.CommandUploadArtifact:
-		err = s.processUploadArtifact(cmd)
-	case protocol.CommandDownloadFile:
-		err = s.processDownload(cmd)
-	case protocol.CommandDownloadDir:
-		err = s.processDownload(cmd)
-	case protocol.CommandFail:
-		err = Err(cmd.Args["0"])
-	default:
-		s.warn("Golang Agent does not support build comamnd '%v' yet, related GoCD feature will not be supported. More details: https://github.com/gocd-contrib/gocd-golang-agent", cmd.Name)
+	exec := s.executors[cmd.Name]
+	if exec == nil {
+		return Err("Unknown build command: %v", cmd.Name)
+	} else {
+		return exec(s, cmd)
 	}
-	return
 }
 
 func (s *BuildSession) testFailed(test *protocol.BuildCommand) bool {
@@ -236,6 +231,7 @@ func (s *BuildSession) onCancel(cmd *protocol.BuildCommand) {
 		secrets:     s.secrets,
 		echo:        s.echo,
 		rootDir:     s.rootDir,
+		executors:   s.executors,
 		command:     cmd.OnCancel,
 		buildStatus: protocol.BuildPassed,
 		cancel:      make(chan bool),
@@ -252,144 +248,6 @@ func (s *BuildSession) onCancel(cmd *protocol.BuildCommand) {
 	}
 }
 
-func (s *BuildSession) processSecret(cmd *protocol.BuildCommand) {
-	value := cmd.Args["value"]
-	substitution := cmd.Args["substitution"]
-	if substitution == "" {
-		substitution = DefaultSecretMask
-	}
-	s.debugLog("%v => %v", value, substitution)
-	s.secrets.Substitutions[value] = substitution
-}
-
-func (s *BuildSession) processCleandir(cmd *protocol.BuildCommand) (err error) {
-	path := cmd.Args["path"]
-	var allows []string
-	err = json.Unmarshal([]byte(cmd.Args["allowed"]), &allows)
-	if err != nil {
-		return
-	}
-	fullPath := filepath.Join(s.wd, path)
-	s.debugLog("cleandir %v, excludes: %+v", fullPath, allows)
-	return Cleandir(fullPath, allows...)
-}
-
-func (s *BuildSession) processMkdirs(cmd *protocol.BuildCommand) error {
-	path := cmd.Args["path"]
-	fullPath := filepath.Join(s.wd, path)
-	s.debugLog("mkdirs %v", fullPath)
-	return Mkdirs(fullPath)
-}
-
-func (s *BuildSession) processUploadArtifact(cmd *protocol.BuildCommand) error {
-	src := cmd.Args["src"]
-	destDir := cmd.Args["dest"]
-
-	absSrc := filepath.Join(s.wd, src)
-	return s.uploadArtifacts(absSrc, strings.Replace(destDir, "\\", "/", -1))
-}
-
-func (s *BuildSession) uploadArtifacts(source, destDir string) (err error) {
-	if strings.Contains(source, "*") {
-		matches, err := doublestar.Glob(source)
-		sort.Strings(matches)
-		if err != nil {
-			return err
-		}
-		base := BaseDirOfPathWithWildcard(source)
-		baseLen := len(base)
-		for _, file := range matches {
-			fileDir, _ := filepath.Split(file)
-			dest := Join("/", destDir, fileDir[baseLen:len(fileDir)-1])
-			err = s.uploadArtifacts(file, dest)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	srcInfo, err := os.Stat(source)
-	if err != nil {
-		return
-	}
-	s.ConsoleLog("Uploading artifacts from %v to %v\n", source, destDescription(destDir))
-
-	var destPath string
-	if destDir != "" {
-		destPath = Join("/", destDir, srcInfo.Name())
-	} else {
-		destPath = srcInfo.Name()
-	}
-	destURL := AppendUrlParam(AppendUrlPath(s.artifactUploadBaseURL, destDir),
-		"buildId", s.buildId)
-	return s.artifacts.Upload(source, destPath, destURL)
-}
-
-func (s *BuildSession) processDownload(cmd *protocol.BuildCommand) error {
-	checksumURL, err := config.MakeFullServerURL(cmd.Args["checksumUrl"])
-	if err != nil {
-		return err
-	}
-	absChecksumFile := filepath.Join(s.wd, cmd.Args["checksumFile"])
-	err = s.artifacts.DownloadFile(checksumURL, absChecksumFile)
-	if err != nil {
-		return err
-	}
-
-	srcURL, err := config.MakeFullServerURL(cmd.Args["url"])
-	if err != nil {
-		return err
-	}
-	srcPath := cmd.Args["src"]
-	absDestPath := filepath.Join(s.wd, cmd.Args["dest"])
-	if cmd.Name == protocol.CommandDownloadDir {
-		_, fname := filepath.Split(srcPath)
-		absDestPath = filepath.Join(s.wd, cmd.Args["dest"], fname)
-	}
-	err = s.artifacts.VerifyChecksum(srcPath, absDestPath, absChecksumFile)
-	if err == nil {
-		s.ConsoleLog("[%v] exists and matches checksum, does not need dowload it from server.\n", srcPath)
-		return nil
-	}
-	s.debugLog("download %v to %v", srcURL, absDestPath)
-	if cmd.Name == protocol.CommandDownloadDir {
-		err = s.artifacts.DownloadDir(srcURL, absDestPath)
-	} else {
-		err = s.artifacts.DownloadFile(srcURL, absDestPath)
-	}
-	if err != nil {
-		return err
-	}
-	return s.artifacts.VerifyChecksum(srcPath, absDestPath, absChecksumFile)
-}
-
-func (s *BuildSession) processExec(cmd *protocol.BuildCommand, output io.Writer) error {
-	args := cmd.ExtractArgList(len(cmd.Args))
-	execCmd := exec.Command(args[0], args[1:]...)
-	execCmd.Stdout = output
-	execCmd.Stderr = output
-	execCmd.Dir = s.wd
-	done := make(chan error)
-	go func() {
-		done <- execCmd.Run()
-	}()
-
-	select {
-	case <-s.cancel:
-		s.debugLog("received cancel signal")
-		LogInfo("kill process(%v) %v", execCmd.Process, cmd.Args)
-		if err := execCmd.Process.Kill(); err != nil {
-			s.ConsoleLog("Kill command %v failed, error: %v\n", cmd.Args, err)
-		} else {
-			LogInfo("process %v is killed", execCmd.Process)
-		}
-		return Err("%v is canceled", cmd.Args)
-	case err := <-done:
-		return err
-	}
-}
-
 func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buffer, error) {
 	var output bytes.Buffer
 	session := &BuildSession{
@@ -401,6 +259,7 @@ func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buf
 		secrets:     s.secrets.Filter(&output),
 		echo:        s.echo.Filter(&output),
 		rootDir:     s.rootDir,
+		executors:   s.executors,
 		console:     stream.NopCloser(&output),
 		command:     cmd,
 		buildStatus: protocol.BuildPassed,
@@ -410,79 +269,6 @@ func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buf
 
 	err := session.ProcessCommand()
 	return output, err
-}
-
-func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
-	flag := cmd.Args["flag"]
-
-	if flag == "-eq" || flag == "-neq" {
-		output, err := s.processTestCommand(cmd.SubCommands[0])
-		if err != nil {
-			s.debugLog("test -eq exec command error: %v", err)
-		}
-		expected := strings.TrimSpace(cmd.Args["left"])
-		actual := strings.TrimSpace(output.String())
-
-		if flag == "-eq" {
-			if expected != actual {
-				return Err("expected '%v', but was '%v'", expected, actual)
-			}
-		} else {
-			if expected == actual {
-				return Err("expected different with '%v'", expected)
-			}
-		}
-		return nil
-	}
-
-	targetPath := filepath.Join(s.wd, cmd.Args["left"])
-	info, err := os.Stat(targetPath)
-	switch flag {
-	case "-d":
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		} else {
-			return Err("%v is not a directory", targetPath)
-		}
-	case "-nd":
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return err
-		}
-		if info.IsDir() {
-			return Err("%v is a directory", targetPath)
-		} else {
-			return nil
-		}
-	case "-f":
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return Err("%v is not a file", targetPath)
-		} else {
-			return nil
-		}
-	case "-nf":
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		} else {
-			return Err("%v is a file", targetPath)
-		}
-	}
-
-	return Err("unknown test flag: %v", flag)
 }
 
 func (s *BuildSession) Report(jobState string) *protocol.Report {
@@ -498,62 +284,14 @@ func (s *BuildSession) ConsoleLog(format string, a ...interface{}) {
 	s.console.Write([]byte(Sprintf(format, a...)))
 }
 
-func (s *BuildSession) warn(format string, a ...interface{}) {
-	s.ConsoleLog(Sprintf("WARN: %v\n", format), a...)
-}
-
 func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
 	s.echo.Substitutions[name] = value
 }
 
-func (s *BuildSession) processEcho(cmd *protocol.BuildCommand) {
-	for _, line := range cmd.ExtractArgList(len(cmd.Args)) {
-		s.echo.Write([]byte(line))
-		s.echo.Write([]byte{'\n'})
-	}
-}
-
-func (s *BuildSession) processExport(cmd *protocol.BuildCommand) {
-	msg := "setting environment variable '%v' to value '%v'\n"
-	name := cmd.Args["name"]
-	value, ok := cmd.Args["value"]
-	if !ok {
-		s.ConsoleLog(msg, name, os.Getenv(name))
-		return
-	}
-	secure := cmd.Args["secure"]
-	displayValue := value
-	if secure == "true" {
-		displayValue = DefaultSecretMask
-	}
-	_, override := s.envs[name]
-	if override || os.Getenv(name) != "" {
-		msg = "overriding environment variable '%v' with value '%v'\n"
-	}
-	s.envs[name] = value
-	s.ConsoleLog(msg, name, displayValue)
-}
-
-func (s *BuildSession) processCompose(cmd *protocol.BuildCommand) error {
-	var err error
-	for _, sub := range cmd.SubCommands {
-		if err != nil {
-			s.process(sub)
-		} else {
-			err = s.process(sub)
-		}
-	}
-	return err
+func (s *BuildSession) warn(format string, a ...interface{}) {
+	s.ConsoleLog(Sprintf("WARN: %v\n", format), a...)
 }
 
 func (s *BuildSession) debugLog(format string, a ...interface{}) {
 	LogDebug(Sprintf("%v\n", format), a...)
-}
-
-func destDescription(path string) string {
-	if path == "" {
-		return "[defaultRoot]"
-	} else {
-		return path
-	}
 }

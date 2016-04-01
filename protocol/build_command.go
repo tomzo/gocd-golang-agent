@@ -42,6 +42,8 @@ var (
 	CommandSecret              = "secret"
 	CommandDownloadFile        = "downloadFile"
 	CommandDownloadDir         = "downloadDir"
+	CommandGenerateTestReport  = "generateTestReport"
+	CommandGenerateProperty    = "generateProperty"
 )
 
 type BuildCommand struct {
