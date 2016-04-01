@@ -17,7 +17,7 @@ package agent_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"testing"
 	"time"
@@ -27,17 +27,17 @@ func TestOnCancel1(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ComposeCommand(
+		protocol.ComposeCommand(
 			echo("echo before sleep"),
-			protocal.ExecCommand("sleep", "5").SetOnCancel(echo("read on cancel")),
+			protocol.ExecCommand("sleep", "5").SetOnCancel(echo("read on cancel")),
 			echo("should not process this echo").RunIf("any"),
-		).SetOnCancel(protocal.ExecCommand("echo", "compose on cancel")),
+		).SetOnCancel(protocol.ExecCommand("echo", "compose on cancel")),
 		echo("should not process this echo"),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 
-	goServer.Send(AgentId, protocal.CancelMessage())
+	goServer.Send(AgentId, protocol.CancelMessage())
 
 	assert.Equal(t, "build Cancelled", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -60,14 +60,14 @@ func TestOnCancel2(t *testing.T) {
 
 	setUp(t)
 	defer tearDown()
-	cancel := protocal.ExecCommand("sleep", "60")
+	cancel := protocol.ExecCommand("sleep", "60")
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ExecCommand("sleep", "5").SetOnCancel(cancel),
+		protocol.ExecCommand("sleep", "5").SetOnCancel(cancel),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 
-	goServer.Send(AgentId, protocal.CancelMessage())
+	goServer.Send(AgentId, protocol.CancelMessage())
 
 	assert.Equal(t, "build Cancelled", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -84,13 +84,13 @@ func TestOnCancelShouldContinueMaskEchos(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.SecretCommand("secret", "$$$"),
-		protocal.ExecCommand("sleep", "5").SetOnCancel(echo("secret on cancel: ${agent.location}")),
+		protocol.SecretCommand("secret", "$$$"),
+		protocol.ExecCommand("sleep", "5").SetOnCancel(echo("secret on cancel: ${agent.location}")),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 
-	goServer.Send(AgentId, protocal.CancelMessage())
+	goServer.Send(AgentId, protocol.CancelMessage())
 
 	assert.Equal(t, "build Cancelled", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -107,14 +107,14 @@ func TestCancelBuildWhenBuildIsHangingOnTestCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	testCmd := protocal.ExecCommand("sleep", "5")
+	testCmd := protocol.ExecCommand("sleep", "5")
 	goServer.SendBuild(AgentId, buildId,
 		echo("hello before cancel"),
 		echo("hello after sleep 5").SetTest(testCmd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 
-	goServer.Send(AgentId, protocal.CancelMessage())
+	goServer.Send(AgentId, protocol.CancelMessage())
 
 	assert.Equal(t, "build Cancelled", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())

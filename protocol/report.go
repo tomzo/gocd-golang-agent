@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package protocal
+package protocol
 
 type Report struct {
 	BuildId          string            `json:"buildId"`

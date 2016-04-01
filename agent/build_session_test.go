@@ -18,7 +18,7 @@ package agent_test
 import (
 	"github.com/bmatcuk/doublestar"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"os"
 	"path/filepath"
@@ -36,14 +36,14 @@ func TestExport(t *testing.T) {
 	defer os.Setenv("TEST_EXPORT", "")
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ExportCommand("env1", "value1", "false"),
-		protocal.ExportCommand("env2", "value2", "true"),
-		protocal.ExportCommand("env1", "value4", "false"),
-		protocal.ExportCommand("env2", "value5", "true"),
-		protocal.ExportCommand("env2", "value6", "false"),
-		protocal.ExportCommand("env2", "value6", ""),
-		protocal.ExportCommand("env2", "", ""),
-		protocal.ExportCommand("TEST_EXPORT"),
+		protocol.ExportCommand("env1", "value1", "false"),
+		protocol.ExportCommand("env2", "value2", "true"),
+		protocol.ExportCommand("env1", "value4", "false"),
+		protocol.ExportCommand("env2", "value5", "true"),
+		protocol.ExportCommand("env2", "value6", "false"),
+		protocol.ExportCommand("env2", "value6", ""),
+		protocol.ExportCommand("env2", "", ""),
+		protocol.ExportCommand("TEST_EXPORT"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -69,7 +69,7 @@ func TestMkdirCommand(t *testing.T) {
 
 	wd := pipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.MkdirsCommand("path/in/pipeline/dir").Setwd(wd),
+		protocol.MkdirsCommand("path/in/pipeline/dir").Setwd(wd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -84,7 +84,7 @@ func TestCleandirCommand(t *testing.T) {
 
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.CleandirCommand("test", "world2").Setwd(wd),
+		protocol.CleandirCommand("test", "world2").Setwd(wd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -113,7 +113,7 @@ func TestFailCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	goServer.SendBuild(AgentId, buildId, protocal.FailCommand("something is wrong, please fail"))
+	goServer.SendBuild(AgentId, buildId, protocol.FailCommand("something is wrong, please fail"))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -129,10 +129,10 @@ func TestSecretCommand(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.SecretCommand("thisissecret", "$$$$$$"),
-		protocal.SecretCommand("replacebydefaultmask"),
-		protocal.EchoCommand("hello (thisissecret)"),
-		protocal.EchoCommand("hello (replacebydefaultmask)"),
+		protocol.SecretCommand("thisissecret", "$$$$$$"),
+		protocol.SecretCommand("replacebydefaultmask"),
+		protocol.EchoCommand("hello (thisissecret)"),
+		protocol.EchoCommand("hello (replacebydefaultmask)"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -149,8 +149,8 @@ func TestShouldMaskSecretInExecOutput(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.SecretCommand("thisissecret", "$$$$$$"),
-		protocal.ExecCommand("echo", "hello (thisissecret)"),
+		protocol.SecretCommand("thisissecret", "$$$$$$"),
+		protocol.ExecCommand("echo", "hello (thisissecret)"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -167,8 +167,8 @@ func TestReplaceAgentBuildVairables(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.EchoCommand("hello ${agent.location}"),
-		protocal.EchoCommand("hello ${agent.hostname}"),
+		protocol.EchoCommand("hello ${agent.location}"),
+		protocol.EchoCommand("hello ${agent.hostname}"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -185,7 +185,7 @@ func TestReplaceDateBuildVairables(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	goServer.SendBuild(AgentId, buildId, protocal.EchoCommand("${date}"))
+	goServer.SendBuild(AgentId, buildId, protocol.EchoCommand("${date}"))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -201,7 +201,7 @@ func TestShowWarningInfoWhenThereIsUnsupportedBuildCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	cmd := protocal.NewBuildCommand("fancy")
+	cmd := protocol.NewBuildCommand("fancy")
 	goServer.SendBuild(AgentId, buildId, cmd)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())

@@ -14,20 +14,8 @@
  * limitations under the License.
  */
 
-package protocal
+package protocol
 
-var (
-	BuildPassed   = "Passed"
-	BuildFailed   = "Failed"
-	BuildCanceled = "Cancelled"
-)
-
-type Build struct {
-	BuildId                string
-	BuildLocator           string
-	BuildLocatorForDisplay string
-	ConsoleUrl             string
-	ArtifactUploadBaseUrl  string
-	PropertyBaseUrl        string
-	BuildCommand           *BuildCommand
+type Registration struct {
+	AgentPrivateKey, AgentCertificate string
 }

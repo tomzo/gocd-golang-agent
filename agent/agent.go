@@ -17,7 +17,7 @@
 package agent
 
 import (
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"net/http"
@@ -105,16 +105,16 @@ func Start() error {
 	}
 }
 
-func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *protocal.Message) error {
+func processMessage(msg *protocol.Message, httpClient *http.Client, send chan *protocol.Message) error {
 	switch msg.Action {
-	case protocal.SetCookieAction:
+	case protocol.SetCookieAction:
 		SetState("cookie", msg.DataString())
-	case protocal.CancelBuildAction:
+	case protocol.CancelBuildAction:
 		closeBuildSession()
-	case protocal.ReregisterAction:
+	case protocol.ReregisterAction:
 		CleanRegistration()
 		return Err("received reregister message")
-	case protocal.BuildAction:
+	case protocol.BuildAction:
 		closeBuildSession()
 		build := msg.DataBuild()
 		SetState("buildLocator", build.BuildLocator)
@@ -145,7 +145,7 @@ func processMessage(msg *protocal.Message, httpClient *http.Client, send chan *p
 	return nil
 }
 
-func processBuild(send chan *protocal.Message, buildSession *BuildSession) {
+func processBuild(send chan *protocol.Message, buildSession *BuildSession) {
 	defer func() {
 		SetState("runtimeStatus", "Idle")
 		ping(send)
@@ -157,8 +157,8 @@ func processBuild(send chan *protocal.Message, buildSession *BuildSession) {
 	LogInfo("done")
 }
 
-func ping(send chan *protocal.Message) {
-	send <- protocal.PingMessage(GetAgentRuntimeInfo())
+func ping(send chan *protocol.Message) {
+	send <- protocol.PingMessage(GetAgentRuntimeInfo())
 }
 
 func closeBuildSession() {

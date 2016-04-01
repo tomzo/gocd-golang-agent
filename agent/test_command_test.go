@@ -18,7 +18,7 @@ package agent_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"os"
 	"testing"
@@ -50,8 +50,8 @@ func TestTestCommand(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		testCmd := protocal.TestCommand(test.testArgs...).Setwd(wd)
-		goServer.SendBuild(AgentId, buildId, protocal.EchoCommand(test.echo).SetTest(testCmd))
+		testCmd := protocol.TestCommand(test.testArgs...).Setwd(wd)
+		goServer.SendBuild(AgentId, buildId, protocol.EchoCommand(test.echo).SetTest(testCmd))
 		assert.Equal(t, "agent Building", stateLog.Next())
 		assert.Equal(t, "build Passed", stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
@@ -69,10 +69,10 @@ func TestTestCommandEchoShouldAlsoBeMaskedForSecrets(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 
-	testCmd := protocal.TestCommand("-eq", "$$$", "echo", "secret")
+	testCmd := protocol.TestCommand("-eq", "$$$", "echo", "secret")
 	goServer.SendBuild(AgentId, buildId,
-		protocal.SecretCommand("secret", "$$$"),
-		protocal.EchoCommand("hello world").SetTest(testCmd),
+		protocol.SecretCommand("secret", "$$$"),
+		protocol.EchoCommand("hello world").SetTest(testCmd),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())

@@ -19,7 +19,7 @@ package agent_test
 import (
 	"bytes"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"io/ioutil"
 	"os"
@@ -36,7 +36,7 @@ func TestUploadArtifactFailed(t *testing.T) {
 	fname := "nofile"
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand(fname, "").Setwd(artifactWd),
+		protocol.UploadArtifactCommand(fname, "").Setwd(artifactWd),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -62,7 +62,7 @@ func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
 		buf.WriteString("large file content")
 	}
 	writeFile(wd, "large.txt", buf.String())
-	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("large.txt", "").Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("large.txt", "").Setwd(wd))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
@@ -266,9 +266,9 @@ func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
 
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocal.UploadArtifactCommand("src/hello/3.txt", "dest").Setwd(wd),
-		protocal.UploadArtifactCommand("test/5.txt", "").Setwd(wd),
-		protocal.UploadArtifactCommand("test/**/10.txt", "dest").Setwd(wd),
+		protocol.UploadArtifactCommand("src/hello/3.txt", "dest").Setwd(wd),
+		protocol.UploadArtifactCommand("test/5.txt", "").Setwd(wd),
+		protocol.UploadArtifactCommand("test/**/10.txt", "dest").Setwd(wd),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -294,7 +294,7 @@ dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 
 func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
-	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand(srcPath, destDir).Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand(srcPath, destDir).Setwd(wd))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -369,7 +369,7 @@ func TestDownloadArtifactDir(t *testing.T) {
 }
 
 func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string, sourceIsDir bool) {
-	goServer.SendBuild(AgentId, buildId, protocal.UploadArtifactCommand("src", "artifacts").Setwd(wd))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("src", "artifacts").Setwd(wd))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
@@ -378,13 +378,13 @@ func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string,
 	checksumUrl := goServer.ChecksumUrl(buildId)
 	checksumPath := Sprintf("build-%v.md5", buildId)
 
-	var cmd *protocal.BuildCommand
+	var cmd *protocol.BuildCommand
 	if sourceIsDir {
-		cmd = protocal.DownloadDirCommand(srcPath, srcUrl, destDir, checksumUrl, checksumPath)
+		cmd = protocol.DownloadDirCommand(srcPath, srcUrl, destDir, checksumUrl, checksumPath)
 	} else {
 		_, fname := filepath.Split(srcPath)
 		destPath := Join("/", destDir, fname)
-		cmd = protocal.DownloadFileCommand(srcPath, srcUrl, destPath, checksumUrl, checksumPath)
+		cmd = protocol.DownloadFileCommand(srcPath, srcUrl, destPath, checksumUrl, checksumPath)
 	}
 	goServer.SendBuild(AgentId, buildId, cmd.Setwd(wd))
 

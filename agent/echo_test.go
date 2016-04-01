@@ -18,7 +18,7 @@ package agent_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"testing"
 )
@@ -28,7 +28,7 @@ func TestEcho(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.EchoCommand("echo hello world"),
+		protocol.EchoCommand("echo hello world"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())

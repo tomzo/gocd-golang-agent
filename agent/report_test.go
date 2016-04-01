@@ -18,7 +18,7 @@ package agent_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"testing"
 )
@@ -28,9 +28,9 @@ func TestReportStatusAndCompleting(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ReportCurrentStatusCommand("Preparing"),
-		protocal.ReportCurrentStatusCommand("Building"),
-		protocal.ReportCompletingCommand(),
+		protocol.ReportCurrentStatusCommand("Preparing"),
+		protocol.ReportCurrentStatusCommand("Building"),
+		protocol.ReportCompletingCommand(),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())

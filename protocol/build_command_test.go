@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package protocal_test
+package protocol_test
 
 import (
-	. "github.com/gocd-contrib/gocd-golang-agent/protocal"
+	. "github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"testing"
 )

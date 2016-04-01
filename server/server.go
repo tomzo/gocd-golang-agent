@@ -18,7 +18,7 @@ package server
 
 import (
 	"encoding/json"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"golang.org/x/net/websocket"
 	"io"
 	"io/ioutil"
@@ -46,7 +46,7 @@ type StateListener interface {
 
 type AgentMessage struct {
 	agentId string
-	Msg     *protocal.Message
+	Msg     *protocol.Message
 }
 
 type Server struct {
@@ -94,15 +94,15 @@ func (s *Server) HandleFunc(path string, handler func(http.ResponseWriter, *http
 		s.LimittedRequestEntitySize(handler))
 }
 
-func (s *Server) SendBuild(agentId, buildId string, commands ...*protocal.BuildCommand) {
+func (s *Server) SendBuild(agentId, buildId string, commands ...*protocol.BuildCommand) {
 
 	locator := "/builds/" + buildId
-	build := protocal.NewBuild(buildId, locator, locator,
+	build := protocol.NewBuild(buildId, locator, locator,
 		ConsoleLogPath+locator,
 		ArtifactsPath+locator,
 		PropertiesPath+locator,
 		commands...)
-	s.Send(agentId, protocal.BuildMessage(build))
+	s.Send(agentId, protocol.BuildMessage(build))
 }
 
 func (s *Server) SetMaxRequestEntitySize(size int64) {
@@ -147,7 +147,7 @@ func (s *Server) ConsoleLogFile(buildId string) string {
 	return filepath.Join(s.WorkingDir, buildId, "console.log")
 }
 
-func (s *Server) Send(agentId string, msg *protocal.Message) {
+func (s *Server) Send(agentId string, msg *protocol.Message) {
 	s.sendMessage <- &AgentMessage{agentId: agentId, Msg: msg}
 }
 
@@ -232,7 +232,7 @@ func registorHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		var agentPrivateKey, agentCert, regJson []byte
 		var err error
-		var reg *protocal.Registration
+		var reg *protocol.Registration
 
 		agentPrivateKey, err = ioutil.ReadFile(s.KeyPemFile)
 		if err != nil {
@@ -245,7 +245,7 @@ func registorHandler(s *Server) func(http.ResponseWriter, *http.Request) {
 			return
 		}
 
-		reg = &protocal.Registration{
+		reg = &protocol.Registration{
 			AgentPrivateKey:  string(agentPrivateKey),
 			AgentCertificate: string(agentCert),
 		}

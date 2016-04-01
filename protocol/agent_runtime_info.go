@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package protocal
+package protocol
 
 type AgentIdentifier struct {
 	HostName  string `json:"hostName"`

@@ -17,7 +17,7 @@
 package agent
 
 import (
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"runtime"
 	"sync"
 )
@@ -41,14 +41,14 @@ func GetState(key string) string {
 	return state[key]
 }
 
-func GetAgentRuntimeInfo() *protocal.AgentRuntimeInfo {
-	info := protocal.AgentRuntimeInfo{
-		Identifier: &protocal.AgentIdentifier{
+func GetAgentRuntimeInfo() *protocol.AgentRuntimeInfo {
+	info := protocol.AgentRuntimeInfo{
+		Identifier: &protocol.AgentIdentifier{
 			HostName:  config.Hostname,
 			IpAddress: config.IpAddress,
 			Uuid:      AgentId,
 		},
-		BuildingInfo: &protocal.AgentBuildingInfo{
+		BuildingInfo: &protocol.AgentBuildingInfo{
 			BuildingInfo: GetState("buildingInfo"),
 			BuildLocator: GetState("buildLocator"),
 		},

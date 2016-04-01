@@ -18,7 +18,7 @@ package server
 
 import (
 	"fmt"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/satori/go.uuid"
 	"golang.org/x/net/websocket"
 	"io"
@@ -31,7 +31,7 @@ type RemoteAgent struct {
 
 func (agent *RemoteAgent) Listen(server *Server) error {
 	for {
-		msg, err := protocal.ReceiveMessage(agent.conn)
+		msg, err := protocol.ReceiveMessage(agent.conn)
 		if err == io.EOF {
 			return err
 		} else if err != nil {
@@ -42,14 +42,14 @@ func (agent *RemoteAgent) Listen(server *Server) error {
 	}
 }
 
-func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) {
+func (agent *RemoteAgent) processMessage(server *Server, msg *protocol.Message) {
 	server.log("received message: %v", msg.Action)
 	err := agent.Ack(msg)
 	if err != nil {
 		server.error("ack error: %v", err)
 	}
 	switch msg.Action {
-	case protocal.PingAction:
+	case protocol.PingAction:
 		info := msg.AgentRuntimeInfo()
 		if agent.id == "" {
 			agent.id = info.Identifier.Uuid
@@ -67,17 +67,17 @@ func (agent *RemoteAgent) processMessage(server *Server, msg *protocal.Message) 
 	}
 }
 
-func (agent *RemoteAgent) Send(msg *protocal.Message) error {
-	return protocal.SendMessage(agent.conn, msg)
+func (agent *RemoteAgent) Send(msg *protocol.Message) error {
+	return protocol.SendMessage(agent.conn, msg)
 }
 
 func (agent *RemoteAgent) SetCookie() error {
-	return agent.Send(protocal.SetCookieMessage(uuid.NewV4().String()))
+	return agent.Send(protocol.SetCookieMessage(uuid.NewV4().String()))
 }
 
-func (agent *RemoteAgent) Ack(msg *protocal.Message) error {
+func (agent *RemoteAgent) Ack(msg *protocol.Message) error {
 	if msg.AckId != "" {
-		return agent.Send(protocal.AckMessage(msg.AckId))
+		return agent.Send(protocol.AckMessage(msg.AckId))
 	}
 	return nil
 }

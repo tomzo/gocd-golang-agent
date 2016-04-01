@@ -20,7 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/gocd-contrib/gocd-golang-agent/server"
 	"github.com/xli/assert"
 	"io"
@@ -48,7 +48,7 @@ var (
 func TestSetCookieAfterConnected(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-	goServer.SendBuild(AgentId, buildId, protocal.EchoCommand("hello"))
+	goServer.SendBuild(AgentId, buildId, protocol.EchoCommand("hello"))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.NotEqual(t, "", GetState("cookie"))
@@ -294,7 +294,7 @@ func setUp(t *testing.T) {
 }
 
 func tearDown() {
-	goServer.Send(AgentId, protocal.ReregisterMessage())
+	goServer.Send(AgentId, protocol.ReregisterMessage())
 	select {
 	case <-time.After(5 * time.Second):
 		panic("wait for agent stop timeout")
@@ -306,6 +306,6 @@ func tearDown() {
 	}
 }
 
-func echo(str string) *protocal.BuildCommand {
-	return protocal.EchoCommand(str)
+func echo(str string) *protocol.BuildCommand {
+	return protocol.EchoCommand(str)
 }

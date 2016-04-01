@@ -17,15 +17,15 @@
 package agent
 
 import (
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"golang.org/x/net/websocket"
 	"time"
 )
 
 type WebsocketConnection struct {
 	Conn     *websocket.Conn
-	Send     chan *protocal.Message
-	Received chan *protocal.Message
+	Send     chan *protocol.Message
+	Received chan *protocol.Message
 }
 
 func (wc *WebsocketConnection) Close() {
@@ -52,15 +52,15 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 		return nil, err
 	}
 	ack := make(chan string)
-	send := make(chan *protocal.Message)
-	received := make(chan *protocal.Message)
+	send := make(chan *protocol.Message)
+	received := make(chan *protocol.Message)
 
 	go startReceiveMessage(ws, received, ack)
 	go startSendMessage(ws, send, ack)
 	return &WebsocketConnection{Conn: ws, Send: send, Received: received}, nil
 }
 
-func startSendMessage(ws *websocket.Conn, send chan *protocal.Message, ack chan string) {
+func startSendMessage(ws *websocket.Conn, send chan *protocol.Message, ack chan string) {
 	defer LogDebug("! exit goroutine: send message")
 	connClosed := false
 loop:
@@ -76,7 +76,7 @@ loop:
 			logger.Error.Printf("send message failed: connection is closed")
 			goto loop
 		}
-		if err := protocal.SendMessage(ws, msg); err == nil {
+		if err := protocol.SendMessage(ws, msg); err == nil {
 			waitForMessageAck(msg.AckId, ack)
 			goto loop
 		} else {
@@ -107,11 +107,11 @@ func waitForMessageAck(ackId string, ack chan string) {
 	}
 }
 
-func startReceiveMessage(ws *websocket.Conn, received chan *protocal.Message, ack chan string) {
+func startReceiveMessage(ws *websocket.Conn, received chan *protocol.Message, ack chan string) {
 	defer LogDebug("! exit goroutine: receive message")
 	defer close(received)
 	for {
-		msg, err := protocal.ReceiveMessage(ws)
+		msg, err := protocol.ReceiveMessage(ws)
 		if err != nil {
 			logger.Error.Printf("receive message failed: %v", err)
 			return

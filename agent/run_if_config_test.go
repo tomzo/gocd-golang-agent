@@ -17,7 +17,7 @@ package agent_test
 
 import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
 	"testing"
 )
@@ -27,13 +27,13 @@ func TestRunIfConfig(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.EchoCommand("should not echo if failed when passed").RunIf("failed"),
-		protocal.EchoCommand("should echo if any when passed").RunIf("any"),
-		protocal.EchoCommand("should echo if passed when passed").RunIf("passed"),
-		protocal.ExecCommand("cmdnotexist"),
-		protocal.EchoCommand("should echo if failed when failed").RunIf("failed"),
-		protocal.EchoCommand("should echo if any when failed").RunIf("any"),
-		protocal.EchoCommand("should not echo if passed when failed").RunIf("passed"),
+		protocol.EchoCommand("should not echo if failed when passed").RunIf("failed"),
+		protocol.EchoCommand("should echo if any when passed").RunIf("any"),
+		protocol.EchoCommand("should echo if passed when passed").RunIf("passed"),
+		protocol.ExecCommand("cmdnotexist"),
+		protocol.EchoCommand("should echo if failed when failed").RunIf("failed"),
+		protocol.EchoCommand("should echo if any when failed").RunIf("any"),
+		protocol.EchoCommand("should not echo if passed when failed").RunIf("passed"),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -57,19 +57,19 @@ func TestComposeCommandWithRunIfConfig(t *testing.T) {
 	defer tearDown()
 
 	goServer.SendBuild(AgentId, buildId,
-		protocal.ComposeCommand(
-			protocal.ComposeCommand(
-				protocal.EchoCommand("hello world1"),
-				protocal.EchoCommand("hello world2"),
+		protocol.ComposeCommand(
+			protocol.ComposeCommand(
+				protocol.EchoCommand("hello world1"),
+				protocol.EchoCommand("hello world2"),
 			).RunIf("any"),
-			protocal.ComposeCommand(
-				protocal.EchoCommand("hello world3"),
-				protocal.EchoCommand("hello world4"),
+			protocol.ComposeCommand(
+				protocol.EchoCommand("hello world3"),
+				protocol.EchoCommand("hello world4"),
 			),
 		).RunIf("failed"),
-		protocal.ComposeCommand(
-			protocal.EchoCommand("hello world5").RunIf("failed"),
-			protocal.EchoCommand("hello world6"),
+		protocol.ComposeCommand(
+			protocol.EchoCommand("hello world5").RunIf("failed"),
+			protocol.EchoCommand("hello world6"),
 		),
 	)
 

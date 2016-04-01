@@ -21,7 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"github.com/gocd-contrib/gocd-golang-agent/protocal"
+	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -173,7 +173,7 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	}
 
 	defer resp.Body.Close()
-	var registration protocal.Registration
+	var registration protocol.Registration
 
 	dec := json.NewDecoder(resp.Body)
 
