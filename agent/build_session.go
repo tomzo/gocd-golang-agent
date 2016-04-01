@@ -129,20 +129,8 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 		return nil
 	}
 	s.debugLog("process: %v", cmd.Name)
-	if cmd.Test != nil {
-		s.debugLog("test: %+v", cmd.Test)
-		_, testErr := s.processTestCommand(cmd.Test.Command)
-		if s.isCanceled() {
-			s.debugLog("test is canceled due to build is canceled")
-			return nil
-		}
-		success := testErr == nil
-		if success != cmd.Test.Expectation {
-			s.debugLog("test failed: %v, ignore command", testErr)
-			return nil
-		} else {
-			s.debugLog("test matches expectation, continue")
-		}
+	if s.testFailed(cmd.Test) {
+		return nil
 	}
 
 	switch cmd.Name {
@@ -189,6 +177,26 @@ func (s *BuildSession) process(cmd *protocol.BuildCommand) (err error) {
 	}
 
 	return
+}
+
+func (s *BuildSession) testFailed(test *protocol.BuildCommandTest) bool {
+	if test == nil {
+		return false
+	}
+	s.debugLog("test: %+v", test)
+	_, err := s.processTestCommand(test.Command)
+	if s.isCanceled() {
+		s.debugLog("test is canceled due to build is canceled")
+		return true
+	}
+	success := err == nil
+	if success != test.Expectation {
+		s.debugLog("test failed with err: %v", err)
+		return true
+	} else {
+		s.debugLog("test matches expectation")
+		return false
+	}
 }
 
 func (s *BuildSession) onCancel(cmd *protocol.BuildCommand) {
