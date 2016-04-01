@@ -163,6 +163,15 @@ func closeAndWait(stop, closed chan bool, timeout time.Duration) error {
 	}
 }
 
+func isClosedChan(ch chan bool) bool {
+	select {
+	case _, ok := <-ch:
+		return !ok
+	default:
+		return false
+	}
+}
+
 func ParseChecksum(checksum string) map[string]string {
 	ret := make(map[string]string)
 	for _, l := range strings.Split(checksum, "\n") {

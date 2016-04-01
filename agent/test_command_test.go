@@ -64,3 +64,22 @@ func TestTestCommand(t *testing.T) {
 		os.Truncate(goServer.ConsoleLogFile(buildId), 0)
 	}
 }
+
+func TestTestCommandEchoShouldAlsoBeMaskedForSecrets(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	testCmd := protocal.TestCommand("-eq", "$$$", "echo", "secret")
+	goServer.SendBuild(AgentId, buildId,
+		protocal.SecretCommand("secret", "$$$"),
+		protocal.EchoCommand("hello world").SetTest(testCmd),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	log, err := goServer.ConsoleLog(buildId)
+	assert.Nil(t, err)
+	expected := Sprintf("hello world\n")
+	assert.Equal(t, expected, trimTimestamp(log))
+}

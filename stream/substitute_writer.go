@@ -30,6 +30,10 @@ func NewSubstituteWriter(writer io.Writer) *SubstituteWriter {
 	return &SubstituteWriter{writer, make(map[string]interface{})}
 }
 
+func (w *SubstituteWriter) Filter(writer io.Writer) *SubstituteWriter {
+	return &SubstituteWriter{writer, w.Substitutions}
+}
+
 func (w *SubstituteWriter) Write(out []byte) (int, error) {
 	str := string(out)
 	for k, v := range w.Substitutions {

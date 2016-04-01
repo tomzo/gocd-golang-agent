@@ -86,10 +86,13 @@ func (s *BuildSession) Close() error {
 }
 
 func (s *BuildSession) isCanceled() bool {
-	select {
-	case <-s.cancel:
+	if s.buildStatus == protocal.BuildCanceled {
 		return true
-	default:
+	}
+	if isClosedChan(s.cancel) {
+		s.buildStatus = protocal.BuildCanceled
+		return true
+	} else {
 		return false
 	}
 }
@@ -128,10 +131,14 @@ func (s *BuildSession) process(cmd *protocal.BuildCommand) (err error) {
 	s.debugLog("process: %v", cmd.Name)
 	if cmd.Test != nil {
 		s.debugLog("test: %+v", cmd.Test)
-		_, err := s.processTestCommand(cmd.Test.Command)
-		success := err == nil
+		_, testErr := s.processTestCommand(cmd.Test.Command)
+		if s.isCanceled() {
+			s.debugLog("test is canceled due to build is canceled")
+			return nil
+		}
+		success := testErr == nil
 		if success != cmd.Test.Expectation {
-			s.debugLog("test failed: %v, ignore command", err)
+			s.debugLog("test failed: %v, ignore command", testErr)
 			return nil
 		} else {
 			s.debugLog("test matches expectation, continue")
@@ -370,8 +377,21 @@ func (s *BuildSession) processExec(cmd *protocal.BuildCommand, output io.Writer)
 
 func (s *BuildSession) processTestCommand(cmd *protocal.BuildCommand) (bytes.Buffer, error) {
 	var output bytes.Buffer
-	session := MakeBuildSession(s.buildId, cmd, stream.NopCloser(&output), s.artifacts, s.artifactUploadBaseURL, s.send)
-	session.cancel = s.cancel
+	session := &BuildSession{
+		buildId:               s.buildId,
+		artifacts:             s.artifacts,
+		artifactUploadBaseURL: s.artifactUploadBaseURL,
+		send:        s.send,
+		envs:        s.envs,
+		secrets:     s.secrets.Filter(&output),
+		echo:        s.echo.Filter(&output),
+		console:     stream.NopCloser(&output),
+		command:     cmd,
+		buildStatus: protocal.BuildPassed,
+		cancel:      s.cancel,
+		done:        make(chan bool),
+	}
+
 	err := session.ProcessCommand()
 	return output, err
 }
