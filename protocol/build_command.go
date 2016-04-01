@@ -44,18 +44,13 @@ var (
 	CommandDownloadDir         = "downloadDir"
 )
 
-type BuildCommandTest struct {
-	Command     *BuildCommand
-	Expectation bool
-}
-
 type BuildCommand struct {
 	Name             string
 	Args             map[string]string
 	RunIfConfig      string
 	SubCommands      []*BuildCommand
 	WorkingDirectory string
-	Test             *BuildCommandTest
+	Test             *BuildCommand
 	OnCancel         *BuildCommand
 }
 
@@ -198,10 +193,7 @@ func (cmd *BuildCommand) SetArgs(args map[string]string) *BuildCommand {
 }
 
 func (cmd *BuildCommand) SetTest(test *BuildCommand) *BuildCommand {
-	cmd.Test = &BuildCommandTest{
-		Command:     test,
-		Expectation: true,
-	}
+	cmd.Test = test
 	return cmd
 }
 

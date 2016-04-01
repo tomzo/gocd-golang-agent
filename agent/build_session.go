@@ -203,23 +203,22 @@ func (s *BuildSession) doProcess(cmd *protocol.BuildCommand) (err error) {
 	return
 }
 
-func (s *BuildSession) testFailed(test *protocol.BuildCommandTest) bool {
+func (s *BuildSession) testFailed(test *protocol.BuildCommand) bool {
 	if test == nil {
 		return false
 	}
 	s.debugLog("test: %+v", test)
-	_, err := s.processTestCommand(test.Command)
+	_, err := s.processTestCommand(test)
 	if s.isCanceled() {
 		s.debugLog("test is canceled due to build is canceled")
 		return true
 	}
-	success := err == nil
-	if success != test.Expectation {
-		s.debugLog("test failed with err: %v", err)
-		return true
-	} else {
+	if err == nil {
 		s.debugLog("test matches expectation")
 		return false
+	} else {
+		s.debugLog("test failed with err: %v", err)
+		return true
 	}
 }
 
