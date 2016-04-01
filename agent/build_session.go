@@ -415,10 +415,30 @@ func (s *BuildSession) processTestCommand(cmd *protocol.BuildCommand) (bytes.Buf
 func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 	flag := cmd.Args["flag"]
 
+	if flag == "-eq" || flag == "-neq" {
+		output, err := s.processTestCommand(cmd.SubCommands[0])
+		if err != nil {
+			s.debugLog("test -eq exec command error: %v", err)
+		}
+		expected := strings.TrimSpace(cmd.Args["left"])
+		actual := strings.TrimSpace(output.String())
+
+		if flag == "-eq" {
+			if expected != actual {
+				return Err("expected '%v', but was '%v'", expected, actual)
+			}
+		} else {
+			if expected == actual {
+				return Err("expected different with '%v'", expected)
+			}
+		}
+		return nil
+	}
+
+	targetPath := filepath.Join(s.wd, cmd.Args["left"])
+	info, err := os.Stat(targetPath)
 	switch flag {
 	case "-d":
-		targetPath := filepath.Join(s.wd, cmd.Args["left"])
-		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err
 		}
@@ -428,11 +448,10 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return Err("%v is not a directory", targetPath)
 		}
 	case "-nd":
-		targetPath := filepath.Join(s.wd, cmd.Args["left"])
-		info, err := os.Stat(targetPath)
-		if err != nil && os.IsNotExist(err) {
-			return nil
-		} else if err != nil {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		if info.IsDir() {
@@ -441,8 +460,6 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return nil
 		}
 	case "-f":
-		targetPath := filepath.Join(s.wd, cmd.Args["left"])
-		info, err := os.Stat(targetPath)
 		if err != nil {
 			return err
 		}
@@ -452,11 +469,10 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 			return nil
 		}
 	case "-nf":
-		targetPath := filepath.Join(s.wd, cmd.Args["left"])
-		info, err := os.Stat(targetPath)
-		if err != nil && os.IsNotExist(err) {
-			return nil
-		} else if err != nil {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		if info.IsDir() {
@@ -464,28 +480,6 @@ func (s *BuildSession) processTest(cmd *protocol.BuildCommand) error {
 		} else {
 			return Err("%v is a file", targetPath)
 		}
-	case "-eq":
-		output, err := s.processTestCommand(cmd.SubCommands[0])
-		if err != nil {
-			s.debugLog("test -eq exec command error: %v", err)
-		}
-		expected := strings.TrimSpace(cmd.Args["left"])
-		actual := strings.TrimSpace(output.String())
-		if expected != actual {
-			return Err("expected '%v', but was '%v'", expected, actual)
-		}
-		return nil
-	case "-neq":
-		output, err := s.processTestCommand(cmd.SubCommands[0])
-		if err != nil {
-			s.debugLog("test -neq exec command error: %v", err)
-		}
-		expected := strings.TrimSpace(cmd.Args["left"])
-		actual := strings.TrimSpace(output.String())
-		if expected == actual {
-			return Err("expected different with '%v'", expected)
-		}
-		return nil
 	}
 
 	return Err("unknown test flag: %v", flag)
