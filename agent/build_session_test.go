@@ -20,6 +20,8 @@ import (
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"github.com/xli/assert"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -365,4 +367,58 @@ func TestTestCommandEchoShouldAlsoBeMaskedForSecrets(t *testing.T) {
 	assert.Nil(t, err)
 	expected := Sprintf("hello world\n")
 	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestGenerateTestReportFromTestSuiteReports(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+	copyTestReports(filepath.Join(wd, "reports"), "junit_report1.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "junit_report2.xml")
+
+	goServer.SendBuild(AgentId, buildId,
+		protocol.GenerateTestReportCommand("reports/junit_report1.xml",
+			"reports/junit_report2.xml").Setwd(relativePath(wd)),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	reportPath := goServer.ArtifactFile(buildId, protocol.TestReportUploadPath)
+	content, err := ioutil.ReadFile(reportPath)
+	assert.Nil(t, err)
+	assert.True(t, strings.Contains(string(content), "junit.framework.AssertionFailedError:"), Sprintf("wrong unit test report? %s", content))
+}
+
+func TestGenerateTestReportFromTestSuitesReport(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+	copyTestReports(filepath.Join(wd, "reports"), "junit_report3.xml")
+
+	goServer.SendBuild(AgentId, buildId,
+		protocol.GenerateTestReportCommand("reports/junit_report3.xml").Setwd(relativePath(wd)),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	reportPath := goServer.ArtifactFile(buildId, protocol.TestReportUploadPath)
+	content, err := ioutil.ReadFile(reportPath)
+	assert.Nil(t, err)
+	assert.True(t, strings.Contains(string(content), "<span class=\"tests_total_count\">1</span>"), Sprintf("wrong unit test report? %s", content))
+}
+
+func copyTestReports(wd, rep string) {
+	Mkdirs(wd)
+	rep1 := filepath.Join(DIR(), "..", "junit", "test", rep)
+	src, _ := os.Open(rep1)
+	defer src.Close()
+	dest, _ := os.Create(filepath.Join(wd, rep))
+	defer dest.Close()
+
+	_, err := io.Copy(dest, src)
+	if err != nil {
+		panic(err)
+	}
 }

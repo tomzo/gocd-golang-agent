@@ -24,5 +24,6 @@ go get golang.org/x/net/websocket
 go get github.com/satori/go.uuid
 go get github.com/xli/assert
 go get github.com/bmatcuk/doublestar
+go get github.com/jstemmer/go-junit-report
 # go get -u all
-go test -test.v ./...
+go test -test.v ./... | $GOPATH/bin/go-junit-report > testreport.xml

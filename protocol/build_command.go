@@ -25,6 +25,8 @@ import (
 )
 
 const (
+	TestReportUploadPath = "testoutput/index.html"
+
 	RunIfConfigAny    = "any"
 	RunIfConfigPassed = "passed"
 
@@ -174,6 +176,10 @@ func DownloadCommand(file_or_dir, src, url, dest, checksumUrl, checksumPath stri
 		"checksumFile": checksumPath,
 	}
 	return NewBuildCommand(file_or_dir).SetArgs(args)
+}
+
+func GenerateTestReportCommand(args ...string) *BuildCommand {
+	return NewBuildCommand(CommandGenerateTestReport).SetArgs(listMap(args...))
 }
 
 func (cmd *BuildCommand) RunIfAny() bool {

@@ -57,7 +57,7 @@ func Executors() map[string]Executor {
 		protocol.CommandDownloadFile:        CommandDownloadArtifact,
 		protocol.CommandDownloadDir:         CommandDownloadArtifact,
 		protocol.CommandFail:                CommandFail,
-		protocol.CommandGenerateTestReport:  NotImplemented,
+		protocol.CommandGenerateTestReport:  CommandGenerateTestReport,
 		protocol.CommandGenerateProperty:    NotImplemented,
 	}
 }

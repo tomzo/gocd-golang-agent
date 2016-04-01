@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -84,6 +85,11 @@ func AppendUrlPath(base *url.URL, path string) *url.URL {
 
 func Mkdirs(path string) error {
 	return os.MkdirAll(path, 0755)
+}
+
+func DIR() string {
+	_, filename, _, _ := runtime.Caller(1)
+	return filepath.Dir(filename)
 }
 
 func Cleandir(root string, allows ...string) error {
