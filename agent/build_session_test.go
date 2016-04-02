@@ -377,14 +377,13 @@ func TestGenerateTestReportFromTestSuiteReports(t *testing.T) {
 	copyTestReports(filepath.Join(wd, "reports"), "junit_report2.xml")
 
 	goServer.SendBuild(AgentId, buildId,
-		protocol.GenerateTestReportCommand("reports/junit_report1.xml",
-			"reports/junit_report2.xml").Setwd(relativePath(wd)),
+		protocol.GenerateTestReportCommand("testoutput", "reports/junit_report1.xml", "reports/junit_report2.xml").Setwd(relativePath(wd)),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	reportPath := goServer.ArtifactFile(buildId, protocol.TestReportUploadPath)
+	reportPath := goServer.ArtifactFile(buildId, "testoutput/index.html")
 	content, err := ioutil.ReadFile(reportPath)
 	assert.Nil(t, err)
 	assert.True(t, strings.Contains(string(content), "junit.framework.AssertionFailedError:"), Sprintf("wrong unit test report? %s", content))
@@ -397,13 +396,13 @@ func TestGenerateTestReportFromTestSuitesReport(t *testing.T) {
 	copyTestReports(filepath.Join(wd, "reports"), "junit_report3.xml")
 
 	goServer.SendBuild(AgentId, buildId,
-		protocol.GenerateTestReportCommand("reports/junit_report3.xml").Setwd(relativePath(wd)),
+		protocol.GenerateTestReportCommand("testoutput", "reports/junit_report3.xml").Setwd(relativePath(wd)),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
 
-	reportPath := goServer.ArtifactFile(buildId, protocol.TestReportUploadPath)
+	reportPath := goServer.ArtifactFile(buildId, "testoutput/index.html")
 	content, err := ioutil.ReadFile(reportPath)
 	assert.Nil(t, err)
 	assert.True(t, strings.Contains(string(content), "<span class=\"tests_total_count\">1</span>"), Sprintf("wrong unit test report? %s", content))

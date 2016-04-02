@@ -17,12 +17,12 @@
 package agent
 
 import (
+	"encoding/json"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/junit"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"html/template"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -37,7 +37,13 @@ type UnitTestReport struct {
 }
 
 func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) error {
-	srcs := cmd.ExtractArgList(len(cmd.Args))
+	var srcs []string
+	err := json.Unmarshal([]byte(cmd.Args["srcs"]), &srcs)
+	if err != nil {
+		return err
+	}
+	uploadPath := cmd.Args["uploadPath"]
+
 	suite := junit.NewTestSuite()
 	for _, src := range srcs {
 		path := filepath.Join(s.wd, src)
@@ -60,7 +66,7 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 		return err
 	}
 
-	outputPath := filepath.Join(s.wd, "testoutput", "index.html")
+	outputPath := filepath.Join(s.wd, uploadPath, protocol.TestReportFileName)
 	err = Mkdirs(filepath.Dir(outputPath))
 	if err != nil {
 		return err
@@ -83,7 +89,7 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 	if err != nil {
 		return err
 	}
-	return uploadArtifacts(s, file.Name(), path.Dir(protocol.TestReportUploadPath))
+	return uploadArtifacts(s, file.Name(), uploadPath)
 }
 
 func generateTestReport(s *BuildSession, result *junit.TestSuite, path string) {

@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	TestReportUploadPath = "testoutput/index.html"
+	TestReportFileName = "index.html"
 
 	RunIfConfigAny    = "any"
 	RunIfConfigPassed = "passed"
@@ -179,7 +179,15 @@ func DownloadCommand(file_or_dir, src, url, dest, checksumUrl, checksumPath stri
 }
 
 func GenerateTestReportCommand(args ...string) *BuildCommand {
-	return NewBuildCommand(CommandGenerateTestReport).SetArgs(listMap(args...))
+	srcs, err := json.Marshal(args[1:])
+	if err != nil {
+		panic(err)
+	}
+	cmdArgs := map[string]string{
+		"uploadPath": args[0],
+		"srcs":       string(srcs),
+	}
+	return NewBuildCommand(CommandGenerateTestReport).SetArgs(cmdArgs)
 }
 
 func (cmd *BuildCommand) RunIfAny() bool {
