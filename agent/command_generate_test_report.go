@@ -42,6 +42,9 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 	if err != nil {
 		return err
 	}
+	if len(srcs) == 0 {
+		return nil
+	}
 	uploadPath := cmd.Args["uploadPath"]
 
 	suite := junit.NewTestSuite()

@@ -408,6 +408,24 @@ func TestGenerateTestReportFromTestSuitesReport(t *testing.T) {
 	assert.True(t, strings.Contains(string(content), "<span class=\"tests_total_count\">1</span>"), Sprintf("wrong unit test report? %s", content))
 }
 
+func TestDoNothingIfGenerateTestReportSrcsIsEmpty(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+	copyTestReports(filepath.Join(wd, "reports"), "junit_report3.xml")
+
+	goServer.SendBuild(AgentId, buildId,
+		protocol.GenerateTestReportCommand("testoutput").Setwd(relativePath(wd)),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	reportPath := goServer.ArtifactFile(buildId, "testoutput/index.html")
+	_, err := os.Stat(reportPath)
+	assert.NotNil(t, err)
+}
+
 func copyTestReports(wd, rep string) {
 	Mkdirs(wd)
 	rep1 := filepath.Join(DIR(), "..", "junit", "test", rep)
