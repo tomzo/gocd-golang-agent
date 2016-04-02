@@ -151,10 +151,11 @@ func CleandirCommand(path string, allows ...string) *BuildCommand {
 	return NewBuildCommand(CommandCleandir).SetArgs(args)
 }
 
-func UploadArtifactCommand(src, dest string) *BuildCommand {
+func UploadArtifactCommand(src, dest, ignoreUnmatchError string) *BuildCommand {
 	args := map[string]string{
-		"src":  src,
-		"dest": dest,
+		"src":                src,
+		"dest":               dest,
+		"ignoreUnmatchError": ignoreUnmatchError,
 	}
 	return NewBuildCommand(CommandUploadArtifact).SetArgs(args)
 }

@@ -89,7 +89,7 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 	if err != nil {
 		return err
 	}
-	return uploadArtifacts(s, file.Name(), uploadPath)
+	return uploadArtifacts(s, file.Name(), uploadPath, false)
 }
 
 func generateTestReport(s *BuildSession, result *junit.TestSuite, path string) {

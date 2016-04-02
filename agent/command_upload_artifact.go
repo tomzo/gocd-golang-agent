@@ -28,12 +28,13 @@ import (
 func CommandUploadArtifact(s *BuildSession, cmd *protocol.BuildCommand) error {
 	src := cmd.Args["src"]
 	destDir := cmd.Args["dest"]
+	ignoreUnmatchError := cmd.Args["ignoreUnmatchError"] == "true"
 
 	absSrc := filepath.Join(s.wd, src)
-	return uploadArtifacts(s, absSrc, strings.Replace(destDir, "\\", "/", -1))
+	return uploadArtifacts(s, absSrc, strings.Replace(destDir, "\\", "/", -1), ignoreUnmatchError)
 }
 
-func uploadArtifacts(s *BuildSession, source, destDir string) (err error) {
+func uploadArtifacts(s *BuildSession, source, destDir string, ignoreUnmatchError bool) (err error) {
 	if strings.Contains(source, "*") {
 		matches, err := doublestar.Glob(source)
 		if err != nil {
@@ -45,7 +46,7 @@ func uploadArtifacts(s *BuildSession, source, destDir string) (err error) {
 		for _, file := range matches {
 			fileDir, _ := filepath.Split(file)
 			dest := Join("/", destDir, fileDir[baseLen:len(fileDir)-1])
-			err = uploadArtifacts(s, file, dest)
+			err = uploadArtifacts(s, file, dest, ignoreUnmatchError)
 			if err != nil {
 				return err
 			}
@@ -55,6 +56,9 @@ func uploadArtifacts(s *BuildSession, source, destDir string) (err error) {
 
 	srcInfo, err := os.Stat(source)
 	if err != nil {
+		if ignoreUnmatchError {
+			return nil
+		}
 		return
 	}
 	s.ConsoleLog("Uploading artifacts from %v to %v\n", source, destDescription(destDir))

@@ -36,7 +36,7 @@ func TestUploadArtifactFailed(t *testing.T) {
 	fname := "nofile"
 
 	goServer.SendBuild(AgentId, buildId,
-		protocol.UploadArtifactCommand(fname, "").Setwd(relativePath(wd)),
+		protocol.UploadArtifactCommand(fname, "", "false").Setwd(relativePath(wd)),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -47,6 +47,22 @@ func TestUploadArtifactFailed(t *testing.T) {
 	assert.Nil(t, err)
 	expected := Sprintf("ERROR: stat %v/%v: no such file or directory\n", wd, fname)
 	assert.Equal(t, expected, trimTimestamp(log))
+}
+
+func TestIgnoreUnmatchError(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+
+	wd := createPipelineDir()
+	fname := "nofile"
+
+	goServer.SendBuild(AgentId, buildId,
+		protocol.UploadArtifactCommand(fname, "", "true").Setwd(relativePath(wd)),
+	)
+
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
 }
 
 func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
@@ -61,7 +77,7 @@ func TestUploadArtifactFailedWhenServerHasNotEnoughDiskspace(t *testing.T) {
 		buf.WriteString("large file content")
 	}
 	writeFile(wd, "large.txt", buf.String())
-	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("large.txt", "").Setwd(relativePath(wd)))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("large.txt", "", "false").Setwd(relativePath(wd)))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Failed", stateLog.Next())
@@ -265,9 +281,9 @@ func TestProcessMultipleUploadArtifactCommands(t *testing.T) {
 
 	wd := createTestProjectInPipelineDir()
 	goServer.SendBuild(AgentId, buildId,
-		protocol.UploadArtifactCommand("src/hello/3.txt", "dest").Setwd(relativePath(wd)),
-		protocol.UploadArtifactCommand("test/5.txt", "").Setwd(relativePath(wd)),
-		protocol.UploadArtifactCommand("test/**/10.txt", "dest").Setwd(relativePath(wd)),
+		protocol.UploadArtifactCommand("src/hello/3.txt", "dest", "false").Setwd(relativePath(wd)),
+		protocol.UploadArtifactCommand("test/5.txt", "", "false").Setwd(relativePath(wd)),
+		protocol.UploadArtifactCommand("test/**/10.txt", "dest", "false").Setwd(relativePath(wd)),
 	)
 
 	assert.Equal(t, "agent Building", stateLog.Next())
@@ -293,7 +309,7 @@ dest/world2/10.txt=41e43efb30d3fbfcea93542157809ac0
 
 func testUpload(t *testing.T, srcPath, destDir, checksum string, src2dest map[string]string) {
 	wd := createTestProjectInPipelineDir()
-	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand(srcPath, destDir).Setwd(relativePath(wd)))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand(srcPath, destDir, "false").Setwd(relativePath(wd)))
 
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -368,7 +384,7 @@ func TestDownloadArtifactDir(t *testing.T) {
 }
 
 func testDownload(t *testing.T, wd, srcPath, destDir string, destFiles []string, sourceIsDir bool) {
-	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("src", "artifacts").Setwd(relativePath(wd)))
+	goServer.SendBuild(AgentId, buildId, protocol.UploadArtifactCommand("src", "artifacts", "false").Setwd(relativePath(wd)))
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
 	assert.Equal(t, "agent Idle", stateLog.Next())
