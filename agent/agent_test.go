@@ -161,24 +161,19 @@ func (log *StateLog) Notify(class, id, state string) {
 }
 
 func (log *StateLog) notify(state string) {
-	defer func() {
-		_ = recover()
-	}()
-	log.states <- state
+	select {
+	case log.states <- state:
+	case <-time.After(1 * time.Second):
+	}
 }
 
 func (log *StateLog) Next() string {
 	select {
 	case state := <-log.states:
 		return state
-	case <-time.After(5 * time.Second):
+	case <-time.After(1 * time.Second):
 		return "timeout"
 	}
-}
-
-func (log *StateLog) Close() {
-	close(log.states)
-	log.states = make(chan string)
 }
 
 func (log *StateLog) Reset(buildId, agentId string) {
@@ -320,8 +315,6 @@ func tearDown() {
 		panic("wait for agent stop timeout")
 	case <-agentStopped:
 	}
-
-	stateLog.Close()
 
 	err := os.RemoveAll(pipelineDir())
 	if err != nil {
