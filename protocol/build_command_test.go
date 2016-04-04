@@ -22,14 +22,27 @@ import (
 	"testing"
 )
 
-func TestExtractArgList(t *testing.T) {
-	cmd := EchoCommand("hello", "world")
-	cmd.Args["2"] = "!"
-	cmd.Args["3"] = "not extracted"
-	cmd.Args["key"] = "value"
-	list := cmd.ExtractArgList(3)
+func TestListArg(t *testing.T) {
+	cmd := EchoCommand("hello", "world", "!")
+	list, err := cmd.ListArg("lines")
+	assert.Nil(t, err)
 	assert.Equal(t, 3, len(list))
 	assert.Equal(t, "hello", list[0])
 	assert.Equal(t, "world", list[1])
 	assert.Equal(t, "!", list[2])
+
+	assert.Equal(t, `["hello","world","!"]`, cmd.Args["lines"])
+}
+
+func TestAddArg(t *testing.T) {
+	cmd := NewBuildCommand(CommandCompose)
+	cmd.AddArg("hello", "world")
+	assert.Equal(t, "world", cmd.Args["hello"])
+}
+
+func TestAddCommands(t *testing.T) {
+	cmd := NewBuildCommand(CommandCompose)
+	assert.Equal(t, 0, len(cmd.SubCommands))
+	cmd.AddCommands(NewBuildCommand(CommandEcho))
+	assert.Equal(t, 1, len(cmd.SubCommands))
 }

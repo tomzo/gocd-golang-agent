@@ -17,15 +17,13 @@
 package agent
 
 import (
-	"encoding/json"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
 	"path/filepath"
 )
 
 func CommandCleandir(s *BuildSession, cmd *protocol.BuildCommand) (err error) {
 	path := cmd.Args["path"]
-	var allows []string
-	err = json.Unmarshal([]byte(cmd.Args["allowed"]), &allows)
+	allows, err := cmd.ListArg("allowed")
 	if err != nil {
 		return
 	}

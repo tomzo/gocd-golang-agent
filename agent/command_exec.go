@@ -22,8 +22,11 @@ import (
 )
 
 func CommandExec(s *BuildSession, cmd *protocol.BuildCommand) error {
-	args := cmd.ExtractArgList(len(cmd.Args))
-	execCmd := exec.Command(args[0], args[1:]...)
+	args, err := cmd.ListArg("args")
+	if err != nil {
+		return err
+	}
+	execCmd := exec.Command(cmd.Args["command"], args...)
 	execCmd.Stdout = s.secrets
 	execCmd.Stderr = s.secrets
 	execCmd.Dir = s.wd

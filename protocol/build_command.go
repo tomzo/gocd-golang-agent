@@ -17,10 +17,7 @@
 package protocol
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -83,12 +80,12 @@ func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
 	return NewBuildCommand(CommandCompose).AddCommands(commands...)
 }
 
-func EchoCommand(contents ...string) *BuildCommand {
-	return NewBuildCommand(CommandEcho).SetArgs(listMap(contents...))
+func EchoCommand(lines ...string) *BuildCommand {
+	return NewBuildCommand(CommandEcho).AddListArg("lines", lines)
 }
 
 func ExecCommand(args ...string) *BuildCommand {
-	return NewBuildCommand(CommandExec).SetArgs(listMap(args...))
+	return NewBuildCommand(CommandExec).AddArg("command", args[0]).AddListArg("args", args[1:])
 }
 
 func ExportCommand(kvs ...string) *BuildCommand {
@@ -140,15 +137,7 @@ func MkdirsCommand(path string) *BuildCommand {
 }
 
 func CleandirCommand(path string, allows ...string) *BuildCommand {
-	bytes, err := json.Marshal(allows)
-	if err != nil {
-		panic(err)
-	}
-	args := map[string]string{
-		"path":    path,
-		"allowed": string(bytes),
-	}
-	return NewBuildCommand(CommandCleandir).SetArgs(args)
+	return NewBuildCommand(CommandCleandir).AddArg("path", path).AddListArg("allowed", allows)
 }
 
 func UploadArtifactCommand(src, dest, ignoreUnmatchError string) *BuildCommand {
@@ -180,15 +169,7 @@ func DownloadCommand(file_or_dir, src, url, dest, checksumUrl, checksumPath stri
 }
 
 func GenerateTestReportCommand(args ...string) *BuildCommand {
-	srcs, err := json.Marshal(args[1:])
-	if err != nil {
-		panic(err)
-	}
-	cmdArgs := map[string]string{
-		"uploadPath": args[0],
-		"srcs":       string(srcs),
-	}
-	return NewBuildCommand(CommandGenerateTestReport).SetArgs(cmdArgs)
+	return NewBuildCommand(CommandGenerateTestReport).AddArg("uploadPath", args[0]).AddListArg("srcs", args[1:])
 }
 
 func (cmd *BuildCommand) RunIfAny() bool {
@@ -207,6 +188,22 @@ func (cmd *BuildCommand) AddCommands(commands ...*BuildCommand) *BuildCommand {
 func (cmd *BuildCommand) SetArgs(args map[string]string) *BuildCommand {
 	cmd.Args = args
 	return cmd
+}
+
+func (cmd *BuildCommand) AddArg(name, value string) *BuildCommand {
+	if cmd.Args == nil {
+		cmd.Args = make(map[string]string)
+	}
+	cmd.Args[name] = value
+	return cmd
+}
+
+func (cmd *BuildCommand) AddListArg(name string, list []string) *BuildCommand {
+	bs, err := json.Marshal(list)
+	if err != nil {
+		panic(err)
+	}
+	return cmd.AddArg(name, string(bs))
 }
 
 func (cmd *BuildCommand) SetTest(test *BuildCommand) *BuildCommand {
@@ -229,44 +226,7 @@ func (cmd *BuildCommand) SetOnCancel(c *BuildCommand) *BuildCommand {
 	return cmd
 }
 
-func (cmd *BuildCommand) ExtractArgList(size int) []string {
-	ret := make([]string, size)
-	for i := 0; i < size; i++ {
-		ret[i] = cmd.Args[strconv.Itoa(i)]
-	}
-	return ret
-}
-
-func (cmd *BuildCommand) String() string {
-	return cmd.Dump(2, 2, false)
-}
-
-func (cmd *BuildCommand) Dump(indent, step int, includeSubCmds bool) string {
-	var buffer bytes.Buffer
-	buffer.WriteString(strings.Repeat(" ", indent))
-	buffer.WriteString(cmd.Name)
-	for key, value := range cmd.Args {
-		buffer.WriteString(fmt.Sprintf(" %v='%v'", key, value))
-	}
-	if !cmd.RunIfMatch(RunIfConfigPassed) {
-		buffer.WriteString(fmt.Sprintf(" runIf:%v", cmd.RunIfConfig))
-	}
-	if cmd.Test != nil {
-		buffer.WriteString(fmt.Sprintf(" test:%+v", cmd.Test))
-	}
-	if includeSubCmds {
-		for _, subCmd := range cmd.SubCommands {
-			buffer.WriteString("\n")
-			buffer.WriteString(subCmd.Dump(indent+step, step, true))
-		}
-	}
-	return buffer.String()
-}
-
-func listMap(list ...string) map[string]string {
-	ret := make(map[string]string, len(list))
-	for i, s := range list {
-		ret[strconv.Itoa(i)] = s
-	}
-	return ret
+func (cmd *BuildCommand) ListArg(name string) (list []string, err error) {
+	err = json.Unmarshal([]byte(cmd.Args[name]), &list)
+	return
 }

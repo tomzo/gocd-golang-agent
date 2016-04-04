@@ -17,7 +17,6 @@
 package agent
 
 import (
-	"encoding/json"
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/junit"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
@@ -37,8 +36,7 @@ type UnitTestReport struct {
 }
 
 func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) error {
-	var srcs []string
-	err := json.Unmarshal([]byte(cmd.Args["srcs"]), &srcs)
+	srcs, err := cmd.ListArg("srcs")
 	if err != nil {
 		return err
 	}
