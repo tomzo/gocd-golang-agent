@@ -29,5 +29,5 @@ func CommandCleandir(s *BuildSession, cmd *protocol.BuildCommand) (err error) {
 	}
 	fullPath := filepath.Join(s.wd, path)
 	s.debugLog("cleandir %v, excludes: %+v", fullPath, allows)
-	return Cleandir(fullPath, allows...)
+	return Cleandir(s.console, fullPath, allows...)
 }

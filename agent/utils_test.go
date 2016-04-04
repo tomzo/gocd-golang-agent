@@ -16,6 +16,7 @@
 package agent_test
 
 import (
+	"bytes"
 	"github.com/bmatcuk/doublestar"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/xli/assert"
@@ -51,7 +52,8 @@ func TestCleandir(t *testing.T) {
 	assert.Nil(t, err)
 	createTestProject(tmpDir)
 
-	err = Cleandir(tmpDir, "src/hello", "test/world2")
+	var log bytes.Buffer
+	err = Cleandir(&log, tmpDir, "src/hello", "test/world2")
 	assert.Nil(t, err)
 
 	matches, err := doublestar.Glob(filepath.Join(tmpDir, "**/*.txt"))
@@ -68,6 +70,20 @@ func TestCleandir(t *testing.T) {
 		actual := f[len(tmpDir)+1:]
 		assert.Equal(t, expected[i], actual)
 	}
+	expectedLog := `Deleting file 0.txt
+Deleting file src/1.txt
+Deleting file src/2.txt
+Keeping folder src/hello
+Deleting file test/5.txt
+Deleting file test/6.txt
+Deleting file test/7.txt
+Deleting file test/world/10.txt
+Deleting file test/world/11.txt
+Deleting file test/world/8.txt
+Deleting file test/world/9.txt
+Keeping folder test/world2
+`
+	assert.Equal(t, expectedLog, log.String())
 }
 
 func TestShouldFailWhenCleandirAllowsContainsPathThatIsOutsideOfBaseDir(t *testing.T) {
@@ -75,8 +91,10 @@ func TestShouldFailWhenCleandirAllowsContainsPathThatIsOutsideOfBaseDir(t *testi
 	assert.Nil(t, err)
 	createTestProject(tmpDir)
 
-	err = Cleandir(tmpDir, "test/world2", "./../")
+	var log bytes.Buffer
+	err = Cleandir(&log, tmpDir, "test/world2", "./../")
 	assert.NotNil(t, err)
+	assert.Equal(t, "", log.String())
 }
 
 func TestParseChecksum(t *testing.T) {
