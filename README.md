@@ -5,8 +5,7 @@ GOCD agent golang implementation. Comparing to java implementation, golang agent
 
 Golang agent is based on "BuildCommand API" proposed [here](https://github.com/gocd/gocd/issues/1954). We are working on contributing serverside implementation to GOCD codebase. Meanwhile you can run golang agent against server in this experimental GOCD fork: https://github.com/wpc/gocd/tree/build_command_protocol.
 
-Installation
-===========
+### Installation
 
 On Ubuntu:
 * Add Bintray's GPG key:
@@ -22,7 +21,7 @@ sudo echo deb https://dl.bintray.com/alex-hal9000/gocd-golang-agent master main 
 sudo apt-get install gocd-golang-agent
 ```
 
-## Configure Agent
+### Configure Agent
 
 Agent is designed to be configured by environment variables. The followings are available options:
 
