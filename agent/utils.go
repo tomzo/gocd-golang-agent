@@ -21,9 +21,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"github.com/gocd-contrib/gocd-golang-agent/stream"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -91,61 +89,6 @@ func Mkdirs(path string) error {
 func DIR() string {
 	_, filename, _, _ := runtime.Caller(1)
 	return filepath.Dir(filename)
-}
-
-func Cleandir(log io.Writer, root string, allows ...string) error {
-	root = filepath.Clean(root)
-	for i, allow := range allows {
-		allows[i] = filepath.Clean(filepath.Join(root, allow))
-		if allows[i] == root {
-			return nil
-		}
-		if strings.HasPrefix(root, allows[i]) {
-			return Err("Cannot clean directory. Folder %v is outside the base folder %v", allows[i], root)
-		}
-	}
-	w := stream.NewSubstituteWriter(log)
-	w.Substitutions[" "+root+"/"] = " "
-	return cleandir(w, root, allows...)
-}
-
-func cleandir(log io.Writer, root string, allows ...string) error {
-	infos, err := ioutil.ReadDir(root)
-	if err != nil {
-		return err
-	}
-
-	for _, finfo := range infos {
-		fpath := filepath.Join(root, finfo.Name())
-		if finfo.IsDir() {
-			match := ""
-			for _, allow := range allows {
-				if strings.HasPrefix(allow, fpath) {
-					match = allow
-					break
-				}
-			}
-			if match == "" {
-				log.Write([]byte(Sprintf("Deleting folder %v\n", fpath)))
-				if err := os.RemoveAll(fpath); err != nil {
-					return err
-				}
-			} else if fpath != match {
-				if err := cleandir(log, fpath, allows...); err != nil {
-					return err
-				}
-			} else {
-				log.Write([]byte(Sprintf("Keeping folder %v\n", fpath)))
-			}
-		} else {
-			log.Write([]byte(Sprintf("Deleting file %v\n", fpath)))
-			err := os.Remove(fpath)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func Sprintf(f string, args ...interface{}) string {

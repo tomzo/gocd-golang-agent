@@ -16,13 +16,8 @@
 package agent_test
 
 import (
-	"bytes"
-	"github.com/bmatcuk/doublestar"
 	. "github.com/gocd-contrib/gocd-golang-agent/agent"
 	"github.com/xli/assert"
-	"io/ioutil"
-	"path/filepath"
-	"sort"
 	"testing"
 )
 
@@ -45,56 +40,6 @@ func TestJoin(t *testing.T) {
 	assert.Equal(t, "a/b", Join("/", "a/", "/b"))
 	assert.Equal(t, "a/", Join("/", "a/", "/"))
 	assert.Equal(t, "a/b/", Join("/", "a/b", "/"))
-}
-
-func TestCleandir(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "cleandir-test")
-	assert.Nil(t, err)
-	createTestProject(tmpDir)
-
-	var log bytes.Buffer
-	err = Cleandir(&log, tmpDir, "src/hello", "test/world2")
-	assert.Nil(t, err)
-
-	matches, err := doublestar.Glob(filepath.Join(tmpDir, "**/*.txt"))
-	assert.Nil(t, err)
-	sort.Strings(matches)
-	expected := []string{
-		"src/hello/3.txt",
-		"src/hello/4.txt",
-		"test/world2/10.txt",
-		"test/world2/11.txt",
-	}
-
-	for i, f := range matches {
-		actual := f[len(tmpDir)+1:]
-		assert.Equal(t, expected[i], actual)
-	}
-	expectedLog := `Deleting file 0.txt
-Deleting file src/1.txt
-Deleting file src/2.txt
-Keeping folder src/hello
-Deleting file test/5.txt
-Deleting file test/6.txt
-Deleting file test/7.txt
-Deleting file test/world/10.txt
-Deleting file test/world/11.txt
-Deleting file test/world/8.txt
-Deleting file test/world/9.txt
-Keeping folder test/world2
-`
-	assert.Equal(t, expectedLog, log.String())
-}
-
-func TestShouldFailWhenCleandirAllowsContainsPathThatIsOutsideOfBaseDir(t *testing.T) {
-	tmpDir, err := ioutil.TempDir("", "cleandir-test2")
-	assert.Nil(t, err)
-	createTestProject(tmpDir)
-
-	var log bytes.Buffer
-	err = Cleandir(&log, tmpDir, "test/world2", "./../")
-	assert.NotNil(t, err)
-	assert.Equal(t, "", log.String())
 }
 
 func TestParseChecksum(t *testing.T) {
