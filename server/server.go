@@ -50,7 +50,7 @@ type AgentMessage struct {
 }
 
 type Server struct {
-	Port                 string
+	Address              string
 	CertPemFile          string
 	KeyPemFile           string
 	WorkingDir           string
@@ -64,9 +64,9 @@ type Server struct {
 	sendMessage chan *AgentMessage
 }
 
-func New(port, certFile, keyFile, workingDir string, logger *log.Logger) *Server {
+func New(address, certFile, keyFile, workingDir string, logger *log.Logger) *Server {
 	return &Server{
-		Port:        port,
+		Address:     address,
 		CertPemFile: certFile,
 		KeyPemFile:  keyFile,
 		WorkingDir:  workingDir,
@@ -85,8 +85,8 @@ func (s *Server) Start() error {
 	s.HandleFunc(ConsoleLogPath+"/", consoleHandler(s))
 	s.HandleFunc(ArtifactsPath+"/", artifactsHandler(s))
 	s.HandleFunc(StatusPath, statusHandler())
-	s.log("listen to %v", s.Port)
-	return http.ListenAndServeTLS(":"+s.Port, s.CertPemFile, s.KeyPemFile, nil)
+	s.log("listen to %v", s.Address)
+	return http.ListenAndServeTLS(s.Address, s.CertPemFile, s.KeyPemFile, nil)
 }
 
 func (s *Server) HandleFunc(path string, handler func(http.ResponseWriter, *http.Request)) {

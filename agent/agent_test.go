@@ -93,15 +93,15 @@ func TestMain(m *testing.M) {
 func startServer(workingDir string) {
 	certFile := filepath.Join(workingDir, "cert.pem")
 	keyFile := filepath.Join(workingDir, "private.pem")
-	cert := server.NewCert()
+	cert := server.NewCert("localhost")
 	err := cert.Generate(certFile, keyFile)
 	if err != nil {
 		panic(err)
 	}
-	port := "1234"
+	address := cert.Host + ":1234"
 	stateLog = &StateLog{states: make(chan string)}
-	goServerUrl = "https://" + cert.Host + ":" + port
-	goServer = server.New(port,
+	goServerUrl = "https://" + address
+	goServer = server.New(address,
 		certFile,
 		keyFile,
 		workingDir,

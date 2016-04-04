@@ -37,8 +37,7 @@ type Cert struct {
 	Organization string
 }
 
-func NewCert() *Cert {
-	host, _ := os.Hostname()
+func NewCert(host string) *Cert {
 	return &Cert{
 		Host:         host,
 		ValidFrom:    time.Now(),
