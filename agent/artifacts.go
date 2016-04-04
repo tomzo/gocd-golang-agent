@@ -95,7 +95,7 @@ startDownload:
 	}
 	LogDebug("response: %v", resp.Status)
 	if resp.StatusCode == http.StatusAccepted {
-		LogDebug("sleep 1 sec and start download again")
+		LogDebug("Server responsed StatusAccepted, sleep 1 sec and start download again")
 		time.Sleep(1 * time.Second)
 		goto startDownload
 	}
