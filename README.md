@@ -35,5 +35,5 @@ Agent is designed to be configured by environment variables. The followings are 
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/gocd-contrib/gocd-golang-agent.
 
-[Document for Developer](/gocd-contrib/gocd-golang-agent/wiki/For-Developer)
+[Document for Developer](https://github.com/gocd-contrib/gocd-golang-agent/wiki/For-Developer)
 
