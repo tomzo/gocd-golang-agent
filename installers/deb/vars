@@ -1,3 +1,3 @@
 export GGA_VERSION=0.1
-export GGA_DEB_VERSION=12
+export GGA_DEB_VERSION=13
 export DEB_FILENAME="gocd-golang-agent_${GGA_VERSION}-${GGA_DEB_VERSION}_amd64.deb"
