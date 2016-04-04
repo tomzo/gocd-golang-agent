@@ -23,7 +23,7 @@ import (
 )
 
 func TestListArg(t *testing.T) {
-	cmd := EchoCommand("hello", "world", "!")
+	cmd := NewBuildCommand("foo").AddListArg("lines", []string{"hello", "world", "!"})
 	list, err := cmd.ListArg("lines")
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(list))

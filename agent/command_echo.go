@@ -21,13 +21,8 @@ import (
 )
 
 func CommandEcho(s *BuildSession, cmd *protocol.BuildCommand) error {
-	lines, err := cmd.ListArg("lines")
-	if err != nil {
-		return err
-	}
-	for _, line := range lines {
-		s.echo.Write([]byte(line))
-		s.echo.Write([]byte{'\n'})
-	}
+	line := cmd.Args["line"]
+	s.echo.Write([]byte(line))
+	s.echo.Write([]byte{'\n'})
 	return nil
 }

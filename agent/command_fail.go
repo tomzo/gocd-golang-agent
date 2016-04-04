@@ -21,5 +21,5 @@ import (
 )
 
 func CommandFail(s *BuildSession, cmd *protocol.BuildCommand) error {
-	return Err(cmd.Args["0"])
+	return Err(cmd.Args["message"])
 }

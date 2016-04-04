@@ -80,8 +80,8 @@ func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
 	return NewBuildCommand(CommandCompose).AddCommands(commands...)
 }
 
-func EchoCommand(lines ...string) *BuildCommand {
-	return NewBuildCommand(CommandEcho).AddListArg("lines", lines)
+func EchoCommand(line string) *BuildCommand {
+	return NewBuildCommand(CommandEcho).AddArg("line", line)
 }
 
 func ExecCommand(args ...string) *BuildCommand {
@@ -127,7 +127,7 @@ func SecretCommand(vs ...string) *BuildCommand {
 }
 
 func FailCommand(msg string) *BuildCommand {
-	args := map[string]string{"0": msg}
+	args := map[string]string{"message": msg}
 	return NewBuildCommand(CommandFail).SetArgs(args)
 }
 
