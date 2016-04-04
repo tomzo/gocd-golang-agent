@@ -37,7 +37,7 @@ function set_go_agents_defaults_path {
 }
 
 function fix_agent_defaults_ownership {
-    go_owned $GO_AGENT_DEFAULTS || ( echo "user 'go' and group 'go' must exist" && exit 1 )
+    go_owned $GOCD_AGENT_DEFAULTS || ( echo "user 'go' and group 'go' must exist" && exit 1 )
 }
 
 function create_necessary_agent_directories {
@@ -47,7 +47,7 @@ function create_necessary_agent_directories {
 }
 
 function print_agent_configuration_suggestions {
-    echo "Now please edit $GO_AGENT_DEFAULTS and set GO_SERVER_URL to the HTTPS address of your Go Server. Please make sure the HOST in the URL is connectable from the agent machine."
+    echo "Now please edit $GOCD_AGENT_DEFAULTS and set GOCD_SERVER_URL to the HTTPS address of your Go Server. Please make sure the HOST in the URL is connectable from the agent machine."
     echo "Once that is done start the Go Agent with '/etc/init.d/gocd-golang-agent start'"
 }
 
