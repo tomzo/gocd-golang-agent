@@ -8,16 +8,12 @@ Golang agent is based on "BuildCommand API" proposed [here](https://github.com/g
 ### Installation
 
 On Ubuntu:
-* Add Bintray's GPG key:
 ```
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
-```
-* Add repo
-```
+# Add Bintray's GPG key:
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61 
+# Add repo
 sudo echo deb https://dl.bintray.com/alex-hal9000/gocd-golang-agent master main | sudo tee -a /etc/apt/sources.list
-```
-* Install
-```
+# Install the package
 sudo apt-get install gocd-golang-agent
 ```
 
