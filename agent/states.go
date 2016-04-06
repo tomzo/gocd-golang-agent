@@ -49,7 +49,7 @@ func GetAgentRuntimeInfo() *protocol.AgentRuntimeInfo {
 			Uuid:      AgentId,
 		},
 		BuildingInfo: &protocol.AgentBuildingInfo{
-			BuildingInfo: GetState("buildingInfo"),
+			BuildingInfo: GetState("buildLocatorForDisplay"),
 			BuildLocator: GetState("buildLocator"),
 		},
 		RuntimeStatus:                GetState("runtimeStatus"),
