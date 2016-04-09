@@ -3,7 +3,7 @@ GoLang agent for GoCD
 
 GOCD agent golang implementation. Comparing to java implementation, golang agent has less installation dependency, less memory footprint and shorter boostrap time. More suitable for running in container.
 
-Golang agent is based on "BuildCommand API" proposed [here](https://github.com/gocd/gocd/issues/1954). We are working on contributing serverside implementation to GOCD codebase. Meanwhile you can run golang agent against server in this GOCD PR fork before it get merged into the trunck: https://github.com/wpc/gocd/tree/build_command_protocol.
+Golang agent is based on "BuildCommand API" proposed [here](https://github.com/gocd/gocd/issues/1954). It's still working in progress. If you want to try out the golang agent, please build GoCD server from the latest master branch.
 
 ### Installation
 
