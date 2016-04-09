@@ -5,6 +5,12 @@ GOCD agent golang implementation. Comparing to java implementation, golang agent
 
 Golang agent is based on "BuildCommand API" proposed [here](https://github.com/gocd/gocd/issues/1954). It's still working in progress. If you want to try out the golang agent, please build GoCD server from the latest master branch.
 
+### Features not supported yet
+* SCM materials other than git
+* Java task plugins
+* Java scm plugins such as Github-PR
+
+
 ### Installation
 
 On Ubuntu:
