@@ -426,6 +426,57 @@ func TestDoNothingIfGenerateTestReportSrcsIsEmpty(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
+func TestConditionalCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	var tests = []struct {
+		cond     *protocol.BuildCommand
+		expected string
+	}{
+		{protocol.CondCommand(
+			protocol.ComposeCommand(), protocol.EchoCommand("foo")),
+			"foo\n"},
+		{protocol.CondCommand(
+			protocol.FailCommand(""), protocol.EchoCommand("foo")),
+			""},
+		{protocol.CondCommand(
+			protocol.ComposeCommand(),
+			protocol.EchoCommand("foo"),
+			protocol.EchoCommand("bar")),
+			"foo\n"},
+		{protocol.CondCommand(
+			protocol.FailCommand(""),
+			protocol.EchoCommand("foo"),
+			protocol.EchoCommand("bar")),
+			"bar\n"},
+
+		{protocol.CondCommand(
+			protocol.FailCommand(""), protocol.EchoCommand("1"),
+			protocol.FailCommand(""), protocol.EchoCommand("2"),
+			protocol.ComposeCommand(), protocol.EchoCommand("3"),
+			protocol.ComposeCommand(), protocol.EchoCommand("4"),
+			protocol.EchoCommand("else")),
+			"3\n"},
+	}
+
+	for _, test := range tests {
+		goServer.SendBuild(AgentId, buildId, test.cond)
+		assert.Equal(t, "agent Building", stateLog.Next())
+		assert.Equal(t, "build Passed", stateLog.Next())
+		assert.Equal(t, "agent Idle", stateLog.Next())
+		log, err := goServer.ConsoleLog(buildId)
+		if err != nil {
+			t.Errorf("Can't find console log when test: %+v", test)
+		}
+		actual := trimTimestamp(log)
+		if test.expected != actual {
+			t.Errorf("test: %+v\nbut was '%v'", test, actual)
+		}
+		os.Truncate(goServer.ConsoleLogFile(buildId), 0)
+	}
+
+}
+
 func copyTestReports(wd, rep string) {
 	Mkdirs(wd)
 	rep1 := filepath.Join(DIR(), "..", "junit", "test", rep)

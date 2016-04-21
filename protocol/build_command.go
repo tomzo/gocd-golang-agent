@@ -28,6 +28,7 @@ const (
 	RunIfConfigPassed = "passed"
 
 	CommandCompose             = "compose"
+	CommandCond                = "cond"
 	CommandExport              = "export"
 	CommandTest                = "test"
 	CommandExec                = "exec"
@@ -78,6 +79,10 @@ func NewBuild(id, locator, locatorForDisplay,
 
 func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
 	return NewBuildCommand(CommandCompose).AddCommands(commands...)
+}
+
+func CondCommand(commands ...*BuildCommand) *BuildCommand {
+	return NewBuildCommand("cond").AddCommands(commands...)
 }
 
 func EchoCommand(line string) *BuildCommand {
