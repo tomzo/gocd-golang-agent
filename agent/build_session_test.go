@@ -432,37 +432,40 @@ func TestConditionalCommand(t *testing.T) {
 	var tests = []struct {
 		cond     *protocol.BuildCommand
 		expected string
+		result   string
 	}{
 		{protocol.CondCommand(
 			protocol.ComposeCommand(), protocol.EchoCommand("foo")),
-			"foo\n"},
+			"foo\n", "Passed"},
 		{protocol.CondCommand(
 			protocol.FailCommand(""), protocol.EchoCommand("foo")),
-			""},
+			"", "Passed"},
 		{protocol.CondCommand(
 			protocol.ComposeCommand(),
 			protocol.EchoCommand("foo"),
 			protocol.EchoCommand("bar")),
-			"foo\n"},
+			"foo\n", "Passed"},
 		{protocol.CondCommand(
 			protocol.FailCommand(""),
 			protocol.EchoCommand("foo"),
 			protocol.EchoCommand("bar")),
-			"bar\n"},
-
+			"bar\n", "Passed"},
 		{protocol.CondCommand(
 			protocol.FailCommand(""), protocol.EchoCommand("1"),
 			protocol.FailCommand(""), protocol.EchoCommand("2"),
 			protocol.ComposeCommand(), protocol.EchoCommand("3"),
 			protocol.ComposeCommand(), protocol.EchoCommand("4"),
 			protocol.EchoCommand("else")),
-			"3\n"},
+			"3\n", "Passed"},
+		{protocol.CondCommand(
+			protocol.ComposeCommand(), protocol.FailCommand("foo")),
+			"ERROR: foo\n", "Failed"},
 	}
 
 	for _, test := range tests {
 		goServer.SendBuild(AgentId, buildId, test.cond)
 		assert.Equal(t, "agent Building", stateLog.Next())
-		assert.Equal(t, "build Passed", stateLog.Next())
+		assert.Equal(t, "build "+test.result, stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
 		if err != nil {
