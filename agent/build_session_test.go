@@ -30,6 +30,10 @@ import (
 	"time"
 )
 
+var (
+	echo = protocol.EchoCommand
+)
+
 func TestEcho(t *testing.T) {
 	setUp(t)
 	defer tearDown()
@@ -306,7 +310,6 @@ func TestTestCommand(t *testing.T) {
 	wd := createTestProjectInPipelineDir()
 	file := "src/hello/3.txt"
 	dir := "src/hello"
-
 	var tests = []struct {
 		echo     string
 		testArgs []string
@@ -334,7 +337,7 @@ func TestTestCommand(t *testing.T) {
 
 	for _, test := range tests {
 		testCmd := protocol.TestCommand(test.testArgs...).Setwd(relativePath(wd))
-		goServer.SendBuild(AgentId, buildId, echo(test.echo).SetTest(testCmd))
+		goServer.SendBuild(AgentId, buildId, protocol.CondCommand(testCmd, echo(test.echo)))
 		assert.Equal(t, "agent Building", stateLog.Next())
 		assert.Equal(t, "build Passed", stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
@@ -429,11 +432,7 @@ func TestDoNothingIfGenerateTestReportSrcsIsEmpty(t *testing.T) {
 func TestConditionalCommand(t *testing.T) {
 	setUp(t)
 	defer tearDown()
-	var tests = []struct {
-		cond     *protocol.BuildCommand
-		expected string
-		result   string
-	}{
+	verify(t, []TestRow{
 		{protocol.CondCommand(
 			protocol.ComposeCommand(), protocol.EchoCommand("foo")),
 			"foo\n", "Passed"},
@@ -460,24 +459,32 @@ func TestConditionalCommand(t *testing.T) {
 		{protocol.CondCommand(
 			protocol.ComposeCommand(), protocol.FailCommand("foo")),
 			"ERROR: foo\n", "Failed"},
-	}
+	})
 
-	for _, test := range tests {
-		goServer.SendBuild(AgentId, buildId, test.cond)
+}
+
+type TestRow struct {
+	command  *protocol.BuildCommand
+	expected string
+	result   string
+}
+
+func verify(t *testing.T, testRows []TestRow) {
+	for _, row := range testRows {
+		goServer.SendBuild(AgentId, buildId, row.command)
 		assert.Equal(t, "agent Building", stateLog.Next())
-		assert.Equal(t, "build "+test.result, stateLog.Next())
+		assert.Equal(t, "build "+row.result, stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
 		if err != nil {
-			t.Errorf("Can't find console log when test: %+v", test)
+			t.Errorf("Can't find console log when test: %+v", row)
 		}
 		actual := trimTimestamp(log)
-		if test.expected != actual {
-			t.Errorf("test: %+v\nbut was '%v'", test, actual)
+		if row.expected != actual {
+			t.Errorf("test: %+v\nbut was '%v'", row, actual)
 		}
 		os.Truncate(goServer.ConsoleLogFile(buildId), 0)
 	}
-
 }
 
 func copyTestReports(wd, rep string) {

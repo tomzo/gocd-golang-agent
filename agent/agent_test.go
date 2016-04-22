@@ -321,7 +321,3 @@ func tearDown() {
 		println("WARN: clean up pipeline directory failed:", err.Error())
 	}
 }
-
-func echo(str string) *protocol.BuildCommand {
-	return protocol.EchoCommand(str)
-}
