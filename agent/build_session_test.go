@@ -463,6 +463,22 @@ func TestConditionalCommand(t *testing.T) {
 
 }
 
+func TestAndCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	truthy := protocol.ComposeCommand()
+	falsy := protocol.FailCommand("")
+	and := protocol.AndCommand
+
+	verify(t, []TestRow{
+		{and(), "", "Passed"},
+		{and(truthy), "", "Passed"},
+		{and(falsy), "ERROR: \n", "Failed"},
+		{and(truthy, truthy, truthy), "", "Passed"},
+		{and(truthy, falsy, truthy), "ERROR: \n", "Failed"},
+	})
+}
+
 type TestRow struct {
 	command  *protocol.BuildCommand
 	expected string
@@ -476,12 +492,12 @@ func verify(t *testing.T, testRows []TestRow) {
 		assert.Equal(t, "build "+row.result, stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
-		if err != nil {
-			t.Errorf("Can't find console log when test: %+v", row)
+		if err != nil && row.expected != "" {
+			t.Errorf("Can't find console log when test: %+v, error: %+v", row, err)
 		}
 		actual := trimTimestamp(log)
 		if row.expected != actual {
-			t.Errorf("test: %+v\nbut was '%v'", row, actual)
+			t.Errorf("test: %+v\nbut was '%v'", row.expected, actual)
 		}
 		os.Truncate(goServer.ConsoleLogFile(buildId), 0)
 	}

@@ -29,6 +29,7 @@ const (
 
 	CommandCompose             = "compose"
 	CommandCond                = "cond"
+	CommandAnd                 = "and"
 	CommandExport              = "export"
 	CommandTest                = "test"
 	CommandExec                = "exec"
@@ -83,6 +84,10 @@ func ComposeCommand(commands ...*BuildCommand) *BuildCommand {
 
 func CondCommand(commands ...*BuildCommand) *BuildCommand {
 	return NewBuildCommand("cond").AddCommands(commands...)
+}
+
+func AndCommand(commands ...*BuildCommand) *BuildCommand {
+	return NewBuildCommand("and").AddCommands(commands...)
 }
 
 func EchoCommand(line string) *BuildCommand {

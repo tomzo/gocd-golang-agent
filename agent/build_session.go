@@ -50,6 +50,7 @@ func Executors() map[string]Executor {
 		protocol.CommandReportCompleting:    CommandReport,
 		protocol.CommandCompose:             CommandCompose,
 		protocol.CommandCond:                CommandCond,
+		protocol.CommandAnd:                 CommandAnd,
 		protocol.CommandTest:                CommandTest,
 		protocol.CommandExec:                CommandExec,
 		protocol.CommandMkdirs:              CommandMkdirs,
