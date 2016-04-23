@@ -30,6 +30,7 @@ const (
 	CommandCompose             = "compose"
 	CommandCond                = "cond"
 	CommandAnd                 = "and"
+	CommandOr                  = "or"
 	CommandExport              = "export"
 	CommandTest                = "test"
 	CommandExec                = "exec"
@@ -88,6 +89,10 @@ func CondCommand(commands ...*BuildCommand) *BuildCommand {
 
 func AndCommand(commands ...*BuildCommand) *BuildCommand {
 	return NewBuildCommand("and").AddCommands(commands...)
+}
+
+func OrCommand(commands ...*BuildCommand) *BuildCommand {
+	return NewBuildCommand("or").AddCommands(commands...)
 }
 
 func EchoCommand(line string) *BuildCommand {

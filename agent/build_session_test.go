@@ -479,6 +479,22 @@ func TestAndCommand(t *testing.T) {
 	})
 }
 
+func TestOrCommand(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	truthy := protocol.ComposeCommand()
+	falsy := protocol.FailCommand("")
+	or := protocol.OrCommand
+
+	verify(t, []TestRow{
+		{or(), "", "Passed"},
+		{or(truthy), "", "Passed"},
+		{or(falsy), "ERROR: \n", "Failed"},
+		{or(truthy, truthy, truthy), "", "Passed"},
+		{or(truthy, falsy, truthy), "", "Passed"},
+		{or(falsy, falsy, falsy), "ERROR: \n", "Failed"}})
+}
+
 type TestRow struct {
 	command  *protocol.BuildCommand
 	expected string
