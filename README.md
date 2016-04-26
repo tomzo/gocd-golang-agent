@@ -19,7 +19,8 @@ On Ubuntu:
 sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61 
 # Add repo
 sudo echo deb https://dl.bintray.com/alex-hal9000/gocd-golang-agent master main | sudo tee -a /etc/apt/sources.list
-# Install the package
+sudo apt-get update
+# Install the package  (add '-y --force-yes' after 'install' if automating)
 sudo apt-get install gocd-golang-agent
 ```
 
