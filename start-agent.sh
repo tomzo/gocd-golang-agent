@@ -17,4 +17,4 @@ detectIP() {
 GOCD_SERVER_HOST=${GOCD_SERVER_HOST:-`detectIP`}
 GOCD_SERVER_SSL_PORT=${GOCD_SERVER_SSL_PORT:-8154}
 
-docker run -e GOCD_SERVER_URL="https://$GOCD_SERVER_HOST:$GOCD_SERVER_SSL_PORT" -e DEBUG="${DEBUG}" -e GOCD_AGNENT_WORK_DIR="/var/lib/gocd-golang-agent" golang-agent /usr/bin/gocd-golang-agent
+docker run -e GOCD_SERVER_URL="https://$GOCD_SERVER_HOST:$GOCD_SERVER_SSL_PORT/go" -e DEBUG="${DEBUG}" -e GOCD_AGNENT_WORK_DIR="/var/lib/gocd-golang-agent" golang-agent /usr/bin/gocd-golang-agent
