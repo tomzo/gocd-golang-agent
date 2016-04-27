@@ -180,6 +180,9 @@ func readAgentKeyAndCerts(params map[string]string) error {
 	if err := dec.Decode(&registration); err != nil {
 		return err
 	}
+	if registration.AgentCertificate == "" {
+		return Err("Register failed, probably need approve agent registration on Server side")
+	}
 
 	ioutil.WriteFile(config.AgentPrivateKeyFile, []byte(registration.AgentPrivateKey), 0600)
 	ioutil.WriteFile(config.AgentCertFile, []byte(registration.AgentCertificate), 0600)
