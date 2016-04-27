@@ -113,6 +113,5 @@ func generateTestReport(s *BuildSession, result *junit.TestSuite, path string) {
 }
 
 func loadTestReportTemplate() (*template.Template, error) {
-	path := filepath.Join(DIR(), "unit_test_report_template.html")
-	return template.ParseFiles(path)
+	return template.New("TestReportTemplate").Parse(UNIT_TEST_REPORT_TEMPLATE)
 }

@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -531,4 +532,9 @@ func copyTestReports(wd, rep string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func DIR() string {
+	_, filename, _, _ := runtime.Caller(1)
+	return filepath.Dir(filename)
 }
