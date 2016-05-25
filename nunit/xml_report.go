@@ -67,10 +67,23 @@ type TestSuite struct {
 	Asserts int `xml:"asserts,attr"`
 }
 
+func (t *TestSuite) TestCases() []*TestCase{
+	testCases := t.Results.TestCases
+	if testCases != nil {
+		return testCases
+	} else {
+		fmt.Println("loop internel result test suits", t.Results.TestSuites)
+		for _, suite := range t.Results.TestSuites {
+			testCases = append(testCases, suite.TestCases()...)
+		}
+		return testCases
+	}
+}
+
 type Results struct {
-	XMLName xml.Name `xml:"results"`
-	TestSuits []*TestSuite `xml:"test-suite"`
-	TestCases []*TestCase `xml:"test-case"`
+	XMLName    xml.Name `xml:"results"`
+	TestSuites []*TestSuite `xml:"test-suite"`
+	TestCases  []*TestCase `xml:"test-case"`
 }
 
 type TestCase struct {
@@ -133,6 +146,10 @@ func NewTestResults() *TestResults {
 	return new(TestResults)
 }
 
+func (t *TestResults) TestCases() []*TestCase{
+	return t.TestSuite.TestCases()
+}
+
 func (t *TestResults) Merge(another *TestResults) {
 	fmt.Println(t.Total, another.Total)
 	t.Total += another.Total
@@ -154,6 +171,8 @@ func Read(f string) (results *TestResults, err error){
 	xml.Unmarshal(data, results)
 
 	fmt.Println("results is", results)
+	fmt.Println(results.TestSuite.Results.TestSuites)
+	fmt.Println(results.TestSuite.Results.TestCases)
 
 	return
 }
