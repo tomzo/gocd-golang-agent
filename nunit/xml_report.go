@@ -34,16 +34,99 @@ type TestResults struct {
 	Skipped int `xml:"skipped,attr"`
 	Invalid int `xml:"invalid,attr"`
 
+	Environment *Environment `xml:"environment"`
+	TestSuite *TestSuite `xml:"test-suite"`
 }
 
-type TestSuit struct {
+type Environment struct {
+	XMLName xml.Name `xl:"environment"`
+	NUnitVersion string `xml:"nunit-version,attr"`
+	ClrVersion string `xml:"clr-version,attr"`
+	OsVersion string `xml:"os-version,attr"`
+	Platform string `xml:"platform,attr"`
+	Cwd string `xml:"cwd,attr"`
+	MachineName string`xml:"machine-name,attr"`
+	User string `xml:"user,attr"`
+	UserDomain string `xml:"user-domain,attr"`
+}
+
+type TestSuite struct {
 	XMLName xml.Name `xml:"test-suite"`
+
+	Categories *Categories `xml:"categories"`
+	Properties *Properties `xml:"properties"`
+	Failure *Failure `xml:"failure"`
+	Reason *Reason `xml:"reason"`
+
+	Results *Results `xml:"results"`
 
 	Name string `xml:"name,attr"`
 	Executed bool `xml:"executed,attr"`
 	Success bool `xml:"success,attr"`
 	Time float64 `xml:"time,attr"`
 	Asserts int `xml:"asserts,attr"`
+}
+
+type Results struct {
+	XMLName xml.Name `xml:"results"`
+	TestSuits []*TestSuite `xml:"test-suite"`
+	TestCases []*TestCase `xml:"test-case"`
+}
+
+type TestCase struct {
+	XMLName xml.Name `xml:"test-case"`
+
+	Categories *Categories `xml:"categories"`
+	Properties *Properties `xml:"properties"`
+	Failure *Failure `xml:"failure"`
+	Reason *Reason `xml:"reason"`
+
+	Name string `xml:"name,attr"`
+	Description string `xml:"name,attr"`
+	Success string `xml:"success,attr"`
+	Time float64 `xml:"time.attr"`
+	Executed bool `xml:"executed,attr"`
+	Asserts int `xml:"asserts,attr"`
+}
+
+type Categories struct {
+	Categories []*Category `xml:"category"`
+}
+
+type Category struct {
+	XMLName xml.Name `xml:"category"`
+	Name string `xml:"name,attr"`
+}
+
+type Properties struct {
+	XMLName xml.Name `xml:"properties"`
+	Properties []*Property `xml:"property"`
+}
+
+type Property struct {
+	XMLName xml.Name `xml:"property"`
+	Name string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
+type Failure struct {
+	XMLName xml.Name `xml:"failure"`
+	Message *Message `xml:"message"`
+}
+
+type Reason struct {
+	XMLName xml.Name `xml:"reason"`
+	Message *Message `xml:"message"`
+}
+
+type Message struct {
+	XMLName xml.Name `xml:"message"`
+	Content string `xml:",chardata"`
+}
+
+type StackTrace struct {
+	XMLName xml.Name `xml:"stack-trace"`
+	Content string `xml:",chardata"`
 }
 
 func NewTestResults() *TestResults {
@@ -69,6 +152,8 @@ func Read(f string) (results *TestResults, err error){
 
 	results = NewTestResults()
 	xml.Unmarshal(data, results)
+
+	fmt.Println("results is", results)
 
 	return
 }
