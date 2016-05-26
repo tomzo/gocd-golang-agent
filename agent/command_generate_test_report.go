@@ -20,6 +20,7 @@ import (
 	"github.com/bmatcuk/doublestar"
 	"github.com/gocd-contrib/gocd-golang-agent/junit"
 	"github.com/gocd-contrib/gocd-golang-agent/protocol"
+	"github.com/yunlzheng/gocd-golang-agent/nunit"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -35,6 +36,14 @@ type UnitTestReport struct {
 	TestCases []*junit.TestCase
 }
 
+func (r *UnitTestReport) Merge(another *UnitTestReport) {
+	r.Tests += another.Tests
+	r.Failures += another.Failures
+	r.Skipped += another.Skipped
+	r.Time += another.Time
+	r.TestCases = append(r.TestCases, another.TestCases...)
+}
+
 func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) error {
 	srcs, err := cmd.ListArg("srcs")
 	if err != nil {
@@ -45,14 +54,79 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 	}
 	uploadPath := cmd.Args["uploadPath"]
 
-	req, err := generateUnitTestReport(s, srcs)
+	report := new(UnitTestReport)
+
+	req, err := generateJUnitTestReport(s, srcs)
 	if err != nil {
 		return err
 	}
 
-	return uploadUnitTestReportArtifacts(s, uploadPath, req)
+	report.Merge(req)
+
+	req2, err := generateUnitTestReport(s, srcs)
+	if err !=nil {
+		return err
+	}
+
+	report.Merge(req2)
+
+	return uploadUnitTestReportArtifacts(s, uploadPath, report)
 
 }
+
+func generateUnitTestReport(s *BuildSession, srcs []string) (rep *UnitTestReport, err error) {
+
+	results := nunit.NewTestResults()
+	for _, src := range srcs {
+		path := filepath.Join(s.wd, src)
+		if strings.Contains(path, "*") {
+			matches, err1 := doublestar.Glob(path)
+			if err1 != nil {
+				err = err1
+			}
+			sort.Strings(matches)
+			for _, fpath := range matches {
+				generateNUnitTestReport(s, results, fpath)
+			}
+		} else {
+			generateNUnitTestReport(s, results, path)
+		}
+	}
+	return
+}
+
+
+
+func generateJUnitTestReport(s *BuildSession, srcs []string) (rep *UnitTestReport, err error) {
+
+	suite := junit.NewTestSuite()
+	for _, src := range srcs {
+		path := filepath.Join(s.wd, src)
+		if strings.Contains(path, "*") {
+			matches, err1 := doublestar.Glob(path)
+			if err1 != nil {
+				err = err1
+			}
+			sort.Strings(matches)
+			for _, fpath := range matches {
+				generateJunitTestReport(s, suite, fpath)
+			}
+		} else {
+			generateJunitTestReport(s, suite, path)
+		}
+	}
+
+	s.debugLog("test report: %+v", suite)
+
+	rep.Tests = suite.Tests
+	rep.Skipped = suite.Skipped
+	rep.Failures = suite.Failures + suite.Errors
+	rep.TestCases = suite.TestCases
+	rep.Time = suite.Time
+
+	return
+}
+
 
 func uploadUnitTestReportArtifacts(s *BuildSession, uploadPath string, req *UnitTestReport) error {
 	template, err := loadTestReportTemplate()
@@ -82,36 +156,22 @@ func uploadUnitTestReportArtifacts(s *BuildSession, uploadPath string, req *Unit
 	return uploadArtifacts(s, file.Name(), uploadPath, false)
 }
 
-func generateUnitTestReport(s *BuildSession, srcs []string) (rep *UnitTestReport, err error) {
-
-	err = nil
-	rep = new(UnitTestReport)
-
-	suite := junit.NewTestSuite()
-	for _, src := range srcs {
-		path := filepath.Join(s.wd, src)
-		if strings.Contains(path, "*") {
-			matches, err1 := doublestar.Glob(path)
-			if err1 != nil {
-				err = err1
-			}
-			sort.Strings(matches)
-			for _, fpath := range matches {
-				generateJunitTestReport(s, suite, fpath)
-			}
-		} else {
-			generateJunitTestReport(s, suite, path)
-		}
+func generateNUnitTestReport(s *BuildSession, result *nunit.TestResults, path string) (rep *UnitTestReport, err error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		s.debugLog("ignore %v for error: %v", path, err)
+		return
 	}
-
-	s.debugLog("test report: %+v", suite)
-
-	rep.Tests = suite.Tests
-	rep.Skipped = suite.Skipped
-	rep.Failures = suite.Failures + suite.Errors
-	rep.TestCases = suite.TestCases
-	rep.Time = suite.Time
-
+	if info.IsDir() {
+		return
+	}
+	suite, err := nunit.Read(path)
+	if err != nil {
+		s.debugLog("ignore %v for error: %v", path, err)
+		return
+	}
+	s.debugLog("suite: %+v", suite)
+	result.Merge(suite)
 	return
 }
 
