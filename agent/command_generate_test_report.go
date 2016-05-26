@@ -45,55 +45,77 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 	}
 	uploadPath := cmd.Args["uploadPath"]
 
-	suite := junit.NewTestSuite()
-	for _, src := range srcs {
-		path := filepath.Join(s.wd, src)
-		if strings.Contains(path, "*") {
-			matches, err := doublestar.Glob(path)
-			if err != nil {
-				return err
-			}
-			sort.Strings(matches)
-			for _, fpath := range matches {
-				generateTestReport(s, suite, fpath)
-			}
-		} else {
-			generateTestReport(s, suite, path)
-		}
+	req, err := generateUnitTestReport(s, srcs)
+	if err != nil {
+		return err
 	}
 
+	return uploadUnitTestReportArtifacts(s, uploadPath, req)
+
+}
+
+func uploadUnitTestReportArtifacts(s *BuildSession, uploadPath string, req *UnitTestReport) error {
 	template, err := loadTestReportTemplate()
 	if err != nil {
 		return err
 	}
 
 	outputPath := filepath.Join(s.wd, uploadPath, protocol.TestReportFileName)
+
 	err = Mkdirs(filepath.Dir(outputPath))
 	if err != nil {
 		return err
 	}
+
 	file, err := os.Create(outputPath)
 	if err != nil {
 		return err
 	}
-	s.debugLog("test report: %+v", suite)
 
-	var rep UnitTestReport
-	rep.Tests = suite.Tests
-	rep.Skipped = suite.Skipped
-	rep.Failures = suite.Failures + suite.Errors
-	rep.TestCases = suite.TestCases
-	rep.Time = suite.Time
+	err = template.Execute(file, req)
 
-	err = template.Execute(file, rep)
-	file.Close()
+	defer file.Close()
+
 	if err != nil {
 		return err
 	}
 	return uploadArtifacts(s, file.Name(), uploadPath, false)
 }
 
-func generateTestReport(s *BuildSession, result *junit.TestSuite, path string) {
+func generateUnitTestReport(s *BuildSession, srcs []string) (rep *UnitTestReport, err error) {
+
+	err = nil
+	rep = new(UnitTestReport)
+
+	suite := junit.NewTestSuite()
+	for _, src := range srcs {
+		path := filepath.Join(s.wd, src)
+		if strings.Contains(path, "*") {
+			matches, err1 := doublestar.Glob(path)
+			if err1 != nil {
+				err = err1
+			}
+			sort.Strings(matches)
+			for _, fpath := range matches {
+				generateJunitTestReport(s, suite, fpath)
+			}
+		} else {
+			generateJunitTestReport(s, suite, path)
+		}
+	}
+
+	s.debugLog("test report: %+v", suite)
+
+	rep.Tests = suite.Tests
+	rep.Skipped = suite.Skipped
+	rep.Failures = suite.Failures + suite.Errors
+	rep.TestCases = suite.TestCases
+	rep.Time = suite.Time
+
+	return
+}
+
+func generateJunitTestReport(s *BuildSession, result *junit.TestSuite, path string) {
 	info, err := os.Stat(path)
 	if err != nil {
 		s.debugLog("ignore %v for error: %v", path, err)

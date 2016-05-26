@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package junit_test
+package junit
 
 import (
-	. "github.com/gocd-contrib/gocd-golang-agent/junit"
 	"github.com/xli/assert"
 	"path/filepath"
 	"runtime"
