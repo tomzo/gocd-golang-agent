@@ -294,6 +294,14 @@ func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
 	s.echo.Substitutions[name] = value
 }
 
+func (s *BuildSession) Env() []string {
+	exports := make([]string, 0, len(s.envs))
+	for key, value := range s.envs {
+		exports = append(exports, Sprintf("%v=%v", key, value))
+	}
+	return exports
+}
+
 func (s *BuildSession) warn(format string, a ...interface{}) {
 	s.ConsoleLog(Sprintf("WARN: %v\n", format), a...)
 }

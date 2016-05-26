@@ -57,6 +57,8 @@ func TestExport(t *testing.T) {
 
 	os.Setenv("TEST_EXPORT", "EXPORT_VALUE")
 	defer os.Setenv("TEST_EXPORT", "")
+	os.Setenv("NO_EXPORT", "exec command should not have this")
+	defer os.Setenv("NO_EXPORT", "")
 
 	goServer.SendBuild(AgentId, buildId,
 		protocol.ExportCommand("env1", "value1", "false"),
@@ -67,6 +69,8 @@ func TestExport(t *testing.T) {
 		protocol.ExportCommand("env2", "value6", ""),
 		protocol.ExportCommand("env2", "", ""),
 		protocol.ExportCommand("TEST_EXPORT"),
+		protocol.ExecCommand("bash", "-c", "echo $env1"),
+		protocol.ExecCommand("bash", "-c", "echo $NO_EXPORT"),
 	)
 	assert.Equal(t, "agent Building", stateLog.Next())
 	assert.Equal(t, "build Passed", stateLog.Next())
@@ -82,6 +86,7 @@ overriding environment variable 'env2' with value 'value6'
 overriding environment variable 'env2' with value 'value6'
 overriding environment variable 'env2' with value ''
 setting environment variable 'TEST_EXPORT' to value 'EXPORT_VALUE'
+value4
 `
 	assert.Equal(t, expected, trimTimestamp(log))
 }

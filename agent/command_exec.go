@@ -27,6 +27,7 @@ func CommandExec(s *BuildSession, cmd *protocol.BuildCommand) error {
 		return err
 	}
 	execCmd := exec.Command(cmd.Args["command"], args...)
+	execCmd.Env = s.Env()
 	execCmd.Stdout = s.secrets
 	execCmd.Stderr = s.secrets
 	execCmd.Dir = s.wd
