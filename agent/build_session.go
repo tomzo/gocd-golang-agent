@@ -295,11 +295,13 @@ func (s *BuildSession) ReplaceEcho(name string, value interface{}) {
 }
 
 func (s *BuildSession) Env() []string {
-	exports := make([]string, 0, len(s.envs))
+	osEnv := os.Environ()
+	bsEnv := make([]string, 0, len(s.envs)+len(osEnv))
+	bsEnv = append(bsEnv, osEnv...)
 	for key, value := range s.envs {
-		exports = append(exports, Sprintf("%v=%v", key, value))
+		bsEnv = append(bsEnv, Sprintf("%v=%v", key, value))
 	}
-	return exports
+	return bsEnv
 }
 
 func (s *BuildSession) warn(format string, a ...interface{}) {
