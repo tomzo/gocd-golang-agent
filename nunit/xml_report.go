@@ -23,83 +23,77 @@ import (
 )
 
 type TestResults struct {
-	XMLName xml.Name `xml:"test-results"`
+	XMLName     xml.Name `xml:"test-results"`
 
-	Name string `xml:"name,attr"`
-	Total int `xml:"total,attr"`
-	Errors int `xml:"errors,attr"`
-	Failures int `xml:"failures,attr"`
-	NotRun int `xml:"not-run,attr"`
-	Ignored int `xml:"ignored,attr"`
-	Skipped int `xml:"skipped,attr"`
-	Invalid int `xml:"invalid,attr"`
+	Name        string `xml:"name,attr"`
+	Total       int `xml:"total,attr"`
+	Errors      int `xml:"errors,attr"`
+	Failures    int `xml:"failures,attr"`
+	NotRun      int `xml:"not-run,attr"`
+	Ignored     int `xml:"ignored,attr"`
+	Skipped     int `xml:"skipped,attr"`
+	Invalid     int `xml:"invalid,attr"`
 
 	Environment *Environment `xml:"environment"`
-	TestSuite *TestSuite `xml:"test-suite"`
+	TestSuite   *TestSuite `xml:"test-suite"`
 }
 
 type Environment struct {
-	XMLName xml.Name `xl:"environment"`
+	XMLName      xml.Name `xl:"environment"`
 	NUnitVersion string `xml:"nunit-version,attr"`
-	ClrVersion string `xml:"clr-version,attr"`
-	OsVersion string `xml:"os-version,attr"`
-	Platform string `xml:"platform,attr"`
-	Cwd string `xml:"cwd,attr"`
-	MachineName string`xml:"machine-name,attr"`
-	User string `xml:"user,attr"`
-	UserDomain string `xml:"user-domain,attr"`
+	ClrVersion   string `xml:"clr-version,attr"`
+	OsVersion    string `xml:"os-version,attr"`
+	Platform     string `xml:"platform,attr"`
+	Cwd          string `xml:"cwd,attr"`
+	MachineName  string`xml:"machine-name,attr"`
+	User         string `xml:"user,attr"`
+	UserDomain   string `xml:"user-domain,attr"`
 }
 
 type TestSuite struct {
-	XMLName xml.Name `xml:"test-suite"`
+	XMLName    xml.Name `xml:"test-suite"`
+
+	Name       string `xml:"name,attr"`
+	Executed   bool `xml:"executed,attr"`
+	Success    bool `xml:"success,attr"`
+	Time       float64 `xml:"time,attr"`
+	Asserts    int `xml:"asserts,attr"`
 
 	Categories *Categories `xml:"categories"`
 	Properties *Properties `xml:"properties"`
-	Failure *Failure `xml:"failure"`
-	Reason *Reason `xml:"reason"`
+	Failure    *Failure `xml:"failure"`
+	Reason     *Reason `xml:"reason"`
 
-	Results *Results `xml:"results"`
-
-	Name string `xml:"name,attr"`
-	Executed bool `xml:"executed,attr"`
-	Success bool `xml:"success,attr"`
-	Time float64 `xml:"time,attr"`
-	Asserts int `xml:"asserts,attr"`
+	TestSuites []*TestSuite `xml:"results>test-suite"`
+	TestCases  []*TestCase `xml:"results>test-case"`
 }
 
-func (t *TestSuite) TestCases() []*TestCase{
-	testCases := t.Results.TestCases
+func (t *TestSuite) InternalTestCases() []*TestCase {
+	testCases := t.TestCases
 	if testCases != nil {
 		return testCases
 	} else {
-		fmt.Println("loop internel result test suits", t.Results.TestSuites)
-		for _, suite := range t.Results.TestSuites {
-			testCases = append(testCases, suite.TestCases()...)
+		for _, suite := range t.TestSuites {
+			testCases = append(testCases, suite.InternalTestCases()...)
 		}
 		return testCases
 	}
 }
 
-type Results struct {
-	XMLName    xml.Name `xml:"results"`
-	TestSuites []*TestSuite `xml:"test-suite"`
-	TestCases  []*TestCase `xml:"test-case"`
-}
-
 type TestCase struct {
-	XMLName xml.Name `xml:"test-case"`
+	XMLName     xml.Name `xml:"test-case"`
 
-	Categories *Categories `xml:"categories"`
-	Properties *Properties `xml:"properties"`
-	Failure *Failure `xml:"failure"`
-	Reason *Reason `xml:"reason"`
+	Name        string `xml:"name,attr"`
+	Description string `xml:"description,attr"`
+	Success     string `xml:"success,attr"`
+	Time        float64 `xml:"time.attr"`
+	Executed    bool `xml:"executed,attr"`
+	Asserts     int `xml:"asserts,attr"`
 
-	Name string `xml:"name,attr"`
-	Description string `xml:"name,attr"`
-	Success string `xml:"success,attr"`
-	Time float64 `xml:"time.attr"`
-	Executed bool `xml:"executed,attr"`
-	Asserts int `xml:"asserts,attr"`
+	Categories  *Categories `xml:"categories"`
+	Properties  *Properties `xml:"properties"`
+	Failure     *Failure `xml:"failure"`
+	Reason      *Reason `xml:"reason"`
 }
 
 type Categories struct {
@@ -108,18 +102,18 @@ type Categories struct {
 
 type Category struct {
 	XMLName xml.Name `xml:"category"`
-	Name string `xml:"name,attr"`
+	Name    string `xml:"name,attr"`
 }
 
 type Properties struct {
-	XMLName xml.Name `xml:"properties"`
+	XMLName    xml.Name `xml:"properties"`
 	Properties []*Property `xml:"property"`
 }
 
 type Property struct {
 	XMLName xml.Name `xml:"property"`
-	Name string `xml:"name,attr"`
-	Value string `xml:"value,attr"`
+	Name    string `xml:"name,attr"`
+	Value   string `xml:"value,attr"`
 }
 
 type Failure struct {
@@ -146,8 +140,8 @@ func NewTestResults() *TestResults {
 	return new(TestResults)
 }
 
-func (t *TestResults) TestCases() []*TestCase{
-	return t.TestSuite.TestCases()
+func (t *TestResults) TestCases() []*TestCase {
+	return t.TestSuite.InternalTestCases()
 }
 
 func (t *TestResults) Merge(another *TestResults) {
@@ -161,18 +155,12 @@ func (t *TestResults) Merge(another *TestResults) {
 	t.Invalid += another.Invalid
 }
 
-func Read(f string) (results *TestResults, err error){
+func Read(f string) (results *TestResults, err error) {
 	data, err := ioutil.ReadFile(f)
 	if err != nil {
 		return
 	}
-
 	results = NewTestResults()
 	xml.Unmarshal(data, results)
-
-	fmt.Println("results is", results)
-	fmt.Println(results.TestSuite.Results.TestSuites)
-	fmt.Println(results.TestSuite.Results.TestCases)
-
 	return
 }
