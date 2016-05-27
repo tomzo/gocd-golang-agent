@@ -19,6 +19,7 @@ package nunit
 import (
 	"encoding/xml"
 	"io/ioutil"
+	"os"
 )
 
 type TestResults struct {
@@ -172,3 +173,21 @@ func Read(f string) (results *TestResults, err error) {
 
 	return
 }
+
+func GenerateNUnitTestReport(result *TestResults, path string) (err error){
+	info, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	if info.IsDir() {
+		return
+	}
+	suite, err := Read(path)
+	if err != nil {
+		return
+	}
+	result.Merge(suite)
+	return
+}
+
+

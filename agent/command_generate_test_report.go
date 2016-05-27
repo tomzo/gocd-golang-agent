@@ -185,40 +185,20 @@ func generateUnitTestReportFromJunitReport(s *BuildSession, srcs []string) (repo
 }
 
 func generateNUnitTestReport(s *BuildSession, result *nunit.TestResults, path string) {
-	info, err := os.Stat(path)
+	err := nunit.GenerateNUnitTestReport(result, path)
 	if err != nil {
 		s.debugLog("ignore %v for error: %v", path, err)
 		return
 	}
-	if info.IsDir() {
-		return
-	}
-	suite, err := nunit.Read(path)
-	if err != nil {
-		s.debugLog("ignore %v for error: %v", path, err)
-		return
-	}
-	s.debugLog("suite: %+v", suite)
-	result.Merge(suite)
 	return
 }
 
 func generateJunitTestReport(s *BuildSession, result *junit.TestSuite, path string) {
-	info, err := os.Stat(path)
+	err := junit.GenerateJunitTestReport(result, path)
 	if err != nil {
 		s.debugLog("ignore %v for error: %v", path, err)
 		return
 	}
-	if info.IsDir() {
-		return
-	}
-	suite, err := junit.Read(path)
-	if err != nil {
-		s.debugLog("ignore %v for error: %v", path, err)
-		return
-	}
-	s.debugLog("suite: %+v", suite)
-	result.Merge(suite)
 	return
 }
 

@@ -19,6 +19,7 @@ package junit
 import (
 	"encoding/xml"
 	"io/ioutil"
+	"os"
 )
 
 type TestSuites struct {
@@ -139,6 +140,22 @@ func Read(f string) (suite *TestSuite, err error) {
 			return
 		}
 	}
+	return
+}
+
+func GenerateJunitTestReport(result *TestSuite, path string) (err error){
+	info, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	if info.IsDir() {
+		return
+	}
+	suite, err := Read(path)
+	if err != nil {
+		return
+	}
+	result.Merge(suite)
 	return
 }
 
