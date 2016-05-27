@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package nunit
+package nunit_test
 
 import (
+	. "github.com/gocd-contrib/gocd-golang-agent/nunit"
 	"testing"
 	"path/filepath"
 	"runtime"
@@ -35,6 +36,11 @@ func TestReadReportForNUnit2XReport(t *testing.T) {
 	assert.Equal(t, 0, results.Skipped)
 	assert.Equal(t, 15, len(results.TestCases))
 	assert.Equal(t, 0.125, results.Time)
+}
+
+func TestReadReportForIllegalXml(t *testing.T) {
+	_, err := Read(filepath.Join(DIR(), "test", "illegal_report.xml"))
+	assert.NotNil(t, err)
 }
 
 func TestReadReportMergeNUnit2XReport(t *testing.T) {

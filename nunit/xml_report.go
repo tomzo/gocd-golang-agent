@@ -37,7 +37,7 @@ type TestResults struct {
 	TestSuite   *TestSuite `xml:"test-suite"`
 
 	Time        float64
-	TestCases  []*TestCase
+	TestCases   []*TestCase
 }
 
 type Environment struct {
@@ -121,6 +121,7 @@ type Property struct {
 type Failure struct {
 	XMLName xml.Name `xml:"failure"`
 	Message *Message `xml:"message"`
+	StackTrace *StackTrace `xml:"stack-trace"`
 }
 
 type Reason struct {
@@ -160,8 +161,14 @@ func Read(f string) (results *TestResults, err error) {
 		return
 	}
 	results = NewTestResults()
-	xml.Unmarshal(data, results)
+	err = xml.Unmarshal(data, results)
+
+	if err !=nil {
+		return
+	}
+
 	results.Time = results.TestSuite.Time
 	results.TestCases = results.TestSuite.InternalTestCases()
+
 	return
 }

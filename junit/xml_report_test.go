@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package junit
+package junit_test
 
 import (
+	. "github.com/gocd-contrib/gocd-golang-agent/junit"
 	"github.com/xli/assert"
 	"path/filepath"
 	"runtime"
@@ -26,6 +27,11 @@ func TestReadReport(t *testing.T) {
 	suite, err := Read(filepath.Join(DIR(), "test", "junit_report1.xml"))
 	assert.Nil(t, err)
 	assert.Equal(t, 1, suite.Tests)
+}
+
+func TestReadIllegalReport(t *testing.T) {
+	_, err := Read(filepath.Join(DIR(), "test", "junit_illegal_report.xml"))
+	assert.NotNil(t, err)
 }
 
 func TestReadTestSuitesReport(t *testing.T) {
