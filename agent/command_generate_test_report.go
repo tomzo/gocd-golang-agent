@@ -74,18 +74,18 @@ func CommandGenerateTestReport(s *BuildSession, cmd *protocol.BuildCommand) erro
 
 	report := new(UnitTestReport)
 
-	rep, err := generateUnitTestReportFromJunitReport(s, srcs)
+	junitRep, err := generateUnitTestReportFromJunitReport(s, srcs)
 	if err != nil {
 		return err
 	}
-	report.Merge(rep)
+	report.Merge(junitRep)
 
-	req2, err := generateUnitTestReportFromNunitReport(s, srcs)
+	nUnitRep, err := generateUnitTestReportFromNunitReport(s, srcs)
 	if err != nil {
 		return err
 	}
 
-	report.Merge(req2)
+	report.Merge(nUnitRep)
 
 	return uploadUnitTestReportArtifacts(s, uploadPath, report)
 }
