@@ -19,7 +19,6 @@ package nunit
 import (
 	"encoding/xml"
 	"io/ioutil"
-	"fmt"
 )
 
 type TestResults struct {
@@ -36,6 +35,9 @@ type TestResults struct {
 
 	Environment *Environment `xml:"environment"`
 	TestSuite   *TestSuite `xml:"test-suite"`
+
+	Time        float64
+	TestCases  []*TestCase
 }
 
 type Environment struct {
@@ -140,12 +142,7 @@ func NewTestResults() *TestResults {
 	return new(TestResults)
 }
 
-func (t *TestResults) TestCases() []*TestCase {
-	return t.TestSuite.InternalTestCases()
-}
-
 func (t *TestResults) Merge(another *TestResults) {
-	fmt.Println(t.Total, another.Total)
 	t.Total += another.Total
 	t.Errors += another.Errors
 	t.Failures += another.Failures
@@ -153,6 +150,8 @@ func (t *TestResults) Merge(another *TestResults) {
 	t.Ignored += another.Ignored
 	t.Skipped += another.Skipped
 	t.Invalid += another.Invalid
+	t.Time += another.Time
+	t.TestCases = append(t.TestCases, another.TestCases...)
 }
 
 func Read(f string) (results *TestResults, err error) {
@@ -162,5 +161,7 @@ func Read(f string) (results *TestResults, err error) {
 	}
 	results = NewTestResults()
 	xml.Unmarshal(data, results)
+	results.Time = results.TestSuite.Time
+	results.TestCases = results.TestSuite.InternalTestCases()
 	return
 }

@@ -33,7 +33,8 @@ func TestReadReportForNUnit2XReport(t *testing.T) {
 	assert.Equal(t, 7, results.NotRun)
 	assert.Equal(t, 4, results.Ignored)
 	assert.Equal(t, 0, results.Skipped)
-	assert.Equal(t, 15, len(results.TestCases()))
+	assert.Equal(t, 15, len(results.TestCases))
+	assert.Equal(t, 0.125, results.Time)
 }
 
 func TestReadReportMergeNUnit2XReport(t *testing.T) {
@@ -54,6 +55,8 @@ func TestReadReportMergeNUnit2XReport(t *testing.T) {
 	assert.Equal(t, 14, result.NotRun)
 	assert.Equal(t, 8, result.Ignored)
 	assert.Equal(t, 0, result.Skipped)
+	assert.Equal(t, 0.25, result.Time)
+	assert.Equal(t, 30, len(result.TestCases))
 }
 
 func DIR() string {
