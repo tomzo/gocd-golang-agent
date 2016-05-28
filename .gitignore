@@ -3,3 +3,5 @@
 /installers/deb/package/usr/bin/gocd-golang-agent
 /gocd-golang-agent
 /testreport.xml
+.idea/
+*.iml
