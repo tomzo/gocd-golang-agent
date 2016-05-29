@@ -526,7 +526,7 @@ func verify(t *testing.T, testRows []TestRow) {
 	for _, row := range testRows {
 		goServer.SendBuild(AgentId, buildId, row.command)
 		assert.Equal(t, "agent Building", stateLog.Next())
-		assert.Equal(t, "build " + row.result, stateLog.Next())
+		assert.Equal(t, "build "+row.result, stateLog.Next())
 		assert.Equal(t, "agent Idle", stateLog.Next())
 		log, err := goServer.ConsoleLog(buildId)
 		if err != nil && row.expected != "" {
