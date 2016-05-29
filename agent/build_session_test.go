@@ -142,7 +142,7 @@ func TestCleandirCommand(t *testing.T) {
 	}
 
 	for i, f := range matches {
-		actual := f[len(wd) + 1:]
+		actual := f[len(wd)+1:]
 		assert.Equal(t, expected[i], actual)
 	}
 }
