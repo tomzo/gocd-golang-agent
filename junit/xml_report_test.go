@@ -29,6 +29,11 @@ func TestReadReport(t *testing.T) {
 	assert.Equal(t, 1, suite.Tests)
 }
 
+func TestReadIllegalReport(t *testing.T) {
+	_, err := Read(filepath.Join(DIR(), "test", "junit_illegal_report.xml"))
+	assert.NotNil(t, err)
+}
+
 func TestReadTestSuitesReport(t *testing.T) {
 	suite, err := Read(filepath.Join(DIR(), "test", "junit_report3.xml"))
 	assert.Nil(t, err)

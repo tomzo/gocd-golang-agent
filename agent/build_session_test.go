@@ -379,12 +379,32 @@ func TestTestCommandEchoShouldAlsoBeMaskedForSecrets(t *testing.T) {
 	assert.Equal(t, expected, trimTimestamp(log))
 }
 
+func TestGenerateTestReportFromNunit2xTestResultsReport(t *testing.T) {
+	setUp(t)
+	defer tearDown()
+	wd := createTestProjectInPipelineDir()
+	copyTestReports(filepath.Join(wd, "reports"), "nunit", "nunit2x_report1.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "nunit", "nunit2x_report2.xml")
+
+	goServer.SendBuild(AgentId, buildId,
+		protocol.GenerateTestReportCommand("testoutput", "reports/nunit2x_report1.xml", "reports/nunit2x_report1.xml").Setwd(relativePath(wd)),
+	)
+	assert.Equal(t, "agent Building", stateLog.Next())
+	assert.Equal(t, "build Passed", stateLog.Next())
+	assert.Equal(t, "agent Idle", stateLog.Next())
+
+	reportPath := goServer.ArtifactFile(buildId, "testoutput/index.html")
+	content, err := ioutil.ReadFile(reportPath)
+	assert.Nil(t, err)
+	assert.True(t, strings.Contains(string(content), "NUnit.Tests.Assemblies.MockTestFixture.MethodThrowsException"), Sprintf("wrong unit test report? %s", content))
+}
+
 func TestGenerateTestReportFromTestSuiteReports(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	wd := createTestProjectInPipelineDir()
-	copyTestReports(filepath.Join(wd, "reports"), "junit_report1.xml")
-	copyTestReports(filepath.Join(wd, "reports"), "junit_report2.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "junit", "junit_report1.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "junit", "junit_report2.xml")
 
 	goServer.SendBuild(AgentId, buildId,
 		protocol.GenerateTestReportCommand("testoutput", "reports/junit_report1.xml", "reports/junit_report2.xml").Setwd(relativePath(wd)),
@@ -403,7 +423,7 @@ func TestGenerateTestReportFromTestSuitesReport(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	wd := createTestProjectInPipelineDir()
-	copyTestReports(filepath.Join(wd, "reports"), "junit_report3.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "junit", "junit_report3.xml")
 
 	goServer.SendBuild(AgentId, buildId,
 		protocol.GenerateTestReportCommand("testoutput", "reports/junit_report3.xml").Setwd(relativePath(wd)),
@@ -422,7 +442,7 @@ func TestDoNothingIfGenerateTestReportSrcsIsEmpty(t *testing.T) {
 	setUp(t)
 	defer tearDown()
 	wd := createTestProjectInPipelineDir()
-	copyTestReports(filepath.Join(wd, "reports"), "junit_report3.xml")
+	copyTestReports(filepath.Join(wd, "reports"), "junit", "junit_report3.xml")
 
 	goServer.SendBuild(AgentId, buildId,
 		protocol.GenerateTestReportCommand("testoutput").Setwd(relativePath(wd)),
@@ -526,9 +546,9 @@ func verify(t *testing.T, testRows []TestRow) {
 	}
 }
 
-func copyTestReports(wd, rep string) {
+func copyTestReports(wd, chdir string, rep string) {
 	Mkdirs(wd)
-	rep1 := filepath.Join(DIR(), "..", "junit", "test", rep)
+	rep1 := filepath.Join(DIR(), "..", chdir, "test", rep)
 	src, _ := os.Open(rep1)
 	defer src.Close()
 	dest, _ := os.Create(filepath.Join(wd, rep))
