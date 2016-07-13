@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"crypto/tls"
 )
 
 type Config struct {
@@ -86,11 +87,23 @@ func LoadConfig() *Config {
 		OutputDebugLog:                   os.Getenv("DEBUG") != "",
 		WebSocketPath:                    readEnv("GOCD_SERVER_WEB_SOCKET_PATH", "/agent-websocket"),
 		RegistrationPath:                 readEnv("GOCD_SERVER_REGISTRATION_PATH", "/admin/agent"),
-		IpAddress:                        lookupIpAddress(),
+		IpAddress:                        lookupIpAddress(serverUrl.Host),
 	}
 }
 
-func lookupIpAddress() string {
+func lookupIpAddress(host string) string {
+	conn, err := tls.Dial("tcp", host, &tls.Config{
+		InsecureSkipVerify: true,
+	})
+	if err != nil {
+		return checkAllInterfaces()
+	}
+	ipAddress := strings.Split(conn.LocalAddr().String(), ":")[0]
+	conn.Close()
+	return ipAddress
+}
+
+func checkAllInterfaces() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		panic(err)
