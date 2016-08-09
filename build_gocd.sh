@@ -39,7 +39,7 @@ go get golang.org/x/net/websocket
 go get golang.org/x/text
 go get golang.org/x/crypto/ssh
 
-go build github.com/jstemmer/go-junit-report -o $GOPATH/bin/go-junit-report
+go build -o $GOPATH/bin/go-junit-report github.com/jstemmer/go-junit-report
 go test -test.v github.com/gocd-contrib/gocd-golang-agent | $GOPATH/bin/go-junit-report > testreport.xml
 
 # Go Build !!
