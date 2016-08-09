@@ -25,20 +25,14 @@ fi
 BUILD_DIR=$(pwd)
 export GOPATH=$BUILD_DIR
 
-# Clean my build
-if [[ -f gocd-golang-agent ]]; then
-  echo "Remove binary : gocd-golang-agent"
-  rm -rf gocd-golang-agent
-fi
-
 # Pull dependencies
 echo "================"
 echo "Get dependencies"
 echo "================"
 
 if [[ -d src/golang.org/x/net/websocket ]]; then
-  echo "Remove external library : golang.org/x/net/websocket"
-  rm -rf src/golang.org/x/net/websocket
+  echo "Remove external library : golang.org/x/net"
+  rm -rf src/golang.org/x/net
 fi
 echo "Get golang.org/x/net/websocket"
 go get golang.org/x/net/websocket
@@ -48,12 +42,14 @@ if [[ -d src/golang.org/x/text ]]; then
   echo "Remove external library : golang.org/x/text"
   rm -rf src/golang.org/x/text
 fi
+echo "Get golang.org/x/text"
 go get golang.org/x/text
 
 if [[ -d src/golang.org/x/crypto/ssh ]]; then
-  echo "Remove external library : golang.org/x/crypto/ssh"
-  rm -rf src/golang.org/x/crypto/ssh
+  echo "Remove external library : golang.org/x/crypto"
+  rm -rf src/golang.org/x/crypto
 fi
+echo "Get golang.org/x/crypto/ssh"
 go get golang.org/x/crypto/ssh
 
 if [[ -f $GOPATH/bin/go-junit-report ]]; then
@@ -68,8 +64,11 @@ fi
 go test -test.v github.com/gocd-contrib/gocd-golang-agent... | $GOPATH/bin/go-junit-report > testreport.xml
 
 # Go Build !!
-echo "Starting   building..."
 /bin/rm -rf output
 /bin/mkdir output
+echo "===================="
+echo "Start building gocd-golang-agent for linux"
 CGO_ENABLED=0 GOOS=linux go build -a -o output/gocd-golang-agent_linux_x86 github.com/gocd-contrib/gocd-golang-agent
+echo "===================="
+echo "Start building gocd-golang-agent for OSX"
 CGO_ENABLED=0 GOOS=darwin go build -a -o output/gocd-golang-agent_darwin_x86 github.com/gocd-contrib/gocd-golang-agent
