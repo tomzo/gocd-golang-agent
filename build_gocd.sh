@@ -45,4 +45,4 @@ go test -test.v github.com/gocd-contrib/gocd-golang-agent | $GOPATH/bin/go-junit
 # Go Build !!
 echo "Starting   building..."
 
-CGO_ENABLED=0 GOOS=darwin go build -a -o gocd-golang-agent .
+CGO_ENABLED=0 GOOS=darwin go build -a -o gocd-golang-agent github.com/gocd-contrib/gocd-golang-agent
