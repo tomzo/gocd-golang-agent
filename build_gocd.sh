@@ -3,7 +3,7 @@
 # Copyright 2016 ThoughtWorks, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# you may not use this file except in compliance with the License..
 # You may obtain a copy of the License at
 #
 #  http://www.apache.org/licenses/LICENSE-2.0
@@ -39,6 +39,7 @@ go get golang.org/x/net/websocket
 go get golang.org/x/text
 go get golang.org/x/crypto/ssh
 
+go build github.com/jstemmer/go-junit-report -o $GOPATH/bin/go-junit-report
 go test -test.v github.com/gocd-contrib/gocd-golang-agent | $GOPATH/bin/go-junit-report > testreport.xml
 
 # Go Build !!
