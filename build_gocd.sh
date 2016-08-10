@@ -46,6 +46,18 @@ echo "---------------------------"
 echo "Get golang.org/x/crypto/ssh"
 go get -u golang.org/x/crypto/ssh
 
+echo "---------------------------"
+echo "Get github.com/satori/go.uuid"
+go get -u github.com/satori/go.uuid
+
+echo "---------------------------"
+echo "Get github.com/xli/assert"
+go get -u github.com/xli/assert
+
+echo "---------------------------"
+echo "Get github.com/bmatcuk/doublestar"
+go get -u github.com/bmatcuk/doublestar
+
 #
 # Running Test and generate Test Report
 #
