@@ -24,39 +24,39 @@ fi
 
 BUILD_DIR=$(pwd)
 export GOPATH=$BUILD_DIR
+export GOBIN=$GOPATH/bin
 
+#
 # Pull dependencies
+#
 echo "================"
 echo "Get dependencies"
 echo "================"
+echo ""
 
-if [[ -d src/golang.org/x/net/websocket ]]; then
-  echo "Remove external library : golang.org/x/net"
-  rm -rf src/golang.org/x/net
-fi
+echo "------------------------------"
 echo "Get golang.org/x/net/websocket"
-go get golang.org/x/net/websocket
+go get -u golang.org/x/net/websocket
 
-# Pull dependencies used by Test
-if [[ -d src/golang.org/x/text ]]; then
-  echo "Remove external library : golang.org/x/text"
-  rm -rf src/golang.org/x/text
-fi
+echo "---------------------"
 echo "Get golang.org/x/text"
-go get golang.org/x/text
+go get -u golang.org/x/text
 
-if [[ -d src/golang.org/x/crypto/ssh ]]; then
-  echo "Remove external library : golang.org/x/crypto"
-  rm -rf src/golang.org/x/crypto
-fi
+echo "---------------------------"
 echo "Get golang.org/x/crypto/ssh"
-go get golang.org/x/crypto/ssh
+go get -u golang.org/x/crypto/ssh
 
+#
+# Running Test and generate Test Report
+#
+echo "---------------------------"
+echo "Get github.com/jstemmer/go-junit-report"
 if [[ -f $GOPATH/bin/go-junit-report ]]; then
   echo "Remove binary : $GOPATH/bin/go-junit-report"
   rm -rf $GOPATH/bin/go-junit-report
 fi
-go build -o $GOPATH/bin/go-junit-report github.com/jstemmer/go-junit-report
+go get -u github.com/jstemmer/go-junit-report
+
 if [[ -f testreport.xml ]]; then
   echo "Remove old test report : testreport.xml"
   /bin/rm -rf testreport.xml
