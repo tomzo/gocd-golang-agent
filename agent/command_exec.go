@@ -32,8 +32,11 @@ func CommandExec(s *BuildSession, cmd *protocol.BuildCommand) error {
 	execCmd.Stderr = s.secrets
 	execCmd.Dir = s.wd
 	done := make(chan error)
+	if err := execCmd.Start(); err != nil {
+		return err
+	}
 	go func() {
-		done <- execCmd.Run()
+		done <- execCmd.Wait()
 	}()
 
 	select {
@@ -41,7 +44,7 @@ func CommandExec(s *BuildSession, cmd *protocol.BuildCommand) error {
 		s.debugLog("received cancel signal")
 		LogInfo("kill process(%v) %v", execCmd.Process, cmd.Args)
 		if err := execCmd.Process.Kill(); err != nil {
-			s.ConsoleLog("Kill command %v failed, error: %v\n", cmd.Args, err)
+			LogInfo("Kill command %v failed, error: %v\n", cmd.Args, err)
 		} else {
 			LogInfo("process %v is killed", execCmd.Process)
 		}
