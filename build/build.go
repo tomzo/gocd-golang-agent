@@ -143,7 +143,7 @@ func runTest(pwd string){
 func main() {
 
 	pwd, err := os.Getwd()
-	if err != nil {
+	if err == nil {
 		os.Setenv("GOPATH",pwd)
 		os.Setenv("GOBIN", pwd + "/bin")
 	}
