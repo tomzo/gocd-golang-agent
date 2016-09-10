@@ -162,8 +162,8 @@ func readAgentKeyAndCerts(params map[string]string) error {
 		return err
 	}
 
-	LogInfo("fetching agent key and certificates")
 	url, err := config.RegistrationURL()
+	LogInfo("fetching agent key and certificates from: %v", url)
 	if err != nil {
 		return err
 	}
