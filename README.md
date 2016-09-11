@@ -37,12 +37,11 @@ Agent is designed to be configured by environment variables. The followings are 
 
 ### Development
 
-# Check out source
-checkout the source to src/github.com/gocd-contrib/gocd-golang-agent
-git clone https://github.com/gocd-contrib/gocd-golang-agent.git src/github.com/gocd-contrib/gocd-golang-agent
+Check out source
+* git clone https://github.com/gocd-contrib/gocd-golang-agent.git src/github.com/gocd-contrib/gocd-golang-agent
 
-# Building the agent binary
-go run src/github.com/gocd-contrib/gocd-golang-agent/build/build.go
+Building the agent binary
+* go run src/github.com/gocd-contrib/gocd-golang-agent/build/build.go
 
 
 ## Contributing
