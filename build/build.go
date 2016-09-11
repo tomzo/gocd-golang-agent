@@ -119,13 +119,16 @@ func buildBinary(pwd string, binAllbinary bool){
 }
 
 func compileApp(pwd string, targetOS string, targetArch string){
+	var outputName string
 	fmt.Println("---> " + targetOSmap[targetOS] + " - " + targetArch)
 	ldFlags := "-w -X main.Githash=" + getGitHash(pwd)
 	buildVersion := os.Getenv("BUILD_VERSION")
+	outputName = "output/" + goAgentFilename + "_" + targetOS + "_" + targetArch
 	if len(buildVersion) > 0 {
 		ldFlags = ldFlags + "-X main.Version=" + buildVersion
+		outputName = outputName + "_" + buildVersion
 	}
-	out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", "output/" + goAgentFilename + "_" + targetOS + "_" + targetArch, goAgent).Output()
+	out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", outputName, goAgent).Output()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
