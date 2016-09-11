@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"flag"
+	"runtime"
 )
 
 var goAgentFilename = "gocd-golang-agent"
@@ -97,31 +98,40 @@ func getGitHash(pwd string) string {
 	return string(out)
 }
 
-func buildBinary(pwd string){
+func buildBinary(pwd string, binAllbinary bool){
 	fmt.Println("==================================")
 	fmt.Println("Building Binary")
 	os.RemoveAll("output")
 	os.Mkdir("output",0755)
 	os.Setenv("CGO_ENABLED","0")
-	for buildOS, buildArchs := range targetOS {
-		for _, buildArch := range buildArchs {
-			fmt.Println("---> " + targetOSmap[buildOS] + " - " + buildArch)
-			os.Setenv("GOOS", buildOS)
-			os.Setenv("GOARCH", buildArch)
-			ldFlags := "-w -X main.Githash=" + getGitHash(pwd)
-			buildVersion := os.Getenv("BUILD_VERSION")
-			if len(buildVersion) > 0 {
-				ldFlags = ldFlags + "-X main.Version=" + buildVersion
-			}
-			out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", "output/" + goAgentFilename + "_" + buildOS + "_" + buildArch, goAgent).Output()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(2)
-			}
-			if len(string(out)) > 0 {
-				fmt.Println(out)
+	if binAllbinary {
+		for buildOS, buildArchs := range targetOS {
+			for _, buildArch := range buildArchs {
+				os.Setenv("GOOS", buildOS)
+				os.Setenv("GOARCH", buildArch)
+				compileApp(pwd, buildOS, buildArch)
 			}
 		}
+	}else{
+		compileApp(pwd, runtime.GOOS, runtime.GOARCH)
+	}
+
+}
+
+func compileApp(pwd string, targetOS string, targetArch string){
+	fmt.Println("---> " + targetOSmap[targetOS] + " - " + targetArch)
+	ldFlags := "-w -X main.Githash=" + getGitHash(pwd)
+	buildVersion := os.Getenv("BUILD_VERSION")
+	if len(buildVersion) > 0 {
+		ldFlags = ldFlags + "-X main.Version=" + buildVersion
+	}
+	out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", "output/" + goAgentFilename + "_" + targetOS + "_" + targetArch, goAgent).Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if len(string(out)) > 0 {
+		fmt.Println(out)
 	}
 
 }
@@ -164,9 +174,17 @@ func runTest(pwd string){
 
 func main() {
 
-	var excludeLib string
+	var (
+		excludeLib string
+		runAllTest bool
+		buildLocalBinary bool
+		buildAll bool
+	)
 
-	flag.StringVar(&excludeLib, "excludelib", "github.com/gocd-contrib/fake_agent", "exclude dependencies in comma separated format, eg github.com/gocd-contrib/fake_agent,")
+	flag.StringVar(&excludeLib, "excludelib", "", "exclude dependencies in comma separated format, eg github.com/gocd-contrib/fake_agent,github.com/gocd-contrib/fake_server")
+	flag.BoolVar(&runAllTest,"runtest", true, "Run all Tests")
+	flag.BoolVar(&buildLocalBinary,"buildbinary", true, "Build local GoAgent binary" )
+	flag.BoolVar(&buildAll,"buildall", false, "Build GoAgent binary for all platforms" )
 	flag.Parse()
 
 	pwd, err := os.Getwd()
@@ -175,9 +193,21 @@ func main() {
 		os.Setenv("GOBIN", pwd + "/bin")
 	}
 
+
 	getDependencies(excludeLib)
-	runTest(pwd)
-	buildBinary(pwd)
+
+	if runAllTest {
+		runTest(pwd)
+	}
+
+	if buildAll {
+		buildBinary(pwd,true)
+	}else{
+		if buildLocalBinary {
+			buildBinary(pwd, false)
+		}
+	}
+
 
 
 }
