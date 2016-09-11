@@ -34,6 +34,17 @@ Agent is designed to be configured by environment variables. The followings are 
 * **GOCD_AGENT_LOG_DIR**: Agent log directory, without this configuration, log will be output to stdout.
 * **DEBUG**: set this environment variable to any value will turn on debug log.
 
+
+### Development
+
+# Check out source
+checkout the source to src/github.com/gocd-contrib/gocd-golang-agent
+git clone https://github.com/gocd-contrib/gocd-golang-agent.git src/github.com/gocd-contrib/gocd-golang-agent
+
+# Building the agent binary
+go run src/github.com/gocd-contrib/gocd-golang-agent/build/build.go
+
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/gocd-contrib/gocd-golang-agent.

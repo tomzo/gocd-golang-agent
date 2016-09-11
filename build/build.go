@@ -86,24 +86,38 @@ func getDependencies(excludeLib string) {
 	}
 }
 
+func getGitHash() string {
+	out, err := exec.Command("git", "-C", "src/" + goAgent,"rev-parse", "HEAD").Output()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	return string(out)
+}
+
 func buildBinary(){
 	fmt.Println("==================================")
 	fmt.Println("Building Binary")
 	os.RemoveAll("output")
 	os.Mkdir("output",0755)
 	os.Setenv("CGO_ENABLED","0")
-	args := []string{"build", "-a", "-o", }
-	newArgs := []string{}
 	for buildOS, buildArchs := range targetOS {
 		for _, buildArch := range buildArchs {
 			fmt.Println("---> " + targetOSmap[buildOS] + " - " + buildArch)
 			os.Setenv("GOOS", buildOS)
 			os.Setenv("GOARCH", buildArch)
-			newArgs = append(args, "output/" + goAgentFilename + "_" + buildOS + "_" + buildArch)
-			newArgs = append(newArgs, goAgent)
-			if _, err := exec.Command("go", newArgs...).CombinedOutput(); err != nil {
+			ldFlags := "-w -X main.Githash=" + getGitHash()
+			buildVersion := os.Getenv("BUILD_VERSION")
+			if len(buildVersion) > 0 {
+				ldFlags = ldFlags + "-X main.Version=" + buildVersion
+			}
+			out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", "output/" + goAgentFilename + "_" + buildOS + "_" + buildArch, goAgent).Output()
+			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(2)
+			}
+			if len(string(out)) > 0 {
+				fmt.Println(out)
 			}
 		}
 	}
@@ -150,7 +164,7 @@ func main() {
 
 	var excludeLib string
 
-	flag.StringVar(&excludeLib, "excludelib", "us-west-1", "AWS Regions in comma separated format, eg us-west-1,us-east-1")
+	flag.StringVar(&excludeLib, "excludelib", "github.com/gocd-contrib/fake_agent", "exclude dependencies in comma separated format, eg github.com/gocd-contrib/fake_agent,")
 	flag.Parse()
 
 	pwd, err := os.Getwd()
