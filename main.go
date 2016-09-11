@@ -19,9 +19,26 @@ package main
 import (
 	"github.com/gocd-contrib/gocd-golang-agent/agent"
 	"time"
+	"flag"
+	"fmt"
+	"os"
+)
+
+var (
+	Version = "0.0"
+	Githash = "No Version Provided"
 )
 
 func main() {
+
+	versonPtr := flag.Bool("version", false, "Show GoCD Golang Agent Verson")
+	flag.Parse()
+
+	if *versonPtr {
+		fmt.Println("GoCD Golang Agent Verson : ", Version, " (", Githash, ")")
+		os.Exit(0)
+	}
+
 	agent.Initialize()
 	for {
 		err := agent.Start()
