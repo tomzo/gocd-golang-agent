@@ -86,8 +86,10 @@ func getDependencies(excludeLib string) {
 	}
 }
 
-func getGitHash() string {
-	out, err := exec.Command("git", "-C", "src/" + goAgent,"rev-parse", "HEAD").Output()
+func getGitHash(pwd string) string {
+	runCmd := exec.Command("git", "rev-parse", "HEAD")
+	runCmd.Dir = pwd + "/src/" + goAgent
+	out, err := runCmd.Output()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -95,7 +97,7 @@ func getGitHash() string {
 	return string(out)
 }
 
-func buildBinary(){
+func buildBinary(pwd string){
 	fmt.Println("==================================")
 	fmt.Println("Building Binary")
 	os.RemoveAll("output")
@@ -106,7 +108,7 @@ func buildBinary(){
 			fmt.Println("---> " + targetOSmap[buildOS] + " - " + buildArch)
 			os.Setenv("GOOS", buildOS)
 			os.Setenv("GOARCH", buildArch)
-			ldFlags := "-w -X main.Githash=" + getGitHash()
+			ldFlags := "-w -X main.Githash=" + getGitHash(pwd)
 			buildVersion := os.Getenv("BUILD_VERSION")
 			if len(buildVersion) > 0 {
 				ldFlags = ldFlags + "-X main.Version=" + buildVersion
@@ -175,7 +177,7 @@ func main() {
 
 	getDependencies(excludeLib)
 	runTest(pwd)
-	buildBinary()
+	buildBinary(pwd)
 
 
 }
