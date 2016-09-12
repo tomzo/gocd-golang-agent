@@ -25,13 +25,15 @@ import (
 	"strings"
 	"flag"
 	"runtime"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
 var goAgentFilename = "gocd-golang-agent"
 
 var targetOS = map[string][]string{
 	"darwin" : {"amd64"},
-	"linux" : {"386", "amd64"},
+	"linux" : {"386", "amd64", "arm", "arm64"},
 //	"windows" : {"386", "amd64"},  // Windows build is broken because of undefined syscall.Statfs_t and syscall.Statfs
 }
 
@@ -136,6 +138,24 @@ func compileApp(pwd string, targetOS string, targetArch string){
 	if len(string(out)) > 0 {
 		fmt.Println(out)
 	}
+	hasher := sha256.New()
+	outfileHash, outfileHashErr := ioutil.ReadFile(outputName)
+	if outfileHashErr != nil {
+		fmt.Println("Cannot read file ", outputName)
+		os.Exit(2)
+	}
+	hasher.Write(outfileHash)
+	outputNameSHA256, outputNameSHA256Err := os.Create(outputName + ".SHA256")
+	if outputNameSHA256Err != nil {
+		fmt.Println("Cannot create ", outputName, " SHA256 checksum file")
+		os.Exit(2)
+	}
+	defer outputNameSHA256.Close()
+	_, writeSHA256Err := outputNameSHA256.WriteString(hex.EncodeToString(hasher.Sum(nil)))
+	if writeSHA256Err != nil {
+		fmt.Println("Cannot write ", outputName, " SHA256 checksum to file")
+		os.Exit(2)
+	}
 
 }
 
@@ -175,6 +195,71 @@ func runTest(pwd string){
 	}
 }
 
+func uploadToBintray(pwd string, binAllbinary bool)  {
+
+	var (
+		bintrayURL string =  "https://api.bintray.com/content/gocd-contrib/gocd_golang_goagent"
+		bintrayPackage = "goagent"
+	)
+
+	buildVersion := os.Getenv("BUILD_VERSION")
+	bintrayUser := os.Getenv("BINTRAY_USER")
+	bintrayToken := os.Getenv("BINTRAY_TOKEN")
+	if len(buildVersion) <= 0 {
+		fmt.Println("Unknown BUILD_VERSION")
+		os.Exit(2)
+	}
+	if len(bintrayUser) <= 0 {
+		fmt.Println("Unknown Bintray User")
+		os.Exit(2)
+	}
+	if len(bintrayToken) <= 0 {
+		fmt.Println("Unknown Bintray Token")
+		os.Exit(2)
+	}
+
+
+	// temporary use curl to upload the file , will change it to use native http/net library
+
+	fmt.Println("==================================")
+	fmt.Println("Upload Binary to Bintray")
+	for buildOS, buildArchs := range targetOS {
+		for _, buildArch := range buildArchs {
+			fmt.Println("---> " + targetOSmap[buildOS] + " - " + buildArch)
+			outFilename := goAgentFilename + "_" + buildOS + "_" + buildArch + "_" + buildVersion
+			if _, err := os.Stat("output/" + outFilename); err == nil {
+				if _, err := os.Stat("output/" + outFilename + ".SHA256"); err == nil {
+					outFilenameURL :=  bintrayURL + "/" + bintrayPackage +
+						"/" + buildVersion + "/" + outFilename + ";bt_package=" + bintrayPackage + ";bt_version=" +
+						buildVersion
+					fmt.Println("\t", outFilename)
+					_, uploadErr := exec.Command("curl", "-T", "output/" + outFilename, "-u" + bintrayUser + ":" + bintrayToken , outFilenameURL).Output()
+					if uploadErr != nil {
+						fmt.Println("Error upload file : ", outFilename, " to bintray.")
+						os.Exit(2)
+					}
+					outFilenameURL =  bintrayURL + "/" + bintrayPackage +
+						"/" + buildVersion + "/" + outFilename + ".SHA256" + ";bt_package=" + bintrayPackage + ";bt_version=" +
+						buildVersion
+					fmt.Println("\t", outFilename + ".SHA256")
+					_, uploadErr = exec.Command("curl", "-T", "output/" + outFilename + ".SHA256", "-u" + bintrayUser + ":" + bintrayToken, outFilenameURL).Output()
+					if uploadErr != nil {
+						fmt.Println("Error upload file : ", outFilename,  " SHA256 checksum to bintray.")
+						os.Exit(2)
+					}
+
+				}else{
+					fmt.Println("File : " , outFilename, " SHA256 checksum does not exist")
+					os.Exit(2)
+				}
+			}else{
+				fmt.Println("File : ", outFilename , " does not exist.")
+				os.Exit(2)
+			}
+
+		}
+	}
+}
 func main() {
 
 	var (
@@ -182,12 +267,14 @@ func main() {
 		runAllTest bool
 		buildLocalBinary bool
 		buildAll bool
+		uploadBinary bool
 	)
 
 	flag.StringVar(&excludeLib, "excludelib", "", "exclude dependencies in comma separated format, eg github.com/gocd-contrib/fake_agent,github.com/gocd-contrib/fake_server")
 	flag.BoolVar(&runAllTest,"runtest", true, "Run all Tests")
 	flag.BoolVar(&buildLocalBinary,"buildbinary", true, "Build local GoAgent binary" )
 	flag.BoolVar(&buildAll,"buildall", false, "Build GoAgent binary for all platforms" )
+	flag.BoolVar(&uploadBinary,"upload", false, "Upload GoAgent binary to bintray")
 	flag.Parse()
 
 	pwd, err := os.Getwd()
@@ -211,6 +298,7 @@ func main() {
 		}
 	}
 
-
-
+	if uploadBinary {
+		uploadToBintray(pwd,true)
+	}
 }
