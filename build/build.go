@@ -231,6 +231,9 @@ func uploadToBintray(pwd string, binAllbinary bool)  {
 		for _, buildArch := range buildArchs {
 			fmt.Println("---> " + targetOSmap[buildOS] + " - " + buildArch)
 			outFilename := goAgentFilename + "_" + buildOS + "_" + buildArch + "_" + buildVersion
+			if buildOS == "windows"{
+				outFilename = outFilename + ".exe"
+			}
 			if _, err := os.Stat("output/" + outFilename); err == nil {
 				if _, err := os.Stat("output/" + outFilename + ".SHA256"); err == nil {
 					outFilenameURL :=  bintrayURL + "/" + bintrayPackage +
