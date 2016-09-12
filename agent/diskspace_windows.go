@@ -54,11 +54,15 @@ func diskSpace(path string) (total, free int64, err error) {
 	h := syscall.MustLoadDLL("kernel32.dll")
 	c := h.MustFindProc("GetDiskFreeSpaceExW")
 
-	_, _, err = c.Call(
+	// According to MSDN, err will never be nil, r1 = 0 mean call failed
+	r1, _, err = c.Call(
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(path))),
 		uintptr(unsafe.Pointer(&freeBytes)),
 		uintptr(unsafe.Pointer(&totalBytes)),
 		uintptr(unsafe.Pointer(&availBytes)))
+	if r1 != 0 {
+		err = nil
+	}
 	total = totalBytes
 	free = freeBytes
 	return
