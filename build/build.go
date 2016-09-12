@@ -34,8 +34,8 @@ var goAgentFilename = "gocd-golang-agent"
 var targetOS = map[string][]string{
 	"darwin" : {"amd64"},
 	"linux" : {"386", "amd64", "arm", "arm64"},
-//	"solaris" : {"amd64"},  // cross compile failed. 
-//	"windows" : {"386", "amd64"},  // Windows build is broken because of undefined syscall.Statfs_t and syscall.Statfs
+	"windows" : {"386", "amd64"},
+//	"solaris" : {"amd64"},  // Solaris does not have syscall.Statfs_t and syscall.Statfs to find disk usage.
 }
 
 var goAgent = "github.com/gocd-contrib/gocd-golang-agent"
@@ -98,7 +98,7 @@ func getGitHash(pwd string) string {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	return string(out)
+	return strings.TrimSpace(string(out))
 }
 
 func buildBinary(pwd string, binAllbinary bool){
@@ -128,8 +128,11 @@ func compileApp(pwd string, targetOS string, targetArch string){
 	buildVersion := os.Getenv("BUILD_VERSION")
 	outputName = "output/" + goAgentFilename + "_" + targetOS + "_" + targetArch
 	if len(buildVersion) > 0 {
-		ldFlags = ldFlags + "-X main.Version=" + buildVersion
+		ldFlags = ldFlags + " -X main.Version=" + buildVersion
 		outputName = outputName + "_" + buildVersion
+	}
+	if targetOS == "windows"{
+		outputName = outputName + ".exe"
 	}
 	out, err := exec.Command("go", "build", "-a", "-tags", "netgo", "-ldflags", ldFlags, "-o", outputName, goAgent).Output()
 	if err != nil {
