@@ -1,4 +1,4 @@
-// +build !windows
+// +build windows
 
 /*
  * Copyright 2016 ThoughtWorks, Inc.
@@ -21,10 +21,17 @@ package agent
 import (
 	"strconv"
 	"syscall"
+	"unsafe"
+	"os"
 )
 
 func UsableSpace() int64 {
-	_, free, err := diskSpace("/")
+	wd, err := os.Getwd()
+	if err != nil {
+		LogInfo("Cannot find working directory, error: %v", err)
+		return -1
+	}
+	_, free, err := diskSpace(wd)
 	if err != nil {
 		LogInfo("Unknown diskspace, error: %v", err)
 		return -1
@@ -36,15 +43,23 @@ func UsableSpaceString() string {
 	return strconv.FormatInt(UsableSpace(), 10)
 }
 
-// Space returns total and free bytes available in a directory, e.g. `/`.
-// Think of it as "df" UNIX command.
+
 func diskSpace(path string) (total, free int64, err error) {
-	s := syscall.Statfs_t{}
-	err = syscall.Statfs(path, &s)
-	if err != nil {
-		return
-	}
-	total = int64(s.Bsize) * int64(s.Blocks)
-	free = int64(s.Bsize) * int64(s.Bfree)
+	var (
+		freeBytes int64
+	 	totalBytes int64
+		availBytes int64
+	)
+
+	h := syscall.MustLoadDLL("kernel32.dll")
+	c := h.MustFindProc("GetDiskFreeSpaceExW")
+
+	_, _, err = c.Call(
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(path))),
+		uintptr(unsafe.Pointer(&freeBytes)),
+		uintptr(unsafe.Pointer(&totalBytes)),
+		uintptr(unsafe.Pointer(&availBytes)))
+	total = totalBytes
+	free = freeBytes
 	return
 }
