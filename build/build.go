@@ -34,7 +34,7 @@ var goAgentFilename = "gocd-golang-agent"
 var targetOS = map[string][]string{
 	"darwin" : {"amd64"},
 	"linux" : {"386", "amd64", "arm", "arm64"},
-	"solaris" : {"amd64"},
+//	"solaris" : {"amd64"},  // cross compile failed. 
 //	"windows" : {"386", "amd64"},  // Windows build is broken because of undefined syscall.Statfs_t and syscall.Statfs
 }
 
