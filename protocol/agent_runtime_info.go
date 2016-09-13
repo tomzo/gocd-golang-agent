@@ -24,7 +24,7 @@ type AgentIdentifier struct {
 
 type AgentBuildingInfo struct {
 	BuildingInfo string `json:"buildingInfo"`
-	BuildLocator string `json:"buildingLocator"`
+	BuildLocator string `json:"buildLocator"`
 }
 
 type AgentRuntimeInfo struct {
