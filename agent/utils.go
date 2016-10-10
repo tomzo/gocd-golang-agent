@@ -127,6 +127,8 @@ func ParseChecksum(checksum string) map[string]string {
 		if strings.HasPrefix(l, "#") {
 			continue
 		}
+		// issue #30 : The string 'l' sometimes has "\r" add which make the md5 checksum invalid.
+		l = strings.Trim(l,"\r");
 		i := strings.Index(l, "=")
 		if i > -1 {
 			ret[l[:i]] = l[i+1:]
