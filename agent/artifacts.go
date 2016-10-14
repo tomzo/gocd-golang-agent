@@ -206,6 +206,7 @@ func (u *Artifacts) post(source, contentType string, destURL *url.URL, body *byt
 		return
 	}
 	req.Header.Add("Content-Type", contentType)
+	req.Header.Add("Confirm","true")
 
 	resp, err := u.httpClient.Do(req)
 	if err != nil {
