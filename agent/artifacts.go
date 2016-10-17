@@ -257,7 +257,7 @@ func (u *Artifacts) zipSource(source string, dest string) (string, string, error
 			// source is a directory, find relative path
 			// from source and attach to dest path
 			rel := path[len(source):]
-			if strings.HasPrefix(rel, "/") {
+			if strings.HasPrefix(rel, string(os.PathSeparator)) {
 				rel = rel[1:]
 			}
 			if dest == "" {
