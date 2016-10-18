@@ -266,7 +266,8 @@ func (u *Artifacts) zipSource(source string, dest string) (string, string, error
 				destFile = dest + "/" + rel
 			}
 		}
-
+		// Convert slash to Linux slash especally on Windows
+		destFile=filepath.ToSlash(destFile)
 		md5, err := ComputeMd5(path)
 		if err != nil {
 			return err
