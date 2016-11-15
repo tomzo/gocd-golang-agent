@@ -146,7 +146,7 @@ func (u *Artifacts) VerifyChecksumFile(srcFname, fname, checksumFname string) er
 	}
 	properties := ParseChecksum(string(checksum))
 	// Convert path used as key name in properties, because md5.checksum always has unix / slashes
-	srcFname=filename.ToSlash(srcFname)
+	srcFname=filepath.ToSlash(srcFname)
 	if properties[srcFname] == "" {
 		return Err("[WARN] The md5checksum value of the artifact [%v] was not found on the server. Hence, Go could not verify the integrity of its contents.", srcFname)
 	} else if properties[srcFname] != md5 {
