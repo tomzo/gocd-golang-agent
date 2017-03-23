@@ -51,7 +51,9 @@ func ReadGoServerCACert() error {
 		return err
 	}
 	defer certOut.Close()
-	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: state.PeerCertificates[0].Raw})
+	for i:=0; i < len(state.PeerCertificates); i++ {
+		pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: state.PeerCertificates[i].Raw})
+	}
 	return nil
 }
 
