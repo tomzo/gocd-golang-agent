@@ -51,22 +51,22 @@ func MakeWebsocketConnection(wsLoc, httpLoc string) (*WebsocketConnection, error
 	if err != nil {
 		return nil, err
 	}
-	ack := make(chan string)
+	acknowledge := make(chan string)
 	send := make(chan *protocol.Message)
 	received := make(chan *protocol.Message)
 
-	go startReceiveMessage(ws, received, ack)
-	go startSendMessage(ws, send, ack)
+	go startReceiveMessage(ws, received, acknowledge)
+	go startSendMessage(ws, send, acknowledge)
 	return &WebsocketConnection{Conn: ws, Send: send, Received: received}, nil
 }
 
-func startSendMessage(ws *websocket.Conn, send chan *protocol.Message, ack chan string) {
+func startSendMessage(ws *websocket.Conn, send chan *protocol.Message, acknowledge chan string) {
 	defer LogDebug("! exit goroutine: send message")
 	connClosed := false
 loop:
 	select {
-	case id := <-ack:
-		LogInfo("Ignore ack with id: %v", id)
+	case id := <-acknowledge:
+		LogInfo("Ignore acknowledge with id: %v", id)
 	case msg, ok := <-send:
 		if !ok {
 			return
@@ -77,7 +77,7 @@ loop:
 			goto loop
 		}
 		if err := protocol.SendMessage(ws, msg); err == nil {
-			waitForMessageAck(msg.AckId, ack)
+			waitForMessageAcknowledge(msg.AcknowledgeId, acknowledge)
 			goto loop
 		} else {
 			logger.Error.Printf("send message failed: %v", err)
@@ -91,23 +91,23 @@ loop:
 	goto loop
 }
 
-func waitForMessageAck(ackId string, ack chan string) {
+func waitForMessageAcknowledge(acknowledgeId string, acknowledge chan string) {
 	for {
 		select {
 		case <-time.After(config.SendMessageTimeout):
-			LogInfo("wait for message ack timeout, id: %v", ackId)
+			LogInfo("wait for message acknowledge timeout, id: %v", acknowledgeId)
 			return
-		case id := <-ack:
-			if id == ackId {
+		case id := <-acknowledge:
+			if id == acknowledgeId {
 				return
 			} else {
-				LogInfo("ignore ack with id: %v, expected: %v", id, ackId)
+				LogInfo("ignore acknowledge with id: %v, expected: %v", id, acknowledgeId)
 			}
 		}
 	}
 }
 
-func startReceiveMessage(ws *websocket.Conn, received chan *protocol.Message, ack chan string) {
+func startReceiveMessage(ws *websocket.Conn, received chan *protocol.Message, acknowledge chan string) {
 	defer LogDebug("! exit goroutine: receive message")
 	defer close(received)
 	for {
@@ -118,8 +118,8 @@ func startReceiveMessage(ws *websocket.Conn, received chan *protocol.Message, ac
 		}
 		LogInfo("<-- %v", msg.Action)
 
-		if msg.Action == "ack" {
-			ack <- msg.DataString()
+		if msg.Action == "acknowledge" {
+			acknowledge <- msg.DataString()
 		} else {
 			received <- msg
 		}

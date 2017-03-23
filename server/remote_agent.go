@@ -76,8 +76,8 @@ func (agent *RemoteAgent) SetCookie() error {
 }
 
 func (agent *RemoteAgent) Ack(msg *protocol.Message) error {
-	if msg.AckId != "" {
-		return agent.Send(protocol.AckMessage(msg.AckId))
+	if msg.AcknowledgeId != "" {
+		return agent.Send(protocol.AckMessage(msg.AcknowledgeId))
 	}
 	return nil
 }
