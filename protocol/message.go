@@ -27,16 +27,18 @@ const (
 	ReregisterAction          = "reregister"
 	BuildAction               = "build"
 	PingAction                = "ping"
-	AckAction                 = "ack"
+	AckAction                 = "acknowledge"
 	ReportCurrentStatusAction = "reportCurrentStatus"
 	ReportCompletingAction    = "reportCompleting"
 	ReportCompletedAction     = "reportCompleted"
+	AssignWorkAction          = "assignWork"
+	ConsoleOutActon           = "consoleOut"
 )
 
 type Message struct {
 	Action string `json:"action"`
 	Data   string `json:"data"`
-	AckId  string `json:"ackId"`
+	AcknowledgeId  string `json:"ackId"`
 }
 
 func (m *Message) DataBuild() *Build {
@@ -72,7 +74,7 @@ func newMessage(action string, data interface{}) *Message {
 	return &Message{
 		Action: action,
 		Data:   string(json),
-		AckId:  uuid.NewV4().String(),
+		AcknowledgeId:  uuid.NewV4().String(),
 	}
 }
 
