@@ -38,7 +38,7 @@ const (
 type Message struct {
 	Action string `json:"action"`
 	Data   string `json:"data"`
-	AcknowledgeId  string `json:"ackId"`
+	AcknowledgeId  string `json:"acknowledgementId"`
 }
 
 func (m *Message) DataBuild() *Build {
